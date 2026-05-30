@@ -267,7 +267,7 @@ const TOOLS = [
   {
     name: 'impreza_git_webhook_status',
     description:
-      'Check whether a custom deployment is wired up for git-push auto-deploy. Returns the git url, branch, whether the webhook is currently active, and the payload URL GitHub posts to. Use before calling `impreza_git_webhook_connect` to confirm the deployment was created with a git source (mode=dockerfile + git_url) — image-mode and manifest-mode deploys can\'t auto-deploy from git.',
+      'Check whether a custom deployment is wired up for git-push auto-deploy. Returns the git url, branch, the mode (github one-click | manual generic | none), whether the webhook is active, and the payload URL the provider posts to. Use before calling `impreza_git_webhook_connect` to confirm the deployment was created with a git source (mode=dockerfile + git_url) — image-mode and manifest-mode deploys can\'t auto-deploy from git.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -280,21 +280,21 @@ const TOOLS = [
   {
     name: 'impreza_git_webhook_connect',
     description:
-      'Wire up auto-deploy: install a GitHub webhook on the deployment\'s source repository so every push to its tracked branch triggers a redeploy. The customer must supply a Fine-grained Personal Access Token with `Repository → Webhooks: read and write` scope on the target repo (link to generate: https://github.com/settings/personal-access-tokens/new). The token is used ONCE to install the hook, then discarded — Impreza never stores it. Only works on custom deployments created with mode=dockerfile and a git_url source. Refuses if the deployment is already connected (call disconnect first to re-wire).',
+      'Wire up auto-deploy: connect a push webhook so every push to the deployment\'s tracked branch triggers a redeploy. Works with ANY provider against one per-deployment secret. Two modes: (1) GitHub one-click — pass `github_pat` (a Fine-grained PAT with `Repository → Webhooks: read and write`, generate at https://github.com/settings/personal-access-tokens/new) and Impreza installs the hook for you, then discards the token (never stored). (2) Manual/generic — OMIT `github_pat` (GitLab, Bitbucket, Gitea, self-hosted, CI): the response returns `payload_url` + `webhook_token` (shown once) to add in your provider, sending the token as the GitLab "Secret token" or the `X-Impreza-Token` header / `?token=` query param. Only works on custom deployments created with mode=dockerfile and a git_url source. Refuses if already connected (call disconnect first to re-wire).',
     inputSchema: {
       type: 'object',
       properties: {
         deployment_id: { type: 'string', description: 'The dpl_... id of a custom deployment with mode=dockerfile + git_url.' },
-        github_pat: { type: 'string', description: 'Fine-grained Personal Access Token with Repository → Webhooks read+write scope on the target repo.' },
+        github_pat: { type: 'string', description: 'Optional. GitHub Fine-grained PAT (Repository → Webhooks read+write) for the one-click GitHub flow. Omit for the manual/generic flow (GitLab, Bitbucket, Gitea, self-hosted, CI) — the response then returns a payload_url + webhook_token to add yourself.' },
       },
-      required: ['deployment_id', 'github_pat'],
+      required: ['deployment_id'],
       additionalProperties: false,
     },
   },
   {
     name: 'impreza_git_webhook_disconnect',
     description:
-      'Stop auto-deploying from git. Always clears the Impreza-side webhook state (the deployment will ignore future GitHub pushes). When `github_pat` is supplied we also DELETE the webhook from the GitHub repo cleanly; without the PAT the hook stays on GitHub but every delivery is rejected by HMAC. Idempotent — calling on an already-disconnected deployment is a no-op success.',
+      'Stop auto-deploying from git. Always clears the Impreza-side webhook state (further pushes are rejected — the token/signature no longer matches). For a GitHub one-click hook, supply `github_pat` to also DELETE the webhook from the repo cleanly; for a manual/generic hook (GitLab, Bitbucket, Gitea, self-hosted, CI) remove it yourself in your provider\'s webhook settings. Idempotent — calling on an already-disconnected deployment is a no-op success.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -436,6 +436,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           await impreza.get<{
             git_url: string;
             branch: string;
+            mode: string;
             webhook_id: string | null;
             enabled: boolean;
             payload_url: string;
@@ -447,16 +448,19 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const dep = String(args.deployment_id ?? '');
         const pat = String(args.github_pat ?? '');
         if (!dep) return toError('deployment_id is required');
-        if (!pat) return toError('github_pat is required');
+        // No PAT = manual/generic mode (GitLab, Bitbucket, Gitea, self-hosted,
+        // CI): the response carries payload_url + webhook_token to add yourself.
         return toResult(
           await impreza.post<{
-            webhook_id: string;
+            mode: string;
+            webhook_id?: string;
             payload_url: string;
+            webhook_token?: string;
             branch: string;
             note: string;
           }>(
             `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/git-webhook/connect`,
-            { github_pat: pat },
+            pat ? { github_pat: pat } : {},
           ),
         );
       }
