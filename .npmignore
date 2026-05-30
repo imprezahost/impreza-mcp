@@ -1,0 +1,10 @@
+src/
+tests/
+.github/
+.gitignore
+.eslintrc.json
+tsconfig.json
+vitest.config.ts
+*.tsbuildinfo
+node_modules/
+.env*

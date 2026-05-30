@@ -1,0 +1,55 @@
+{
+  "name": "impreza-mcp",
+  "version": "0.1.1",
+  "description": "Model Context Protocol server for Impreza Host — lets Claude Code / Cursor / Codex / Continue / Zed deploy customer-built apps to managed Impreza VPSes without leaving the chat.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "impreza-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "homepage": "https://github.com/imprezahost/impreza-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imprezahost/impreza-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "impreza",
+    "claude",
+    "cursor",
+    "deploy",
+    "docker",
+    "self-hosted"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "tar": "^7.4.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/tar": "^6.1.13",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.16.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
