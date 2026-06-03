@@ -31,6 +31,7 @@ import {
   tarProjectDir,
 } from './client.js';
 import { runSetup } from './setup.js';
+import { VERSION } from './version.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Subcommand dispatch — `setup` short-circuits before env validation.
@@ -51,7 +52,7 @@ if (sub === '--help' || sub === '-h' || sub === 'help') {
   process.exit(0);
 }
 if (sub === '--version' || sub === '-V' || sub === 'version') {
-  console.log('impreza-mcp 0.1.0');
+  console.log(`impreza-mcp ${VERSION}`);
   process.exit(0);
 }
 
@@ -104,7 +105,7 @@ const impreza = new ImprezaClient({
 // ─────────────────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'impreza-mcp', version: '0.1.1' },
+  { name: 'impreza-mcp', version: VERSION },
   { capabilities: { tools: {} } },
 );
 

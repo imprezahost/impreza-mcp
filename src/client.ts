@@ -116,8 +116,10 @@ export class ImprezaClient {
   }
 }
 
-/** Hard-coded version stamp — bumped per release. */
-const VERSION = '0.1.1';
+// Imported for the User-Agent header below + re-exported so any existing
+// consumer that pulled VERSION from this module keeps working unchanged.
+import { VERSION } from './version.js';
+export { VERSION };
 
 // ─────────────────────────────────────────────────────────────────────
 // Domain types (mirrors the public openapi-platform schemas)
