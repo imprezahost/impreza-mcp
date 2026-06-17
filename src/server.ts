@@ -239,6 +239,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_redeploy_deployment',
+    description:
+      'Rebuild a CUSTOM deployment in place from its current source — re-pull the image, re-clone the watched git ref at its new HEAD, or rebuild — and swap the container with near-zero downtime. Reuses the same deployment, so the domain, host port, and URL never change. This is the in-place way to ship a new build of a running custom app the customer changed — PREFER it over uninstall + recreate. Optional `vars` are merged into the stored environment before the rebuild (rotate a secret / add a var without a teardown); system vars (DEPLOYMENT_ID, DOMAIN_URL, HOST_PORT, ...) are preserved. The source itself is not changed here — to change the image ref or git URL, recreate under the same name (the *.imprezaapps.com domain is preserved either way). Custom deployments only; returns the deployment flipped to `updating` — poll impreza_list_deployments for running/failed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id of the custom deployment to rebuild.' },
+        vars: { type: 'object', description: 'Optional env vars merged into the deployment before the rebuild. System vars are preserved.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_change_domain',
     description:
       'Re-route a RUNNING deployment to a new clearnet hostname without touching its container or data. The agent regenerates its Caddy fragment + reloads zero-downtime; Let\'s Encrypt issues a fresh cert on the first hit. Use to migrate from an auto-subdomain to a custom domain, or vice-versa, or just to rename. Deployment must be in status=running (Phase 9.19).',
@@ -402,6 +416,27 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           await impreza.post<{ command_id: string; deployment: Deployment }>(
             `/v1/platform/deployments/${encodeURIComponent(dep)}/restart`,
             {},
+          ),
+        );
+      }
+
+      case 'impreza_redeploy_deployment': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        const body: { vars?: Record<string, unknown> } = {};
+        if (args.vars && typeof args.vars === 'object') {
+          body.vars = args.vars as Record<string, unknown>;
+        }
+        return toResult(
+          await impreza.post<{
+            id: string;
+            status: string;
+            domain?: string;
+            command_id: string;
+            note: string;
+          }>(
+            `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/redeploy`,
+            body,
           ),
         );
       }

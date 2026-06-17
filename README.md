@@ -12,7 +12,7 @@ back the URL.
 
 ## Status
 
-**Full surface live.** All 13 tools shipped + a setup wizard
+**Full surface live.** All 14 tools shipped + a setup wizard
 that generates ready-to-paste config snippets for 5 AI tools.
 Roadmap context lives in
 [`docs/PLAN_AI_INTEGRATION_ROADMAP.md`](https://git.imprezahost.com/impreza/impreza-platform/-/blob/main/docs/PLAN_AI_INTEGRATION_ROADMAP.md)
@@ -28,6 +28,7 @@ of the impreza-platform repo.
 | `impreza_uninstall_deployment` | `POST .../uninstall` |
 | `impreza_get_logs` | `POST .../logs` (sync tail, last N lines) |
 | `impreza_restart_deployment` | `POST .../restart` |
+| `impreza_redeploy_deployment` | `POST .../custom/{id}/redeploy` (in-place rebuild, same domain) |
 | `impreza_add_onion` | `POST .../onion/add` |
 | `impreza_change_domain` | `POST .../domain` |
 | `impreza_git_webhook_status` | `GET .../custom/{id}/git-webhook` |
