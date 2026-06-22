@@ -13,17 +13,15 @@ back the URL.
 > **No-install alternative:** if your AI client supports remote MCP
 > connectors (e.g. Claude), you can skip this package and add the hosted
 > connector `https://mcp.imprezahost.com/mcp` instead — authorize in your
-> Impreza clientarea, no API key and no IP whitelist. It's read-only today
-> (list servers / apps / deployments); install this package below for the
-> full deploy toolset.
+> Impreza clientarea, no API key and no IP whitelist. It exposes the same
+> full toolset, gated by the scopes you grant on consent (read / deploy /
+> manage). Install this package when you want a local server — e.g. to deploy
+> a project folder straight from your machine, which the hosted connector can't.
 
 ## Status
 
 **Full surface live.** All 14 tools shipped + a setup wizard
 that generates ready-to-paste config snippets for 5 AI tools.
-Roadmap context lives in
-[`docs/PLAN_AI_INTEGRATION_ROADMAP.md`](https://git.imprezahost.com/impreza/impreza-platform/-/blob/main/docs/PLAN_AI_INTEGRATION_ROADMAP.md)
-of the impreza-platform repo.
 
 | Tool | Wraps |
 |------|-------|

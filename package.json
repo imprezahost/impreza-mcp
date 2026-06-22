@@ -1,7 +1,7 @@
 {
   "name": "impreza-mcp",
-  "version": "0.3.0",
-  "description": "Model Context Protocol server for Impreza Host — lets Claude Code / Cursor / Codex / Continue / Zed deploy customer-built apps to managed Impreza VPSes without leaving the chat.",
+  "version": "0.3.1",
+  "description": "Model Context Protocol server for Impreza Host — deploy your apps to your own VPS from Claude / Cursor / Codex / Continue / Zed, right in the chat. Install locally with an API key, or use the hosted remote MCP + OAuth connector (same full toolset, no install).",
   "license": "MIT",
   "type": "module",
   "bin": {
