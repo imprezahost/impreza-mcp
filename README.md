@@ -10,6 +10,13 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+> **No-install alternative:** if your AI client supports remote MCP
+> connectors (e.g. Claude), you can skip this package and add the hosted
+> connector `https://mcp.imprezahost.com/mcp` instead — authorize in your
+> Impreza clientarea, no API key and no IP whitelist. It's read-only today
+> (list servers / apps / deployments); install this package below for the
+> full deploy toolset.
+
 ## Status
 
 **Full surface live.** All 14 tools shipped + a setup wizard
@@ -40,9 +47,10 @@ of the impreza-platform repo.
 ### Prerequisites
 
   - Node ≥ 20
-  - An Impreza Host account with an API key + secret
-    (clientarea → API Keys; the IP of the machine running this MCP
-    server must be whitelisted under the key)
+  - An Impreza Host account with an API key + secret (clientarea →
+    Impreza API). The key's IP factor is per-key: `whitelist` (default —
+    add this machine's IP), `tofu` (trust-on-first-use — auto-pins the
+    first IP), or `keyonly` (no IP factor)
 
 ### One-shot via `npx`
 
@@ -154,9 +162,11 @@ config env — not in any file on disk owned by `impreza-mcp` itself.
 The MCP server holds the secret only in memory and only attaches it
 as HTTP request headers.
 
-The IP of the machine running this MCP server (almost always your
-laptop) must be on the API key's whitelist. Manage the whitelist in
-your Impreza clientarea.
+The API key's IP second factor is per-key: leave it on `whitelist` and
+add this machine's IP, or pick `tofu` (auto-pins the first IP) or
+`keyonly` (no IP factor) in your Impreza clientarea — so the whitelist
+step is now optional. Tokens issued via the hosted OAuth connector are
+scoped and revocable under clientarea → Impreza API → Connected Apps.
 
 ## Build
 
