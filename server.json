@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.imprezahost/impreza-mcp",
   "title": "Impreza Host",
-  "description": "Deploy apps and manage servers, domains/DNS, VPS lifecycle and crypto balance on Impreza Host — privacy-first, no-KYC, offshore/DMCA-resistant hosting paid in Bitcoin/Monero — from your AI. (Impreza Host the hosting provider — not the Impreza WordPress theme.)",
+  "description": "Deploy + manage apps, domains, VPS & crypto balance on Impreza Host - no-KYC, offshore, BTC/XMR.",
   "version": "0.4.2",
   "websiteUrl": "https://docs.imprezahost.com/tutorials/ai-mcp-integration.html",
   "repository": {
