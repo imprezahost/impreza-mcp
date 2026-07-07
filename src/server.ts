@@ -338,6 +338,256 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+
+  // ── Account + balance (crypto top-up) ──────────────────────────────
+  {
+    name: 'impreza_account_info',
+    description:
+      'Get the account profile: name, email, account status, currency, and current account balance (credit). ' +
+      'Read the balance + currency here before calling `impreza_topup`.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_list_services',
+    description:
+      "List the customer's billable services (VPS, hosting, dedicated, domains) — each with its service id, " +
+      'product name, status, billing cycle and next due date. Use this to find the numeric `service_id` for the ' +
+      '`impreza_vps_*` tools. Optional `status` filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Filter by service status (e.g. Active, Suspended, Terminated).' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_topup',
+    description:
+      'Create an account-balance top-up invoice payable in crypto (BTC, XMR, USDT-TRC20, TRX) — Impreza is no-KYC ' +
+      'and privacy-first. Returns an `invoice_id`, the amount, and a `payment_url` the customer opens to pay; the ' +
+      'balance auto-credits once the payment confirms. Poll `impreza_topup_status` for the state.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', description: 'Top-up amount in the account currency (1.00–10000.00).' },
+        method: { type: 'string', enum: ['btc', 'xmr', 'trx', 'usdt', 'usdt_trc20'], description: 'Optional preferred crypto rail; the payment page still lets the customer switch.' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_topup_status',
+    description:
+      'Poll a top-up invoice created by `impreza_topup`. Returns the invoice status (pending / paid), the amount, ' +
+      'and the resulting account balance once paid.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'number', description: 'The invoice_id returned by impreza_topup.' },
+      },
+      required: ['invoice_id'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Domains + DNS ──────────────────────────────────────────────────
+  {
+    name: 'impreza_domain_check',
+    description:
+      'Check domain availability + price before registering. Pass one domain or several comma-separated. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'Domain(s) to check, e.g. "example.com" or "a.com,b.net".' },
+      },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_domain_details',
+    description:
+      "Get a registered domain's details: status, registration/expiry dates, nameservers, registrar-lock and " +
+      'ID-protection state. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+      },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_list_dns',
+    description:
+      'List the DNS records (host, type, value, TTL, priority) for a domain on Impreza-managed DNS. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+      },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_add_dns_record',
+    description:
+      'Add a DNS record to an Impreza-managed domain. `host` is the record name ("@" for the apex, "www", "mail", …); ' +
+      '`value` is the target (IP, hostname, or text).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+        type: { type: 'string', description: 'Record type: A, AAAA, CNAME, MX, TXT, NS, SRV, …' },
+        host: { type: 'string', description: 'Record name/host, e.g. "@" for the apex, "www", "mail".' },
+        value: { type: 'string', description: 'Record value/target (IP, hostname, or text).' },
+        ttl: { type: 'number', description: 'Time-to-live in seconds. Default 14400.' },
+        priority: { type: 'number', description: 'Priority (MX / SRV only).' },
+      },
+      required: ['domain', 'type', 'host', 'value'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_update_dns_record',
+    description:
+      'Update an existing DNS record on an Impreza-managed domain. Locate the record by `type` + `host` + `old_value`, ' +
+      'and supply `new_value`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+        type: { type: 'string', description: 'Record type of the record to change.' },
+        host: { type: 'string', description: 'Record name/host of the record to change.' },
+        old_value: { type: 'string', description: 'Current value of the record (used to locate it).' },
+        new_value: { type: 'string', description: 'New value to set.' },
+        ttl: { type: 'number', description: 'New TTL in seconds. Default 14400.' },
+        priority: { type: 'number', description: 'New priority (MX / SRV only).' },
+      },
+      required: ['domain', 'type', 'host', 'old_value', 'new_value'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_delete_dns_record',
+    description: 'Delete a DNS record from an Impreza-managed domain. Identify it by `type` + `host` + `value`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+        type: { type: 'string', description: 'Record type to delete.' },
+        host: { type: 'string', description: 'Record name/host to delete.' },
+        value: { type: 'string', description: 'Value of the record to delete.' },
+      },
+      required: ['domain', 'type', 'host', 'value'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_set_nameservers',
+    description:
+      'Replace the authoritative nameservers for a domain (2–4 hostnames). Use to point a domain at Impreza DNS or ' +
+      'an external provider.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name, e.g. example.com.' },
+        nameservers: { type: 'array', items: { type: 'string' }, description: 'Ordered list of nameserver hostnames (2–4).' },
+      },
+      required: ['domain', 'nameservers'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── VPS lifecycle (Proxmox KVM) ────────────────────────────────────
+  {
+    name: 'impreza_vps_status',
+    description:
+      "Get a Proxmox VPS's live power state + resource usage (CPU, memory, disk, network, uptime). Find the " +
+      '`service_id` via `impreza_list_services`. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_power',
+    description:
+      'Change a Proxmox VPS power state: start, shutdown (graceful ACPI), reboot, or stop (hard power-off). ' +
+      'shutdown/stop take the server offline — confirm with the customer first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+        action: { type: 'string', enum: ['start', 'shutdown', 'reboot', 'stop'], description: 'Power action to perform.' },
+      },
+      required: ['service_id', 'action'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_list_backups',
+    description: 'List the available backups for a Proxmox VPS (id, timestamp, size). Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_create_backup',
+    description: 'Trigger an on-demand backup of a Proxmox VPS. Poll `impreza_vps_list_backups` for completion.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_list_templates',
+    description:
+      'List the OS templates available for reinstalling a Proxmox VPS (template_id + label). Use to pick a ' +
+      '`template_id` for `impreza_vps_reinstall`. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_reinstall',
+    description:
+      'DESTRUCTIVE: wipe and reinstall a Proxmox VPS from an OS template — ALL DATA ON THE VPS IS ERASED. Pick a ' +
+      '`template_id` via `impreza_vps_list_templates` and set a new root password (min 8 chars). Always confirm with ' +
+      'the customer before calling.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+        template_id: { type: 'number', description: 'OS template id (from impreza_vps_list_templates).' },
+        password: { type: 'string', description: 'New root / administrator password (min 8 chars).' },
+      },
+      required: ['service_id', 'template_id', 'password'],
+      additionalProperties: false,
+    },
+  },
 ] as const;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as unknown as typeof TOOLS[number][] }));
@@ -531,6 +781,155 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         );
       }
 
+      // ── Account + crypto top-up ──────────────────────────────────────
+      case 'impreza_account_info':
+        return toResult(await impreza.get<unknown>('/v1/account'));
+
+      case 'impreza_list_services': {
+        const query: Record<string, string> = {};
+        if (typeof args.status === 'string') query.status = args.status;
+        return toResult(await impreza.get<unknown>('/v1/account/services', query));
+      }
+
+      case 'impreza_topup': {
+        const amount = typeof args.amount === 'number' ? args.amount : Number(args.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return toError('amount is required (a positive number in the account currency)');
+        }
+        const body: Record<string, unknown> = { amount };
+        if (typeof args.method === 'string' && args.method) body.method = args.method;
+        return toResult(await impreza.post<unknown>('/v1/account/topup', body));
+      }
+
+      case 'impreza_topup_status': {
+        const invoiceId = String(args.invoice_id ?? '');
+        if (!invoiceId) return toError('invoice_id is required');
+        return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}`));
+      }
+
+      // ── Domains + DNS ────────────────────────────────────────────────
+      case 'impreza_domain_check': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        return toResult(await impreza.get<unknown>('/v1/domains/check', { domains: domain }));
+      }
+
+      case 'impreza_domain_details': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        return toResult(await impreza.get<unknown>(`/v1/domains/${encodeURIComponent(domain)}`));
+      }
+
+      case 'impreza_list_dns': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        return toResult(await impreza.get<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`));
+      }
+
+      case 'impreza_add_dns_record': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        const body: Record<string, unknown> = {
+          type: String(args.type ?? ''),
+          host: String(args.host ?? ''),
+          value: String(args.value ?? ''),
+        };
+        if (typeof args.ttl === 'number') body.ttl = args.ttl;
+        if (typeof args.priority === 'number') body.priority = args.priority;
+        return toResult(await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+      }
+
+      case 'impreza_update_dns_record': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        const body: Record<string, unknown> = {
+          type: String(args.type ?? ''),
+          host: String(args.host ?? ''),
+          old_value: String(args.old_value ?? ''),
+          new_value: String(args.new_value ?? ''),
+        };
+        if (typeof args.ttl === 'number') body.ttl = args.ttl;
+        if (typeof args.priority === 'number') body.priority = args.priority;
+        return toResult(await impreza.put<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+      }
+
+      case 'impreza_delete_dns_record': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        const body = {
+          type: String(args.type ?? ''),
+          host: String(args.host ?? ''),
+          value: String(args.value ?? ''),
+        };
+        return toResult(await impreza.del<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+      }
+
+      case 'impreza_set_nameservers': {
+        const domain = String(args.domain ?? '');
+        if (!domain) return toError('domain is required');
+        if (!Array.isArray(args.nameservers) || args.nameservers.length === 0) {
+          return toError('nameservers is required (a non-empty array of hostnames)');
+        }
+        return toResult(
+          await impreza.put<unknown>(`/v1/domains/${encodeURIComponent(domain)}/nameservers`, {
+            nameservers: args.nameservers,
+          }),
+        );
+      }
+
+      // ── VPS lifecycle (Proxmox) ──────────────────────────────────────
+      case 'impreza_vps_status': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/status`));
+      }
+
+      case 'impreza_vps_power': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        const action = String(args.action ?? '').toLowerCase();
+        if (!['start', 'shutdown', 'reboot', 'stop'].includes(action)) {
+          return toError('action must be one of: start, shutdown, reboot, stop');
+        }
+        return toResult(await impreza.post<unknown>(`/v1/vps/proxmox/${sid}/${action}`, {}));
+      }
+
+      case 'impreza_vps_list_backups': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/backups`));
+      }
+
+      case 'impreza_vps_create_backup': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        return toResult(await impreza.post<unknown>(`/v1/vps/proxmox/${sid}/backups`, {}));
+      }
+
+      case 'impreza_vps_list_templates': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/templates`));
+      }
+
+      case 'impreza_vps_reinstall': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        const templateId = typeof args.template_id === 'number' ? args.template_id : Number(args.template_id);
+        if (!Number.isInteger(templateId) || templateId <= 0) {
+          return toError('template_id is required (a positive integer — use impreza_vps_list_templates)');
+        }
+        const password = String(args.password ?? '');
+        if (password.length < 8) return toError('password is required (min 8 chars)');
+        return toResult(
+          await impreza.post<unknown>(`/v1/vps/proxmox/${sid}/reinstall`, {
+            template_id: templateId,
+            password,
+            confirm: true,
+          }),
+        );
+      }
+
       default:
         return toError(`unknown tool: ${name}`);
     }
@@ -658,6 +1057,17 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
 // ─────────────────────────────────────────────────────────────────────
 // Result shape — MCP wants either content[] or isError + content[]
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalize a VPS `service_id` arg (JSON may deliver it as a number or a
+ * string) to a numeric string, or '' when it isn't a plain positive integer —
+ * so the caller returns a clean error instead of building a bad path.
+ */
+function svcId(args: Record<string, unknown>): string {
+  const raw = args.service_id;
+  const s = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim();
+  return /^\d+$/.test(s) ? s : '';
+}
 
 function toResult(payload: unknown): { content: Array<{ type: 'text'; text: string }> } {
   return {

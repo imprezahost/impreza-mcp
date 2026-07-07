@@ -64,6 +64,35 @@ export class ImprezaClient {
   }
 
   /**
+   * Authenticated JSON PUT. Mirrors post() — body JSON-stringified, response
+   * decoded as the standard envelope. Used by the DNS-record / nameserver
+   * update tools.
+   */
+  async put<T>(path: string, body: unknown): Promise<T> {
+    const res = await this.fetch(new URL(this.baseURL + path), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    });
+    return this.parseEnvelope<T>(res);
+  }
+
+  /**
+   * Authenticated DELETE, optionally with a JSON body. Some endpoints (e.g.
+   * DNS record removal) identify the target in the request body rather than
+   * the path. Response decoded as the standard envelope.
+   */
+  async del<T>(path: string, body?: unknown): Promise<T> {
+    const init: RequestInit = { method: 'DELETE' };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const res = await this.fetch(new URL(this.baseURL + path), init);
+    return this.parseEnvelope<T>(res);
+  }
+
+  /**
    * Authenticated POST with raw binary body. Used for the Phase 12
    * context upload (`POST /v1/platform/deployments/custom/contexts`)
    * which accepts a gzip tarball as the raw body.

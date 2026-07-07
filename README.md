@@ -20,11 +20,13 @@ back the URL.
 
 ## Status
 
-**Full surface live.** All 14 tools shipped + a setup wizard
-that generates ready-to-paste config snippets for 5 AI tools.
+**Full surface live.** All 31 tools shipped — app deployment (14) plus
+account + crypto balance, domains/DNS, and VPS lifecycle (17) — with a setup
+wizard that generates ready-to-paste config snippets for 5 AI tools.
 
 | Tool | Wraps |
 |------|-------|
+| **Apps & deployments** | |
 | `impreza_list_servers` | `GET /v1/platform/servers` |
 | `impreza_list_apps` | `GET /v1/platform/apps` |
 | `impreza_list_deployments` | `GET /v1/platform/deployments` + `/custom` (merged) |
@@ -39,6 +41,26 @@ that generates ready-to-paste config snippets for 5 AI tools.
 | `impreza_git_webhook_status` | `GET .../custom/{id}/git-webhook` |
 | `impreza_git_webhook_connect` | `POST .../custom/{id}/git-webhook/connect` |
 | `impreza_git_webhook_disconnect` | `POST .../custom/{id}/git-webhook/disconnect` |
+| **Account & balance** | |
+| `impreza_account_info` | `GET /v1/account` |
+| `impreza_list_services` | `GET /v1/account/services` |
+| `impreza_topup` | `POST /v1/account/topup` — top up in BTC / XMR / USDT / TRX |
+| `impreza_topup_status` | `GET /v1/account/topup/{invoice_id}` |
+| **Domains & DNS** | |
+| `impreza_domain_check` | `GET /v1/domains/check` |
+| `impreza_domain_details` | `GET /v1/domains/{domain}` |
+| `impreza_list_dns` | `GET /v1/domains/{domain}/dns` |
+| `impreza_add_dns_record` | `POST /v1/domains/{domain}/dns` |
+| `impreza_update_dns_record` | `PUT /v1/domains/{domain}/dns` |
+| `impreza_delete_dns_record` | `DELETE /v1/domains/{domain}/dns` |
+| `impreza_set_nameservers` | `PUT /v1/domains/{domain}/nameservers` |
+| **VPS lifecycle** (Proxmox) | |
+| `impreza_vps_status` | `GET /v1/vps/proxmox/{id}/status` |
+| `impreza_vps_power` | `POST /v1/vps/proxmox/{id}/{start\|shutdown\|reboot\|stop}` |
+| `impreza_vps_list_backups` | `GET /v1/vps/proxmox/{id}/backups` |
+| `impreza_vps_create_backup` | `POST /v1/vps/proxmox/{id}/backups` |
+| `impreza_vps_list_templates` | `GET /v1/vps/proxmox/{id}/templates` |
+| `impreza_vps_reinstall` | `POST /v1/vps/proxmox/{id}/reinstall` — destructive (wipes) |
 
 ## Install + setup
 
