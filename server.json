@@ -1,0 +1,48 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.imprezahost/impreza-mcp",
+  "title": "Impreza Host",
+  "description": "Deploy apps and manage servers, domains/DNS, VPS lifecycle and crypto balance on Impreza Host — privacy-first, no-KYC, offshore/DMCA-resistant hosting paid in Bitcoin/Monero — from your AI. (Impreza Host the hosting provider — not the Impreza WordPress theme.)",
+  "version": "0.4.2",
+  "websiteUrl": "https://docs.imprezahost.com/tutorials/ai-mcp-integration.html",
+  "repository": {
+    "url": "https://github.com/imprezahost/impreza-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "impreza-mcp",
+      "version": "0.4.2",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "IMPREZA_API_KEY",
+          "description": "Impreza API key (imp_…), from the clientarea → Impreza API.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "IMPREZA_API_SECRET",
+          "description": "Impreza API secret (shown once when the key is created).",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "IMPREZA_BASE_URL",
+          "description": "API base URL. Defaults to https://api.imprezahost.com.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.imprezahost.com/mcp"
+    }
+  ]
+}
