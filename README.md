@@ -20,8 +20,8 @@ back the URL.
 
 ## Status
 
-**Full surface live.** All 31 tools shipped — app deployment (14) plus
-account + crypto balance, domains/DNS, and VPS lifecycle (17) — with a setup
+**Full surface live.** All 32 tools shipped — app deployment (14) plus
+account + crypto balance, domains/DNS, and VPS lifecycle (18) — with a setup
 wizard that generates ready-to-paste config snippets for 5 AI tools.
 
 | Tool | Wraps |
@@ -46,6 +46,7 @@ wizard that generates ready-to-paste config snippets for 5 AI tools.
 | `impreza_list_services` | `GET /v1/account/services` |
 | `impreza_topup` | `POST /v1/account/topup` — top up in BTC / XMR / USDT / TRX |
 | `impreza_topup_status` | `GET /v1/account/topup/{invoice_id}` |
+| `impreza_topup_payment` | `GET /v1/account/topup/{invoice_id}/payment` — crypto address + amount to pay |
 | **Domains & DNS** | |
 | `impreza_domain_check` | `GET /v1/domains/check` |
 | `impreza_domain_details` | `GET /v1/domains/{domain}` |

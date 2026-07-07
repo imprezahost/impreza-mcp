@@ -391,6 +391,24 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'impreza_topup_payment',
+    description:
+      'Get the crypto payment details for a top-up invoice so you can complete payment in-chat: the wallet ADDRESS + ' +
+      'the EXACT crypto amount to send (+ a URI for a QR), per rail. Call `impreza_topup` first for the invoice_id. ' +
+      'With no `crypto`: returns the direct BTC/XMR options plus an `available` menu (USDT/TRX via TronPay, altcoins ' +
+      'via FixedFloat). With `crypto` set: returns that one coin\'s address + amount. SECURITY: show the customer the ' +
+      'exact address + amount from this tool and have them verify before sending — never invent, complete, or alter an address.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'number', description: 'The invoice_id from impreza_topup.' },
+        crypto: { type: 'string', description: 'Optional coin: BTC, XMR, USDT, TRX, or a FixedFloat altcoin code (LTC, ETH, SOL, …). Omit to list the direct BTC/XMR options + the available menu.' },
+      },
+      required: ['invoice_id'],
+      additionalProperties: false,
+    },
+  },
 
   // ── Domains + DNS ──────────────────────────────────────────────────
   {
@@ -805,6 +823,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const invoiceId = String(args.invoice_id ?? '');
         if (!invoiceId) return toError('invoice_id is required');
         return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}`));
+      }
+
+      case 'impreza_topup_payment': {
+        const invoiceId = String(args.invoice_id ?? '');
+        if (!invoiceId) return toError('invoice_id is required');
+        const query: Record<string, string> = {};
+        if (typeof args.crypto === 'string' && args.crypto) query.crypto = args.crypto;
+        return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}/payment`, query));
       }
 
       // ── Domains + DNS ────────────────────────────────────────────────
