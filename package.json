@@ -1,8 +1,8 @@
 {
   "name": "impreza-mcp",
   "mcpName": "io.github.imprezahost/impreza-mcp",
-  "version": "0.4.2",
-  "description": "Model Context Protocol server for Impreza Host — deploy your apps to your own VPS from Claude / Cursor / Codex / Continue / Zed, right in the chat. Install locally with an API key, or use the hosted remote MCP + OAuth connector (same full toolset, no install).",
+  "version": "0.4.3",
+  "description": "Model Context Protocol server for Impreza Host — privacy-first, no-KYC hosting an AI agent can run end-to-end: self-onboard its own anonymous account (no e-mail), fund it in Bitcoin/Monero, then deploy customer-built apps to managed Impreza VPSes and manage domains/DNS & VPS lifecycle, all without leaving the chat.",
   "license": "MIT",
   "type": "module",
   "bin": {

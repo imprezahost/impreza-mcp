@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.imprezahost/impreza-mcp",
   "title": "Impreza Host",
-  "description": "Deploy + manage apps, domains, VPS & crypto balance on Impreza Host - no-KYC, offshore, BTC/XMR.",
-  "version": "0.4.2",
+  "description": "No-KYC offshore hosting an AI agent self-onboards (no e-mail), funds in crypto, then deploys.",
+  "version": "0.4.3",
   "websiteUrl": "https://docs.imprezahost.com/tutorials/ai-mcp-integration.html",
   "repository": {
     "url": "https://github.com/imprezahost/impreza-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "impreza-mcp",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [
