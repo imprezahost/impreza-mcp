@@ -1,16 +1,31 @@
-# Sanity Dockerfile — primarily so `git_url`-mode Phase 15 deploys
-# pointing at this repo build something that runs. The real `npx`
-# install path stays the canonical way to load the MCP server inside
-# an AI tool (npm registry → spawned by Claude / Cursor / Continue /
-# Zed / Codex). This Dockerfile is for the Impreza "deploy from git"
-# smoke target, not the MCP-server-in-an-AI-tool path.
+# Container image for the Impreza MCP server (stdio transport).
 #
-# Intentionally minimal so the build is fast + has no surface area
-# for npm lifecycle-script surprises (first Phase 15 smoke caught a
-# self-inflicted `npm install --omit=dev` + `prepare: npm run build`
-# trap that's not worth the complexity for a sanity image).
+# Canonical ways to load this server inside an AI tool remain the npm
+# path (`npx -y impreza-mcp`, spawned by Claude / Cursor / Continue /
+# Zed / Codex) and the remote OAuth endpoint (https://mcp.imprezahost.com/mcp).
+# This image is for hosted one-click deploys (e.g. a Glama release, which
+# runs security checks before publishing) and doubles as the Impreza
+# "deploy from a git URL" smoke target — both now get a container that
+# actually runs the server instead of a sanity stub.
+#
+# Multi-stage: compile TypeScript with the full toolchain, ship only prod
+# deps. `--ignore-scripts` sidesteps the `prepare: npm run build` lifecycle
+# trap (build is invoked explicitly, after src is copied in).
 
-FROM alpine:3.21
-RUN echo 'impreza-mcp container built from a Phase 15 git_url deploy ✓' > /msg
-EXPOSE 80
-CMD ["sh", "-c", "cat /msg && tail -f /dev/null"]
+# --- build stage: src -> dist/ -----------------------------------------
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json tsconfig.json ./
+COPY src ./src
+RUN npm ci --ignore-scripts && npm run build
+
+# --- runtime stage: prod deps + compiled server ------------------------
+FROM node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+COPY --from=build /app/dist ./dist
+USER node
+# MCP stdio server: reads JSON-RPC on stdin, writes responses on stdout.
+ENTRYPOINT ["node", "dist/server.js"]
