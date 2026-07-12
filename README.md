@@ -1,5 +1,7 @@
 # impreza-mcp
 
+[![smithery badge](https://smithery.ai/badge/imprezahost/impreza-mcp)](https://smithery.ai/servers/imprezahost/impreza-mcp)
+
 [Model Context Protocol](https://modelcontextprotocol.io) server for
 [Impreza Host](https://imprezahost.com). Lets AI coding tools (Claude
 Code, Cursor, Codex CLI, Continue, Zed, ...) deploy customer-built
