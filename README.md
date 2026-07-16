@@ -12,19 +12,12 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
-> **No-install alternative:** if your AI client supports remote MCP
-> connectors (e.g. Claude), you can skip this package and add the hosted
-> connector `https://mcp.imprezahost.com/mcp` instead — authorize in your
-> Impreza clientarea, no API key and no IP whitelist. It exposes the same
-> full toolset, gated by the scopes you grant on consent (read / deploy /
-> manage). Install this package when you want a local server — e.g. to deploy
-> a project folder straight from your machine, which the hosted connector can't.
-
 ## Status
 
-**Full surface live.** All 32 tools shipped — app deployment (14) plus
-account + crypto balance, domains/DNS, and VPS lifecycle (18) — with a setup
-wizard that generates ready-to-paste config snippets for 5 AI tools.
+**Full surface live.** All 34 tools shipped — app deployment (14) plus
+account + crypto balance, catalog + ordering, domains/DNS, and VPS lifecycle
+(20) — with a setup wizard that generates ready-to-paste config snippets for 5
+AI tools.
 
 | Tool | Wraps |
 |------|-------|
@@ -49,6 +42,9 @@ wizard that generates ready-to-paste config snippets for 5 AI tools.
 | `impreza_topup` | `POST /v1/account/topup` — top up in BTC / XMR / USDT / TRX |
 | `impreza_topup_status` | `GET /v1/account/topup/{invoice_id}` |
 | `impreza_topup_payment` | `GET /v1/account/topup/{invoice_id}/payment` — crypto address + amount to pay |
+| **Catalog & ordering** | |
+| `impreza_list_products` | `GET /v1/products` — plans + pricing (filter `type=server` for VPS/dedicated) |
+| `impreza_order_vps` | `POST /v1/orders` — buy from balance; born deployable (`@agent`); 202 + poll `impreza_list_servers` |
 | **Domains & DNS** | |
 | `impreza_domain_check` | `GET /v1/domains/check` |
 | `impreza_domain_details` | `GET /v1/domains/{domain}` |
@@ -70,10 +66,9 @@ wizard that generates ready-to-paste config snippets for 5 AI tools.
 ### Prerequisites
 
   - Node ≥ 20
-  - An Impreza Host account with an API key + secret (clientarea →
-    Impreza API). The key's IP factor is per-key: `whitelist` (default —
-    add this machine's IP), `tofu` (trust-on-first-use — auto-pins the
-    first IP), or `keyonly` (no IP factor)
+  - An Impreza Host account with an API key + secret
+    (clientarea → API Keys; the IP of the machine running this MCP
+    server must be whitelisted under the key)
 
 ### One-shot via `npx`
 
@@ -185,11 +180,9 @@ config env — not in any file on disk owned by `impreza-mcp` itself.
 The MCP server holds the secret only in memory and only attaches it
 as HTTP request headers.
 
-The API key's IP second factor is per-key: leave it on `whitelist` and
-add this machine's IP, or pick `tofu` (auto-pins the first IP) or
-`keyonly` (no IP factor) in your Impreza clientarea — so the whitelist
-step is now optional. Tokens issued via the hosted OAuth connector are
-scoped and revocable under clientarea → Impreza API → Connected Apps.
+The IP of the machine running this MCP server (almost always your
+laptop) must be on the API key's whitelist. Manage the whitelist in
+your Impreza clientarea.
 
 ## Build
 

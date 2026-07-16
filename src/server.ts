@@ -606,6 +606,43 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'impreza_list_products',
+    description:
+      'List the products the customer can order (VPS plans, dedicated servers, ...) with pricing in the account currency. ' +
+      'Filter to VPS / dedicated plans with `type: "server"`. Returns id, name, group and per-cycle price + setup fee — ' +
+      'feed the `id` and a `billing_cycle` into `impreza_order_vps`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', description: 'Product type filter. Use "server" for VPS / dedicated plans.' },
+        group: { type: 'string', description: 'Optional product-group name substring filter, e.g. "VPS".' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_order_vps',
+    description:
+      'Order a VPS (or other catalog product) and pay from the account credit balance — the balance must already cover ' +
+      'the plan price (top up first with `impreza_topup`). Pick `product_id` via `impreza_list_products`. The VPS is born ' +
+      'DEPLOYABLE: unless you pass `app`, the Impreza agent is auto-installed so it appears under `impreza_list_servers` ' +
+      'within a few minutes. Set the OS via `config_options` ({optionId: value}); omit for the plan default. Returns ' +
+      'immediately (202) — the order provisions in the background, so poll `impreza_list_servers` until the new agent is online.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        product_id: { type: 'number', description: 'Product id from impreza_list_products.' },
+        billing_cycle: { type: 'string', description: 'One of: monthly, quarterly, semiannually, annually, biennially, triennially.' },
+        app: { type: 'string', description: "Optional. '@agent' (default — deployable), '@agent-mcp', 'none' (bare OS), or a catalog app name from impreza_list_apps." },
+        config_options: { type: 'object', description: 'Optional configurable options as {optionId: value} (e.g. the OS template). A rejected option is dropped and the plan default is used.' },
+        hostname: { type: 'string', description: 'Optional server hostname.' },
+        domain: { type: 'string', description: 'Optional domain for the order line.' },
+      },
+      required: ['product_id', 'billing_cycle'],
+      additionalProperties: false,
+    },
+  },
 ] as const;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as unknown as typeof TOOLS[number][] }));
@@ -831,6 +868,29 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const query: Record<string, string> = {};
         if (typeof args.crypto === 'string' && args.crypto) query.crypto = args.crypto;
         return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}/payment`, query));
+      }
+
+      // ── Catalog + ordering ───────────────────────────────────────────
+      case 'impreza_list_products': {
+        const query: Record<string, string> = {};
+        if (typeof args.type === 'string' && args.type) query.type = args.type;
+        if (typeof args.group === 'string' && args.group) query.group = args.group;
+        return toResult(await impreza.get<unknown>('/v1/products', query));
+      }
+
+      case 'impreza_order_vps': {
+        const productId = typeof args.product_id === 'number' ? args.product_id : Number(args.product_id);
+        const billingCycle = String(args.billing_cycle ?? '');
+        if (!Number.isFinite(productId) || productId <= 0) {
+          return toError('product_id is required (a positive number from impreza_list_products)');
+        }
+        if (!billingCycle) return toError('billing_cycle is required (e.g. "monthly")');
+        const body: Record<string, unknown> = { product_id: productId, billing_cycle: billingCycle };
+        if (typeof args.app === 'string' && args.app) body.app = args.app;
+        if (typeof args.hostname === 'string' && args.hostname) body.hostname = args.hostname;
+        if (typeof args.domain === 'string' && args.domain) body.domain = args.domain;
+        if (args.config_options && typeof args.config_options === 'object') body.config_options = args.config_options;
+        return toResult(await impreza.post<unknown>('/v1/orders', body));
       }
 
       // ── Domains + DNS ────────────────────────────────────────────────
