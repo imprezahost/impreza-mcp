@@ -113,6 +113,20 @@ const server = new Server(
 // here is what the AI sees in its tool catalog; the description should
 // be rich enough that the LLM picks the right tool without hand-holding.
 
+// Values that end up as PATH segments need a whitelist, not just escaping —
+// same guards the hosted server applies before building the route.
+const SNAPSHOT_NAME = /^[A-Za-z0-9._-]{1,64}$/;
+const SNAPSHOT_NAME_ERROR = 'name must be 1-64 chars of letters, digits, dot, dash or underscore';
+
+function isIpAddress(value: string): boolean {
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
+  if (v4) return v4.slice(1).every((o) => Number(o) <= 255 && String(Number(o)) === o);
+  // Compact IPv6 check: hex groups plus at most one "::" run.
+  if (!/^[0-9A-Fa-f:]+$/.test(value) || (value.match(/::/g) ?? []).length > 1) return false;
+  const groups = value.split(':').filter((g) => g !== '');
+  return groups.length > 0 && groups.length <= 8 && groups.every((g) => g.length <= 4);
+}
+
 const TOOLS = [
   {
     name: 'impreza_list_servers',
@@ -643,6 +657,417 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+
+  // ── Domain registration + invoices (Tier 1 parity with the hosted server) ──
+  {
+    name: 'impreza_domain_pricing',
+    description:
+      'Per-TLD registration, renewal and transfer pricing in the account currency. Use it to answer "how much is a ' +
+      '.com?" and to pick a TLD before checking availability with `impreza_domain_check`. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tld: { type: 'string', description: 'Optional. Narrow to one TLD, e.g. "com" or ".com". Omit for the whole price list.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_register_domain',
+    description:
+      'Register a new domain on the account. Check availability first with `impreza_domain_check`. This raises an ' +
+      'invoice — settle it with `impreza_pay_invoice` (top up first via `impreza_topup` if the balance is short). ' +
+      'Nameservers default to Impreza DNS, so records can be managed right away with `impreza_add_dns_record`; only ' +
+      'pass `nameservers` to delegate the domain elsewhere.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain to register, e.g. example.com.' },
+        years: { type: 'number', description: 'Registration period in years (1 or more).' },
+        nameservers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional. Custom nameservers. Omit to keep Impreza DNS — passing an empty list would leave the domain unresolvable.',
+        },
+      },
+      required: ['domain', 'years'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_list_invoices',
+    description:
+      'List the account invoices with status, due date and total — the way to find what is owed before paying. ' +
+      'Filter with `status` (e.g. Unpaid) to go straight to what needs settling. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', description: 'Optional status filter, e.g. Unpaid, Paid, Cancelled, Refunded.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_pay_invoice',
+    description:
+      'Pay an invoice from the account CREDIT BALANCE (not a card). Get the id from `impreza_list_invoices`. If the ' +
+      'balance does not cover it the call fails with INSUFFICIENT_BALANCE — top up with `impreza_topup`, wait for the ' +
+      'crypto payment to confirm, then call this again. This is the step that turns a domain registration or an ' +
+      'upgrade into an active service.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoice_id: { type: 'number', description: 'Invoice id from impreza_list_invoices.' },
+      },
+      required: ['invoice_id'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Dedicated / bare-metal lifecycle (Tier 2 parity) ───────────────────────
+  {
+    name: 'impreza_list_dedicated',
+    description:
+      'List the dedicated / bare-metal servers on the account: service_id, hostname, product, location and state. The ' +
+      'service_id it returns is what every other `impreza_dedicated_*` tool takes. Note dedicated servers are ' +
+      'provisioned by the Impreza team, not instantly like a VPS — a freshly ordered one only shows up here once it ' +
+      'has been racked and handed over. Read-only.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_dedicated_info',
+    description:
+      'Full detail for one dedicated server — product and specs, location, contract dates, and which capabilities the ' +
+      'box actually supports (power control, reverse DNS, reinstall, KVM console, DDoS filtering). Check this before ' +
+      'assuming an action is available: capabilities differ per machine. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' } },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_status',
+    description:
+      'Current power state of a dedicated server — the cheapest way to answer "is my server up?". Read it before ' +
+      'calling `impreza_dedicated_power`, and again afterwards to confirm the action took effect. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' } },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_ips',
+    description:
+      'List the IP addresses assigned to a dedicated server together with their current reverse DNS (PTR). Feed one of ' +
+      'these ip values into `impreza_dedicated_set_rdns`. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' } },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_bandwidth',
+    description:
+      'Bandwidth / traffic graph data for a dedicated server. Use it to answer questions about usage, saturation or ' +
+      'packet errors over a day, week or month. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' },
+        type: { type: 'string', description: 'Metric: port_bits (default, throughput), port_upkts, port_percent, port_errors, port_pktsize, port_discards.' },
+        scale: { type: 'string', description: 'Time window: day, week or month (default month).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_power',
+    description:
+      'Power-control a dedicated server: boot it, shut it down, or reboot it. A shutdown or reboot interrupts ' +
+      'everything running on the machine, so confirm with the customer before calling it, and check ' +
+      '`impreza_dedicated_status` first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' },
+        action: { type: 'string', description: 'One of: on (boot), off (shut down), restart (reboot).' },
+      },
+      required: ['service_id', 'action'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_set_rdns',
+    description:
+      'Set the reverse DNS (PTR) of one IP on a dedicated server — needed for mail delivery and for TLS/SSH banners ' +
+      'that must match a hostname. Get the ip from `impreza_dedicated_ips`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Service id from impreza_list_dedicated.' },
+        ip: { type: 'string', description: 'The IP to change, exactly as returned by impreza_dedicated_ips.' },
+        hostname: { type: 'string', description: 'The PTR hostname to publish, e.g. mail.example.com. It should have a matching forward A record.' },
+      },
+      required: ['service_id', 'ip', 'hostname'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Upgrade an existing service ────────────────────────────────────────────
+  {
+    name: 'impreza_upgrade_service',
+    description:
+      'Move an existing service (VPS, dedicated, hosting) to a different plan — the answer to "my site is slow, I ' +
+      'need more resources". Pick the target plan with `impreza_list_products` and pass its id as `new_product_id`. ' +
+      'This raises a pro-rata upgrade invoice and pays it from the account credit balance, so top up first with ' +
+      '`impreza_topup` if the balance is short: when it is, the upgrade order is cancelled instead of left ' +
+      'half-done. High-value plans are held for manual review rather than provisioned instantly.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'The service to upgrade (from impreza_list_services or impreza_list_dedicated).' },
+        new_product_id: { type: 'number', description: 'Target plan id from impreza_list_products.' },
+        billing_cycle: { type: 'string', description: 'Billing cycle for the new plan, e.g. monthly, annually.' },
+      },
+      required: ['service_id', 'new_product_id', 'billing_cycle'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Mailboxes: Titan + Google Workspace (Tier 3 parity) ────────────────────
+  {
+    name: 'impreza_titan_details',
+    description:
+      'Details of the Titan Email service on a domain: plan, mailbox count and quota, status and renewal date. Titan is ' +
+      'the mailbox product to reach for right after a site goes live ("I want contact@mydomain"). Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { domain: { type: 'string', description: 'The domain the mail service belongs to, e.g. example.com.' } },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_titan_dns',
+    description:
+      'The exact DNS records a domain needs for Titan Email to work — MX plus SPF/DKIM. If the domain uses Impreza DNS ' +
+      'you can publish each one with `impreza_add_dns_record`; otherwise hand the list to the customer for their own ' +
+      'DNS provider. Mail silently fails to deliver until these exist, so check here first whenever mail is not ' +
+      'arriving. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { domain: { type: 'string', description: 'The domain the mail service belongs to.' } },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_titan_webmail',
+    description:
+      'A one-time sign-in link to the Titan webmail / mail admin panel for a domain, so the customer can read mail or ' +
+      'add mailboxes without hunting for a password. Treat the returned URL as a credential: hand it to the account ' +
+      'owner, do not post it anywhere shared.',
+    inputSchema: {
+      type: 'object',
+      properties: { domain: { type: 'string', description: 'The domain the mail service belongs to.' } },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_google_details',
+    description:
+      'Details of the Google Workspace service on a domain: plan, seats, status and renewal date. Use ' +
+      '`impreza_titan_details` instead for Titan mailboxes — they are different products. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { domain: { type: 'string', description: 'The domain the Workspace service belongs to.' } },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_google_dns',
+    description:
+      'The DNS records required for Google Workspace mail (MX and verification). Publish them with ' +
+      '`impreza_add_dns_record` when the domain is on Impreza DNS. Takes no arguments — the records are the same for ' +
+      'every Workspace domain. Read-only.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_google_setup_admin',
+    description:
+      'Create the administrator account that activates a Google Workspace order — the step that turns a paid order ' +
+      "into a usable Workspace. It submits the customer's own name and contact details to Google, so only call it with " +
+      'details the account owner gave you for this purpose, and never invent them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain the Workspace order belongs to.' },
+        email_address: { type: 'string', description: 'The admin mailbox to create, e.g. admin@example.com.' },
+        first_name: { type: 'string', description: 'Admin first name.' },
+        last_name: { type: 'string', description: 'Admin last name.' },
+        alternate_email: { type: 'string', description: 'A recovery address OUTSIDE this domain — Google uses it if the admin is locked out.' },
+        name: { type: 'string', description: 'Optional. Account holder name, if it differs from the admin name.' },
+        company: { type: 'string', description: 'Optional company / organisation name.' },
+        zip: { type: 'string', description: 'Optional postal code.' },
+      },
+      required: ['domain', 'email_address', 'first_name', 'last_name', 'alternate_email'],
+      additionalProperties: false,
+    },
+  },
+
+  // ── VPS snapshots, backup restore/delete, cloud rDNS ───────────────────────
+  {
+    name: 'impreza_vps_list_snapshots',
+    description:
+      'List the snapshots of a VPS with their names and dates. A snapshot is a point-in-time image of the whole disk — ' +
+      'the thing to take BEFORE a risky change so it can be undone with `impreza_vps_rollback_snapshot`. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { service_id: { type: 'number', description: 'VPS service id from impreza_list_services.' } },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_create_snapshot',
+    description:
+      'Take a snapshot of a VPS before doing something risky. Cheap and fast, and it is what makes a rollback possible ' +
+      'later — offer it whenever the customer is about to upgrade, migrate or change something they cannot easily undo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id.' },
+        name: { type: 'string', description: 'Short snapshot name, e.g. before-php84. Letters, digits, dot, dash and underscore only.' },
+        description: { type: 'string', description: 'Optional note about why the snapshot was taken.' },
+      },
+      required: ['service_id', 'name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_rollback_snapshot',
+    description:
+      'DESTRUCTIVE: revert a VPS to a snapshot. Everything written after that snapshot — files, databases, mail, new ' +
+      'users — is LOST, and the VPS restarts. Never call it on your own initiative: name the snapshot and its date to ' +
+      'the customer, confirm they accept losing everything since then, and prefer taking a fresh snapshot first so the ' +
+      'current state is still recoverable.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id.' },
+        name: { type: 'string', description: 'Snapshot name to roll back to, exactly as listed by impreza_vps_list_snapshots.' },
+      },
+      required: ['service_id', 'name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_delete_snapshot',
+    description:
+      'Delete a snapshot to free disk space. The snapshot is gone for good, so anything it was the only copy of can no ' +
+      'longer be rolled back to — confirm with the customer first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id.' },
+        name: { type: 'string', description: 'Snapshot name from impreza_vps_list_snapshots.' },
+      },
+      required: ['service_id', 'name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_restore_backup',
+    description:
+      'DESTRUCTIVE: restore a VPS from a backup, overwriting the current disk. Everything newer than the backup is ' +
+      'LOST. Same rule as a rollback: state which backup and its date, get explicit confirmation, and consider a ' +
+      'snapshot of the current state first. List candidates with `impreza_vps_list_backups`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id.' },
+        backup_id: { type: 'number', description: 'Backup id from impreza_vps_list_backups.' },
+      },
+      required: ['service_id', 'backup_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_delete_backup',
+    description:
+      'Delete a VPS backup to free storage. Irreversible — if it is the only copy of a given date, that restore point ' +
+      'is gone. Confirm with the customer first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id.' },
+        backup_id: { type: 'number', description: 'Backup id from impreza_vps_list_backups.' },
+      },
+      required: ['service_id', 'backup_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_list_backup_schedules',
+    description:
+      'List the automatic backup schedules on a VPS — use it to answer "am I being backed up, and how often?". An ' +
+      'empty list means nothing is scheduled and only manual backups exist. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { service_id: { type: 'number', description: 'VPS service id.' } },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_rdns',
+    description:
+      'Read the reverse DNS (PTR) currently published for an IP on an Impreza Cloud VPS. Check it before changing ' +
+      'anything, and after, to confirm the change landed. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: { ip: { type: 'string', description: 'The cloud VPS IP address.' } },
+      required: ['ip'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_set_rdns',
+    description:
+      'Set the reverse DNS (PTR) of an Impreza Cloud VPS IP. Needed before the box can send mail that is not rejected ' +
+      'as spam — receivers check that the PTR matches a forward record. Publish the matching A record with ' +
+      '`impreza_add_dns_record`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ip: { type: 'string', description: 'The cloud VPS IP address.' },
+        domain: { type: 'string', description: 'The PTR hostname to publish, e.g. mail.example.com. It should have a forward A record pointing back to this IP.' },
+      },
+      required: ['ip', 'domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_delete_rdns',
+    description:
+      'Remove the reverse DNS (PTR) of an Impreza Cloud VPS IP. Mail sent from the box will likely start being ' +
+      'rejected once the PTR is gone, so only do this when the customer asks for it explicitly.',
+    inputSchema: {
+      type: 'object',
+      properties: { ip: { type: 'string', description: 'The cloud VPS IP address.' } },
+      required: ['ip'],
+      additionalProperties: false,
+    },
+  },
 ] as const;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as unknown as typeof TOOLS[number][] }));
@@ -1014,6 +1439,218 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             confirm: true,
           }),
         );
+      }
+
+      // ── Domain registration + invoices ───────────────────────────────
+      case 'impreza_domain_pricing': {
+        const query: Record<string, string> = {};
+        const tld = String(args.tld ?? '').replace(/^\./, '');
+        if (tld) query.tld = tld;
+        return toResult(await impreza.get<unknown>('/v1/domains/pricing', query));
+      }
+
+      case 'impreza_register_domain': {
+        const domain = String(args.domain ?? '');
+        const years = Number(args.years ?? 0);
+        if (!domain) return toError('domain is required');
+        if (!Number.isInteger(years) || years < 1) return toError('years must be a whole number of 1 or more');
+        const body: Record<string, unknown> = { domain, years };
+        // Only forward nameservers when actually given: an empty array would
+        // overwrite Impreza DNS and leave the domain unresolvable.
+        if (Array.isArray(args.nameservers) && args.nameservers.length > 0) {
+          body.nameservers = args.nameservers.map((ns) => String(ns));
+        }
+        return toResult(await impreza.post<unknown>('/v1/domains/register', body));
+      }
+
+      case 'impreza_list_invoices': {
+        const query: Record<string, string> = {};
+        if (typeof args.status === 'string' && args.status) query.status = args.status;
+        return toResult(await impreza.get<unknown>('/v1/invoices', query));
+      }
+
+      case 'impreza_pay_invoice': {
+        const invoiceId = Number(args.invoice_id ?? 0);
+        if (!Number.isInteger(invoiceId) || invoiceId < 1) return toError('invoice_id is required');
+        return toResult(
+          await impreza.post<unknown>(`/v1/invoices/${encodeURIComponent(String(invoiceId))}/pay`, {}),
+        );
+      }
+
+      // ── Dedicated / bare-metal ───────────────────────────────────────
+      // Ownership is enforced server-side (Auth::ownsDedicated), so a
+      // service_id from another account comes back NOT_FOUND rather than
+      // acting on someone else's machine.
+      case 'impreza_list_dedicated':
+        return toResult(await impreza.get<unknown>('/v1/dedicated'));
+
+      case 'impreza_dedicated_info':
+      case 'impreza_dedicated_status':
+      case 'impreza_dedicated_ips': {
+        const sid = Number(args.service_id ?? 0);
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        const suffix =
+          name === 'impreza_dedicated_status' ? '/status' : name === 'impreza_dedicated_ips' ? '/ips' : '';
+        return toResult(await impreza.get<unknown>(`/v1/dedicated/${sid}${suffix}`));
+      }
+
+      case 'impreza_dedicated_bandwidth': {
+        const sid = Number(args.service_id ?? 0);
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        const query: Record<string, string> = {};
+        if (typeof args.type === 'string' && args.type) query.type = args.type;
+        if (typeof args.scale === 'string' && args.scale) query.scale = args.scale;
+        return toResult(await impreza.get<unknown>(`/v1/dedicated/${sid}/bandwidth`, query));
+      }
+
+      case 'impreza_dedicated_power': {
+        const sid = Number(args.service_id ?? 0);
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        // Accept both the wire vocabulary (on/off/restart) and the route
+        // vocabulary, so a model that guesses either one works.
+        const POWER: Record<string, string> = {
+          on: 'start', start: 'start', boot: 'start',
+          off: 'shutdown', shutdown: 'shutdown', stop: 'shutdown',
+          restart: 'reboot', reboot: 'reboot',
+        };
+        const seg = POWER[String(args.action ?? '').trim().toLowerCase()];
+        if (!seg) return toError('action must be one of: on, off, restart');
+        return toResult(await impreza.post<unknown>(`/v1/dedicated/${sid}/${seg}`, {}));
+      }
+
+      case 'impreza_dedicated_set_rdns': {
+        const sid = Number(args.service_id ?? 0);
+        const ip = String(args.ip ?? '').trim();
+        const hostname = String(args.hostname ?? '').trim();
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        if (!ip) return toError('ip is required (get it from impreza_dedicated_ips)');
+        if (!hostname) return toError('hostname is required — the PTR value to publish, e.g. mail.example.com');
+        return toResult(
+          await impreza.put<unknown>(`/v1/dedicated/${sid}/ips/${encodeURIComponent(ip)}/rdns`, { hostname }),
+        );
+      }
+
+      // ── Upgrade an existing service ──────────────────────────────────
+      case 'impreza_upgrade_service': {
+        const sid = Number(args.service_id ?? 0);
+        const newProductId = Number(args.new_product_id ?? 0);
+        const billingCycle = String(args.billing_cycle ?? '').trim();
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        if (!Number.isInteger(newProductId) || newProductId < 1) {
+          return toError('new_product_id is required (get it from impreza_list_products)');
+        }
+        if (!billingCycle) return toError('billing_cycle is required (e.g. "monthly")');
+        return toResult(
+          await impreza.post<unknown>(`/v1/orders/${sid}/upgrade`, {
+            service_id: sid,
+            new_product_id: newProductId,
+            billing_cycle: billingCycle,
+          }),
+        );
+      }
+
+      // ── Mailboxes ────────────────────────────────────────────────────
+      // Entitlement is checked server-side per domain (FORBIDDEN when the
+      // account has no mail service there), so a domain the caller does not
+      // own is refused before any upstream call.
+      case 'impreza_titan_details':
+      case 'impreza_titan_dns':
+      case 'impreza_titan_webmail':
+      case 'impreza_google_details': {
+        const domain = String(args.domain ?? '').trim().toLowerCase();
+        if (!domain) return toError('domain is required (e.g. example.com)');
+        const vendor = name === 'impreza_google_details' ? 'google' : 'titan';
+        const suffix =
+          name === 'impreza_titan_dns' ? '/dns' : name === 'impreza_titan_webmail' ? '/sso' : '';
+        return toResult(
+          await impreza.get<unknown>(`/v1/email/${vendor}/${encodeURIComponent(domain)}${suffix}`),
+        );
+      }
+
+      case 'impreza_google_dns':
+        // No domain segment on this route — the records are the same for
+        // every Workspace domain.
+        return toResult(await impreza.get<unknown>('/v1/email/google/dns'));
+
+      case 'impreza_google_setup_admin': {
+        const domain = String(args.domain ?? '').trim().toLowerCase();
+        if (!domain) return toError('domain is required (e.g. example.com)');
+        const body: Record<string, string> = {};
+        for (const k of ['email_address', 'first_name', 'last_name', 'alternate_email', 'name', 'company', 'zip']) {
+          const v = String(args[k] ?? '').trim();
+          if (v) body[k] = v;
+        }
+        for (const k of ['email_address', 'first_name', 'last_name', 'alternate_email']) {
+          if (!body[k]) return toError(`${k} is required to create the Workspace admin`);
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/email/google/${encodeURIComponent(domain)}/admin`, body),
+        );
+      }
+
+      // ── VPS snapshots + backup restore/delete ────────────────────────
+      case 'impreza_vps_list_snapshots':
+      case 'impreza_vps_list_backup_schedules': {
+        const sid = Number(args.service_id ?? 0);
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        const seg = name === 'impreza_vps_list_snapshots' ? 'snapshots' : 'backup-schedules';
+        return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/${seg}`));
+      }
+
+      case 'impreza_vps_create_snapshot': {
+        const sid = Number(args.service_id ?? 0);
+        const snap = String(args.name ?? '').trim();
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        if (!snap) return toError('name is required — a short snapshot name like before-php84');
+        if (!SNAPSHOT_NAME.test(snap)) return toError(SNAPSHOT_NAME_ERROR);
+        const body: Record<string, string> = { name: snap };
+        const note = String(args.description ?? '').trim();
+        if (note) body.description = note;
+        return toResult(await impreza.post<unknown>(`/v1/vps/proxmox/${sid}/snapshots`, body));
+      }
+
+      case 'impreza_vps_rollback_snapshot':
+      case 'impreza_vps_delete_snapshot': {
+        const sid = Number(args.service_id ?? 0);
+        const snap = String(args.name ?? '').trim();
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        if (!snap) return toError('name is required (get it from impreza_vps_list_snapshots)');
+        // The name goes in the PATH: keep it to a safe charset so a crafted
+        // value cannot walk the route. encodeURIComponent alone is not the
+        // same guarantee — mirrors the whitelist on the hosted server.
+        if (!SNAPSHOT_NAME.test(snap)) return toError(SNAPSHOT_NAME_ERROR);
+        const path = `/v1/vps/proxmox/${sid}/snapshots/${encodeURIComponent(snap)}`;
+        return name === 'impreza_vps_rollback_snapshot'
+          ? toResult(await impreza.post<unknown>(`${path}/rollback`, {}))
+          : toResult(await impreza.del<unknown>(path));
+      }
+
+      case 'impreza_vps_restore_backup':
+      case 'impreza_vps_delete_backup': {
+        const sid = Number(args.service_id ?? 0);
+        const bid = Number(args.backup_id ?? 0);
+        if (!Number.isInteger(sid) || sid < 1) return toError('service_id is required');
+        if (!Number.isInteger(bid) || bid < 1) return toError('backup_id is required (get it from impreza_vps_list_backups)');
+        const path = `/v1/vps/proxmox/${sid}/backups/${bid}`;
+        return name === 'impreza_vps_restore_backup'
+          ? toResult(await impreza.post<unknown>(`${path}/restore`, {}))
+          : toResult(await impreza.del<unknown>(path));
+      }
+
+      // ── Reverse DNS on Impreza Cloud ─────────────────────────────────
+      // Ownership of the IP is checked server-side (ownsCloudIp).
+      case 'impreza_cloud_rdns':
+      case 'impreza_cloud_set_rdns':
+      case 'impreza_cloud_delete_rdns': {
+        const ip = String(args.ip ?? '').trim();
+        if (!ip) return toError('ip is required — the cloud VPS IP address');
+        if (!isIpAddress(ip)) return toError('ip must be a valid IP address');
+        const path = `/v1/vps/cloud/rdns/${encodeURIComponent(ip)}`;
+        if (name === 'impreza_cloud_rdns') return toResult(await impreza.get<unknown>(path));
+        if (name === 'impreza_cloud_delete_rdns') return toResult(await impreza.del<unknown>(path));
+        const ptr = String(args.domain ?? '').trim();
+        if (!ptr) return toError('domain is required — the PTR hostname to publish, e.g. mail.example.com');
+        return toResult(await impreza.put<unknown>(path, { domain: ptr }));
       }
 
       default:

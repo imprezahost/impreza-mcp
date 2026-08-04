@@ -14,10 +14,14 @@ back the URL.
 
 ## Status
 
-**Full surface live.** All 34 tools shipped — app deployment (14) plus
-account + crypto balance, catalog + ordering, domains/DNS, and VPS lifecycle
-(20) — with a setup wizard that generates ready-to-paste config snippets for 5
-AI tools.
+**Full surface live.** All 62 tools shipped — app deployment (14) plus
+account + crypto balance, catalog + ordering, domains/DNS + registration,
+invoices, VPS lifecycle with snapshots and backups, dedicated / bare-metal
+servers, plan upgrades, and Titan / Google Workspace mailboxes — with a setup
+wizard that generates ready-to-paste config snippets for 5 AI tools.
+
+The local (`npx`) server and the hosted OAuth connector expose the **same 62
+tools**, so nothing is lost by picking either path.
 
 | Tool | Wraps |
 |------|-------|
