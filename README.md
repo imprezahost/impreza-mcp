@@ -1,6 +1,6 @@
 # impreza-mcp
 
-[![smithery badge](https://smithery.ai/badge/imprezahost/impreza-mcp)](https://smithery.ai/servers/imprezahost/impreza-mcp)
+[![LightNow](https://lightnow.ai/badge/io.github.imprezahost/impreza-mcp)](https://lightnow.ai/servers/io.github.imprezahost/impreza-mcp)
 
 [Model Context Protocol](https://modelcontextprotocol.io) server for
 [Impreza Host](https://imprezahost.com). Lets AI coding tools (Claude
