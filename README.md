@@ -12,16 +12,75 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Why this host and not a mainstream one
+
+Any provider can run your app. This one is built so an **agent can obtain and
+operate infrastructure that is not tied to your identity**, end to end, without
+you opening a browser:
+
+- **No KYC, and no email address, to open an account.** An account is a
+  generated client ID plus a recovery token. No documents, no selfie, no phone
+  number.
+- **Funded in cryptocurrency.** `impreza_topup` accepts BTC, XMR, USDT and TRX,
+  and `impreza_order_vps` buys the server from that balance. The agent can go
+  from "I need a server" to a running deployment without a card.
+- **Offshore and onshore jurisdictions side by side**, chosen per project
+  rather than per account.
+- **Tor is a deployment target, not an add-on.** `impreza_add_onion` gives a
+  deployment a `.onion` address in one call, so an agent can publish a hidden
+  service the same way it publishes a normal site.
+- **No API key in your config.** The hosted connector authenticates over OAuth.
+
+If none of that matters for your project, a mainstream provider is a perfectly
+good choice and usually cheaper to start with. This exists for the projects
+where it does matter: research and journalism under pressure, censorship
+circumvention, security work, and anything that should not be one support
+ticket away from being linked to a legal name.
+
 ## Status
 
-**Full surface live.** All 62 tools shipped — app deployment (14) plus
-account + crypto balance, catalog + ordering, domains/DNS + registration,
-invoices, VPS lifecycle with snapshots and backups, dedicated / bare-metal
-servers, plan upgrades, and Titan / Google Workspace mailboxes — with a setup
-wizard that generates ready-to-paste config snippets for 5 AI tools.
+**Full surface live.** All 97 tools shipped — app deployment plus account +
+crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
+lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
+upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
+generates ready-to-paste config snippets for 5 AI tools.
 
-The local (`npx`) server and the hosted OAuth connector expose the **same 62
+The local (`npx`) server and the hosted OAuth connector expose the **same 97
 tools**, so nothing is lost by picking either path.
+
+### New in 0.6.0
+
+Four things that only make sense on a host built for anonymity:
+
+- **Dark previews** — push a branch, get a preview on its own ephemeral Tor
+  `.onion`. Every other platform's preview URL puts your branch name into
+  public DNS and into a permanent Certificate Transparency log; branch names
+  carry ticket ids, customer names and unshipped features. This one creates
+  neither record, and destroys its keys when the branch is deleted or the TTL
+  runs out. `impreza_configure_previews`, `impreza_list_previews`,
+  `impreza_retire_preview`.
+- **Agent sub-credentials** — mint a narrower credential from the one you hold
+  and hand it to a subtask: one deployment, one hour, no spending. A child can
+  never exceed its parent on any axis, and revoking a credential revokes
+  everything it minted, however deep. `impreza_mint_subcredential`,
+  `impreza_list_credentials`, `impreza_revoke_credential`,
+  `impreza_agent_activity`.
+- **A privacy report you can check** — `impreza_privacy_report` returns every
+  field we store about your account, what it is for, how long it survives and
+  who else sees it, and then measures our own retention against the oldest
+  record that actually survived. Counts and date ranges, never contents.
+- **Ask before you guess** — search our docs, validate a deployment manifest
+  before deploying it (including a privacy lint for third-party CDNs, public
+  DNS resolvers and leaked secrets), or run a diagnosis when something is
+  wrong. `impreza_search_docs`, `impreza_validate_manifest`, `impreza_doctor`.
+
+Plus the Tasks extension, so long operations report completion instead of
+leaving you to poll, and three MCP Apps panels — a payment card, a server card
+and a deploy wizard — that render inside clients which support them.
+
+The table below is a **selection**, not the full list — it covers the tools
+most people reach for first. Your client's own tool listing is authoritative,
+and `impreza_api_search` finds anything not named here.
 
 | Tool | Wraps |
 |------|-------|

@@ -18,7 +18,12 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 import {
@@ -31,6 +36,7 @@ import {
   tarProjectDir,
 } from './client.js';
 import { runSetup } from './setup.js';
+import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-assets.js';
 import { VERSION } from './version.js';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -106,7 +112,9 @@ const impreza = new ImprezaClient({
 
 const server = new Server(
   { name: 'impreza-mcp', version: VERSION },
-  { capabilities: { tools: {} } },
+  // `resources` is here for the MCP Apps panels below — they are ordinary
+  // MCP resources under the ui:// scheme, and this server has no others.
+  { capabilities: { tools: {}, resources: {} } },
 );
 
 // Tool definitions — each one wraps an Impreza REST call. JSON Schema
@@ -360,6 +368,621 @@ const TOOLS = [
       'Get the account profile: name, email, account status, currency, and current account balance (credit). ' +
       'Read the balance + currency here before calling `impreza_topup`.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_privacy_report',
+    description:
+      'Everything Impreza stores about this account: every field, what it is for, how long it survives, ' +
+      'and who else necessarily sees it — plus, for the fields with a retention window, whether the oldest ' +
+      'surviving row actually agrees with the window we advertise. Answers "what did I leave here" and "is ' +
+      'the retention policy real" without taking either on trust. Returns counts and date ranges, never the ' +
+      'contents. Use it before trusting this platform with something sensitive, to audit us, or to find out ' +
+      'which of your data you can still make us forget.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_list_previews',
+    description:
+      'Live dark previews of a git deployment — one ephemeral .onion per branch. Every mainstream preview ' +
+      'URL creates a public DNS record and a permanent Certificate Transparency entry, which publishes your ' +
+      'branch names; these create neither. Returns each branch, its .onion, and when it expires. Use it right ' +
+      'after pushing a branch to get the URL to share, or to see what is still running.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The PARENT deployment (dpl_...) — the one connected to the repo, not a preview.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_configure_previews',
+    description:
+      'Turn dark previews on or off for a git deployment, and set how long they live and how many may run at ' +
+      'once. With previews on, every push to a branch OTHER than the watched one gets its own Tor hidden ' +
+      'service — no DNS record, no certificate, no CT log entry — which disappears when the branch is deleted ' +
+      'or the TTL runs out. Needs a deployment created from git with its push webhook connected. Previews run ' +
+      "on the customer's own VPS, so the cap is what stops forty branches from exhausting the box.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The deployment to configure (dpl_...).' },
+        enabled: { type: 'boolean', description: 'On or off. Turning it off leaves running previews alone until they expire.' },
+        ttl_hours: { type: 'number', description: 'Hours a preview lives after the LAST push to its branch (1-168, default 24). Every push slides it forward.' },
+        max: { type: 'number', description: 'How many previews may run at once (1-20, default 5). Over the cap the oldest is retired.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_retire_preview',
+    description:
+      'Tear down one preview now, without waiting for its TTL. The container goes, and so do the hidden ' +
+      'service and its ed25519 keys — the .onion is gone for good and nothing brings it back. Use it when a ' +
+      'review is finished early, or when a preview should not have existed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The PREVIEW deployment id (dpl_...) from impreza_list_previews.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_mint_subcredential',
+    description:
+      'Mint a NARROWER credential from the one you are holding, and hand it to a subtask. This is how you ' +
+      'avoid giving a helper agent the whole account: an hour of life, one deployment, no spending. The child ' +
+      'can never exceed you on any axis — scopes, lifetime, budget, or which resources it may touch — and ' +
+      'asking for more is refused, not silently trimmed. Returns the token ONCE. Revoking this credential ' +
+      'revokes everything it minted. Use it whenever you are about to delegate: the narrowest credential that ' +
+      'can finish the job is the one to hand over.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scopes: { type: 'array', items: { type: 'string' }, description: 'A subset of ["read","deploy","manage"]. Naming a higher scope than you hold is refused.' },
+        ttl_seconds: { type: 'number', description: 'How long it lives (60 to 2592000, default 3600). Clamped to your own remaining lifetime.' },
+        spend_cap_cents: { type: 'number', description: 'Daily purchase ceiling in cents. Default 0 = cannot spend. Needs the manage scope and cannot exceed what you have left today.' },
+        resources: { type: 'object', description: 'Confine it, e.g. {"deployment":["dpl_abc"]}. Kinds: deployment, service, domain. A kind you do NOT name is a kind the child cannot touch at all.' },
+        label: { type: 'string', description: 'What this credential is for. Say the task, e.g. "redeploy blog after CI".' },
+      },
+      required: ['scopes'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_list_credentials',
+    description:
+      'Every MCP credential on this account: what each may do, what it may touch, its budget and what is left ' +
+      'of it, when it was last used, and which credential minted it. Never the token itself. Use it to answer ' +
+      '"what has access to my account", to find a credential to revoke, or to check what you are holding ' +
+      'before delegating.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_revoke_credential',
+    description:
+      'Kill a credential immediately, and everything it minted, however deep — a kill switch that leaves the ' +
+      'children running is not a kill switch. Use it the moment a delegated credential is no longer needed, ' +
+      'or the moment anything looks wrong. Revoking yourself works and is the right move if you believe you ' +
+      'have been compromised.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        credential_id: { type: 'number', description: 'The id from impreza_list_credentials.' },
+      },
+      required: ['credential_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_agent_activity',
+    description:
+      'What credentials on this account have actually DONE: every MCP tool call, newest first, with the ' +
+      'credential that made it, the arguments as recorded, and whether it succeeded. This is the audit trail ' +
+      'the owner can read for themselves rather than take on trust. Use it to check a delegated credential ' +
+      'stayed inside its remit, or to reconstruct what happened before something broke. Arguments are stored ' +
+      'scrubbed — identifiers kept, secrets never recorded.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        credential_id: { type: 'number', description: 'Only this credential. Omit for every credential on the account.' },
+        limit: { type: 'number', description: 'How many entries (1-200, default 50).' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_search_docs',
+    description:
+      'Search the Impreza documentation and get the actual paragraph back. Use this BEFORE guessing an ' +
+      'argument, a field name or how a flow works — "container_name 502", "onion", "how does topup work", ' +
+      '"manifest routing", "rate limit". Returns the matching sections with their heading trail and the ' +
+      'relevant excerpt, so you answer from what the docs say instead of from a guess. A guessed argument ' +
+      'costs a 400 and a round trip; this costs one call. Also use it when a customer asks how something ' +
+      'works: the answer is written down and you can quote it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Plain words or an exact term, e.g. "container_name", "ready_for_deploy", "crypto payment".' },
+        limit: { type: 'number', description: 'Maximum sections (1-10, default 3).' },
+        section: { type: 'string', description: 'Instead of searching, return one whole section by the heading a previous result gave you. Use when the excerpt was cut short.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_validate_manifest',
+    description:
+      'Check a custom-deploy manifest BEFORE deploying it. Returns `errors` — the exact reasons the deploy ' +
+      'endpoint would reject it, checked by the same validator, so no errors means it will not be turned ' +
+      'away for a known reason — and `warnings`: footguns that deploy fine and then hurt (unpinned image, ' +
+      'no restart policy, a published port bypassing the reverse proxy) plus the PRIVACY findings that ' +
+      'matter on this product: third-party CDN/font/analytics origins, public DNS resolvers, hardcoded ' +
+      'timezones, literal secrets, outbound mail. Every finding carries a `fix`. Call this before ' +
+      'impreza_deploy_custom: one call here beats a deploy that reports "running" and 502s.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        manifest: { type: 'object', description: 'The full manifest object you would pass to impreza_deploy_custom, including runtime.compose_yaml and any network.reverse_proxy.routes.' },
+      },
+      required: ['manifest'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_doctor',
+    description:
+      'Diagnose this account in one call: the credential you are holding (scopes, expiry, spend ceiling), ' +
+      'whether each agent is reporting, deployments that failed or are stuck or report "running" without ' +
+      'ever passing a health check, suspended or pending services, and the balance against what is due. ' +
+      'Every finding names the exact tool that fixes it. Start here when something is wrong and you do not ' +
+      'know which tool to reach for, or when a customer says "it is not working". Pass client_time to also ' +
+      'check for clock skew, which presents as random authentication failures.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        client_time: { type: 'string', description: 'Your own clock as ISO-8601 (e.g. 2026-09-09T15:04:05Z), to compare against the server. Optional.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_api_search',
+    description:
+      'Find a READ endpoint of the Impreza API by plain words — "cpu usage", "firewall", ' +
+      '"backup schedule", "reverse dns", "bandwidth". Use this when no named tool covers what you ' +
+      'need to LOOK UP: the named tools cover the common cases, and this catalogue covers everything ' +
+      'else the API can report (VPS metrics and config, IP lists, locations, console links, operation ' +
+      'history, dedicated-server capabilities and firewall state, hosting details, order status, ' +
+      'webhook deliveries …). Returns paths with {placeholders} to fill in, then call ' +
+      '`impreza_api_call`. READ ONLY — anything that changes state has its own named tool.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Plain words describing what you want to read, e.g. "disk usage", "snapshots", "rdns".',
+        },
+        limit: { type: 'number', description: 'Maximum results (1-50, default 15).' },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_api_call',
+    description:
+      'Read one endpoint found with `impreza_api_search`. Pass the exact path from the search result ' +
+      'with every {placeholder} replaced by a real id (get ids from `impreza_list_services`, ' +
+      '`impreza_list_servers` or `impreza_list_dedicated`) — for example "/vps/proxmox/1234/resources". ' +
+      'Optional query parameters go in `query`. This is a GET: it CANNOT change anything, and it only ' +
+      'reaches the catalogued read endpoints — for changes, use the named tool for that action. ' +
+      'Ownership is still checked per resource, so an id belonging to another account comes back refused.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Concrete endpoint path from impreza_api_search, placeholders filled in.',
+        },
+        query: {
+          type: 'object',
+          description: 'Optional query-string parameters, as flat key/value pairs.',
+        },
+      },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_set_deployment_vars',
+    description:
+      "Change a custom app's environment variables — the answer to \"my app needs a different SMTP " +
+      'host / API key / feature flag". Read the current ones first with `impreza_api_call` on ' +
+      '/platform/deployments/custom/{id}/vars: secret-looking values come back masked, and passing a ' +
+      'masked value straight back means "leave it alone", so you can change one variable without ' +
+      'knowing the others. Platform-managed keys (DOMAIN_URL, HOST_PORT, …) are ignored rather than ' +
+      'rejected — the response lists any you sent. Saving does NOT restart anything: call ' +
+      '`impreza_redeploy_deployment` to apply, which keeps the same domain and port.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_… deployment id.' },
+        set: { type: 'object', description: 'Variables to add or update, as flat key/value pairs. Keys are upper-cased.' },
+        unset: { type: 'array', items: { type: 'string' }, description: 'Variable names to remove.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_power',
+    description:
+      'Start, stop or reboot an Impreza Cloud VPS. These are the cloud-VPS machines (a different ' +
+      'product from the Proxmox VPS that `impreza_vps_power` drives) — find the vm_id with ' +
+      '`impreza_list_services`. "shutdown" asks the guest OS to stop cleanly; "poweroff" cuts power, ' +
+      'which can lose unwritten data, so prefer shutdown unless the machine is unresponsive. ' +
+      'Interrupts a running machine, so confirm with the customer first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vm_id: { type: 'string', description: 'Cloud VPS id (from impreza_list_services).' },
+        action: {
+          type: 'string',
+          enum: ['boot', 'shutdown', 'reboot', 'poweroff'],
+          description: 'boot | shutdown (clean) | reboot | poweroff (hard, may lose unwritten data).',
+        },
+      },
+      required: ['vm_id', 'action'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_rescue',
+    description:
+      'Boot an Impreza Cloud VPS into rescue mode, or return it to normal. Rescue boots a live ' +
+      'recovery environment instead of the installed system, so a customer can fix an unbootable ' +
+      'machine or reset a lost root password without wiping the disk — that makes it the thing to try ' +
+      'BEFORE suggesting a reinstall. The machine reboots either way, so confirm with the customer.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vm_id: { type: 'string', description: 'Cloud VPS id (from impreza_list_services).' },
+        enable: { type: 'boolean', description: 'true = boot into rescue; false = back to the normal system.' },
+      },
+      required: ['vm_id', 'enable'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_hosting_autossl',
+    description:
+      'Ask cPanel to issue or renew the free AutoSSL certificate for a shared-hosting account — the ' +
+      'fix for "my site says not secure" or a certificate that expired. Runs the same check cPanel ' +
+      'runs nightly, so it also reports WHY a domain was skipped, which is usually DNS still pointing ' +
+      'elsewhere. Read the account first with `impreza_api_call` on /hosting/{serviceId}. Shared ' +
+      'hosting only; a VPS or dedicated server gets its certificates from the deploy agent instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Hosting service id (from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_set_hostname',
+    description:
+      'Rename a VPS — sets the hostname the machine reports and, on Proxmox, the label shown in the ' +
+      'panel. Works for BOTH Impreza VPS families (Proxmox and Cloud); pass the service_id from ' +
+      '`impreza_list_services` and the right one is used. Cosmetic on its own: it does not move DNS, ' +
+      'so if the customer wants a name that resolves, add a DNS record too. Some guests only pick the ' +
+      'new name up after a reboot.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id. Proxmox or Cloud — both work.' },
+        hostname: { type: 'string', description: 'New hostname, e.g. web-01.example.com.' },
+      },
+      required: ['service_id', 'hostname'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_reset_password',
+    description:
+      'Set a new root/administrator password on a VPS. Works for BOTH VPS families. This REPLACES the ' +
+      'current password, so anything logging in with the old one — a deploy script, a monitoring ' +
+      'agent, a saved SSH session — stops working immediately; check with the customer first. Prefer ' +
+      'an SSH key where the customer has one. The new password is only as private as the channel you ' +
+      'are talking over: generate a strong one, hand it over once, and do not repeat it back later. ' +
+      'Minimum 8 characters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'VPS service id. Proxmox or Cloud — both work.' },
+        password: { type: 'string', description: 'New root password, at least 8 characters.' },
+      },
+      required: ['service_id', 'password'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_create_backup_schedule',
+    description:
+      'Set up automatic backups for a Proxmox VPS — the answer to "make sure this is backed up". ' +
+      'Check what already exists with `impreza_vps_list_backup_schedules` first: a second overlapping ' +
+      'schedule just doubles the storage. Backups land on the Impreza backup store, not on the VPS ' +
+      'disk, so they survive the machine. Cloud VPS uses images instead — see ' +
+      '`impreza_cloud_create_image`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Proxmox VPS service id.' },
+        frequency: { type: 'string', description: 'How often, e.g. "daily" or "weekly".' },
+        hour: { type: 'number', description: 'Hour of day to run (0-23), server time.' },
+        keep: { type: 'number', description: 'How many backups to keep before the oldest rotates out.' },
+        day: { type: 'string', description: 'Day of week for a weekly schedule, e.g. "sunday".' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_vps_delete_backup_schedule',
+    description:
+      'Stop an automatic backup schedule on a Proxmox VPS. Get the schedule_id from ' +
+      '`impreza_vps_list_backup_schedules`. This stops FUTURE backups; the ones already taken stay. ' +
+      'Tell the customer that after this nothing is backing the machine up automatically.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Proxmox VPS service id.' },
+        schedule_id: { type: 'number', description: 'Schedule id from impreza_vps_list_backup_schedules.' },
+      },
+      required: ['service_id', 'schedule_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_resize',
+    description:
+      'Move an Impreza Cloud VPS to a different instance size — more CPU/RAM/disk. Pick the size with ' +
+      '`impreza_api_call` on /vps/cloud/sizes. The machine reboots to apply, so confirm with the ' +
+      'customer. Disk usually cannot shrink, so sizing UP is the safe direction. This changes what the ' +
+      'service costs — use `impreza_upgrade_service` instead when the customer wants the invoice to match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vm_id: { type: 'string', description: 'Cloud VPS id.' },
+        instance_size: { type: 'string', description: 'Target size id, from /vps/cloud/sizes.' },
+      },
+      required: ['vm_id', 'instance_size'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_create_image',
+    description:
+      'Take an image of an Impreza Cloud VPS — a point-in-time copy of the whole disk, kept at the ' +
+      'provider. This is the Cloud equivalent of a Proxmox snapshot, and the right thing to do BEFORE ' +
+      'a reinstall, a resize or a risky upgrade. List existing ones with `impreza_api_call` on ' +
+      '/vps/cloud/{vmId}/images.',
+    inputSchema: {
+      type: 'object',
+      properties: { vm_id: { type: 'string', description: 'Cloud VPS id.' } },
+      required: ['vm_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_restore_image',
+    description:
+      'Roll an Impreza Cloud VPS back to a saved image. DESTRUCTIVE: everything written since that ' +
+      'image was taken is gone — files, databases, mail, logs. Take a fresh image first if the current ' +
+      'state is worth keeping. Find the image_id with `impreza_api_call` on /vps/cloud/{vmId}/images.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vm_id: { type: 'string', description: 'Cloud VPS id.' },
+        image_id: { type: 'string', description: 'Image id to restore.' },
+      },
+      required: ['vm_id', 'image_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_delete_image',
+    description:
+      'Delete a saved Impreza Cloud VPS image. This destroys a restore point — after it, that state ' +
+      'cannot be recovered. Check with `impreza_api_call` on /vps/cloud/{vmId}/images that it is not ' +
+      'the only image the customer has.',
+    inputSchema: {
+      type: 'object',
+      properties: { image_id: { type: 'string', description: 'Image id to delete.' } },
+      required: ['image_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_cloud_add_ssh_key',
+    description:
+      'Attach SSH public keys to an Impreza Cloud VPS, so the customer can log in without a password. ' +
+      'List the keys already on the account with `impreza_api_call` on /vps/cloud/ssh-keys. This is the ' +
+      'safer alternative to `impreza_vps_reset_password`: a key does not have to be spoken out loud. ' +
+      'Only a PUBLIC key ever belongs here — never ask for a private key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        vm_id: { type: 'string', description: 'Cloud VPS id.' },
+        ssh_keys: { type: 'array', items: { type: 'string' }, description: 'Key ids from /vps/cloud/ssh-keys.' },
+      },
+      required: ['vm_id', 'ssh_keys'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_firewall',
+    description:
+      'Change the DDoS filtering on one IP of a dedicated server. Read the current state first with ' +
+      '`impreza_api_call` on /dedicated/{serviceId}/firewall, and the recent attacks with ' +
+      '/dedicated/{serviceId}/firewall/logs. Higher sensitivity filters more, and also drops more ' +
+      'legitimate traffic — turning it up during an attack is right, leaving it up afterwards is ' +
+      'usually not. Both state and sensitivity are optional: whatever you omit is left as it is.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Dedicated service id.' },
+        ip: { type: 'string', description: 'Which IP of the server to change.' },
+        state: { type: 'string', description: 'Filtering on or off. Omit to leave unchanged.' },
+        sensitivity: { type: 'string', description: 'How aggressively to filter. Omit to leave unchanged.' },
+      },
+      required: ['service_id', 'ip'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_kvm',
+    description:
+      'Turn the KVM-over-IP console on or off for a dedicated server — the out-of-band console that ' +
+      'works when the machine will not boot or the network is down, which makes it the thing to reach ' +
+      'for BEFORE a reinstall. Once enabled, read the access details with `impreza_api_call` on ' +
+      '/dedicated/{serviceId}/kvm and hand them to the account owner: treat them as a credential. Turn ' +
+      'it off when the customer is done.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Dedicated service id.' },
+        enable: { type: 'boolean', description: 'true = enable the console; false = disable it.' },
+      },
+      required: ['service_id', 'enable'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_dedicated_reinstall',
+    description:
+      'Reinstall the operating system on a dedicated server. DESTRUCTIVE AND NOT REVERSIBLE: the disks ' +
+      'are wiped — every site, database, mail store, key and config on that machine is gone, and there ' +
+      'is no snapshot to go back to the way a VPS has. Make sure the customer has what they need off ' +
+      'the box first. Pick os_id with `impreza_api_call` on /dedicated/{serviceId}/os-images.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'Dedicated service id.' },
+        os_id: { type: 'string', description: 'OS image id, from /dedicated/{serviceId}/os-images.' },
+      },
+      required: ['service_id', 'os_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_domain_transfer',
+    description:
+      'Transfer a domain in to Impreza from another registrar. Needs the EPP/auth code, which the ' +
+      'customer gets from their CURRENT registrar, and the domain has to be unlocked there and older ' +
+      'than 60 days. Costs money — usually one year of registration, added to the expiry rather than ' +
+      'replacing it. Registries take days, not minutes, and the losing registrar emails the owner to ' +
+      'approve; `impreza_domain_registrar_action` can resend that mail.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'Domain to transfer in, e.g. example.com.' },
+        epp_code: { type: 'string', description: 'Authorisation / EPP code from the current registrar.' },
+      },
+      required: ['domain', 'epp_code'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_domain_lock',
+    description:
+      'Lock or unlock a domain at the registrar. Locked is the safe default and blocks transfers away — ' +
+      'it is what stops a domain being stolen. Unlock ONLY when the customer is deliberately moving the ' +
+      'domain out, and say plainly that it should be re-locked if the move is cancelled. Read the ' +
+      'current state with `impreza_domain_details`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name.' },
+        lock: { type: 'boolean', description: 'true = lock (safe); false = unlock for a deliberate transfer out.' },
+      },
+      required: ['domain', 'lock'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_domain_id_protection',
+    description:
+      "Buy WHOIS privacy (ID protection) for a domain — replaces the registrant's name, address, phone " +
+      "and e-mail in the public WHOIS with the privacy service's own. This is the thing to offer a " +
+      'customer who cares about not being personally listed against their domain. Costs money, charged ' +
+      'to the account balance, so top up first with `impreza_topup` if it is short. Not available on ' +
+      'every TLD.',
+    inputSchema: {
+      type: 'object',
+      properties: { domain: { type: 'string', description: 'The domain name.' } },
+      required: ['domain'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_domain_registrar_action',
+    description:
+      "Run one of the registrar's one-shot administrative actions on a domain, when a process is stuck " +
+      'waiting on it: resend the ICANN registrant verification mail (raa_verify — an unverified domain ' +
+      'gets SUSPENDED after 15 days, so this is the fix for "my domain stopped working after I ' +
+      'registered it"), resend the GDPR contact-disclosure mail, resend the transfer approval mail to ' +
+      "the current owner, or activate Impreza's own DNS for the domain. None of them charge anything.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', description: 'The domain name.' },
+        action: {
+          type: 'string',
+          enum: ['raa_verify', 'gdpr_auth', 'transfer_approval', 'activate_dns'],
+          description: 'raa_verify | gdpr_auth | transfer_approval | activate_dns.',
+        },
+      },
+      required: ['domain', 'action'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_update_account',
+    description:
+      'Set the registrant contact fields on this account (name, address, city, state, postcode, country, phone). ' +
+      'Use this ONLY to clear an INCOMPLETE_REGISTRANT_DATA error from `impreza_register_domain`: that error returns ' +
+      '`missing_fields` naming exactly the keys this tool accepts, so pass those and then retry the registration. ' +
+      'Domain registries require a complete contact (ICANN) — no other Impreza product needs any of this, so never ' +
+      'ask a customer for these details unless they are buying a domain. Ask the customer for the values; do not ' +
+      'invent them. Returns `registrant_ready: true` once a domain order would pass. Note: saving these fields also ' +
+      'propagates the contact to the registrar for any domain the account already holds, because registries require ' +
+      'the registrant contact to stay accurate. Requires the "manage" scope.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        first_name: { type: 'string', description: 'Given name of the registrant.' },
+        last_name: { type: 'string', description: 'Family name of the registrant.' },
+        company: { type: 'string', description: 'Optional company name.' },
+        address1: { type: 'string', description: 'Street address (registries reject a blank one).' },
+        address2: { type: 'string', description: 'Optional second address line.' },
+        city: { type: 'string', description: 'City.' },
+        state: { type: 'string', description: 'State, province or region.' },
+        postcode: { type: 'string', description: 'Zip / postal code.' },
+        country: { type: 'string', description: 'ISO 3166-1 alpha-2 country code, e.g. CH, BR, US.' },
+        phone_number: {
+          type: 'string',
+          description: 'Phone number in international form, e.g. +41 79 000 0000.',
+        },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'impreza_list_services',
@@ -841,6 +1464,32 @@ const TOOLS = [
     },
   },
 
+  // ── Cancel an existing service ─────────────────────────────────────────────
+  {
+    name: 'impreza_cancel_service',
+    description:
+      'Request cancellation of a service (VPS, dedicated, hosting) so it stops renewing. `type` is REQUIRED and ' +
+      'has very different consequences, so ask the customer which one they want instead of guessing: ' +
+      '"End of Billing Period" keeps the service running until the current paid period ends and only stops the ' +
+      'next renewal, while "Immediate" gives up the rest of the paid period and the server is torn down — ALL ' +
+      'DATA ON IT IS LOST, with no refund for unused time. Offer a backup (`impreza_vps_create_backup`) before an ' +
+      'immediate cancellation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'number', description: 'The service to cancel (from impreza_list_services or impreza_list_dedicated).' },
+        type: {
+          type: 'string',
+          enum: ['End of Billing Period', 'Immediate'],
+          description: 'When to cancel. "End of Billing Period" = keep it until the paid period ends, then stop renewing (the safe default to suggest). "Immediate" = tear it down now and lose the data.',
+        },
+        reason: { type: 'string', description: "Optional reason, stored on the cancellation request. Do not put the customer's personal details here." },
+      },
+      required: ['service_id', 'type'],
+      additionalProperties: false,
+    },
+  },
+
   // ── Mailboxes: Titan + Google Workspace (Tier 3 parity) ────────────────────
   {
     name: 'impreza_titan_details',
@@ -1070,7 +1719,351 @@ const TOOLS = [
   },
 ] as const;
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS as unknown as typeof TOOLS[number][] }));
+// ── Tool annotations ────────────────────────────────────────────────────────
+//
+// The four behaviour hints the MCP spec defines, answered honestly per tool.
+// They are what lets a client decide, without calling anything, whether an
+// action needs the customer's confirmation.
+//
+//   readOnlyHint     does the call change anything at all?
+//   destructiveHint  can the change destroy or overwrite data, interrupt a
+//                    live machine, or spend money irreversibly?
+//   idempotentHint   is a repeat with the same arguments a no-op?
+//   openWorldHint    does the effect leave the Impreza account boundary —
+//                    public DNS, a registry, GitHub / Google / Titan, the Tor
+//                    network, or a crypto payment rail?
+//
+// The spec only gives destructiveHint / idempotentHint meaning for writes, so
+// reads carry an explicit destructiveHint:false and omit idempotentHint.
+// Mind the defaults, which are hostile: an omitted destructiveHint means TRUE
+// and an omitted openWorldHint means TRUE — so every tool is listed below, and
+// a missing one throws at module load rather than silently taking a default.
+//
+// This table is the twin of Mcp::toolAnnotations() in the imprezaAPI addon
+// (the hosted mcp.imprezahost.com server). The two tool surfaces are kept at
+// full parity; change one, change the other.
+//
+// WRITE = mutates, but additively and reversibly.
+// EXT   = crosses the account boundary into a system we don't own.
+// IDEM  = calling it twice with the same arguments lands the same state.
+type ToolAnnotations = {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint?: boolean;
+  openWorldHint: boolean;
+};
+
+const A_READ:                 ToolAnnotations = { readOnlyHint: true,  destructiveHint: false,                       openWorldHint: false };
+const A_READ_EXT:             ToolAnnotations = { readOnlyHint: true,  destructiveHint: false,                       openWorldHint: true  };
+const A_WRITE:                ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+const A_WRITE_IDEM:           ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  openWorldHint: false };
+const A_WRITE_EXT:            ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true  };
+const A_WRITE_EXT_IDEM:       ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  openWorldHint: true  };
+const A_DESTRUCTIVE:          ToolAnnotations = { readOnlyHint: false, destructiveHint: true,  idempotentHint: false, openWorldHint: false };
+const A_DESTRUCTIVE_IDEM:     ToolAnnotations = { readOnlyHint: false, destructiveHint: true,  idempotentHint: true,  openWorldHint: false };
+const A_DESTRUCTIVE_EXT:      ToolAnnotations = { readOnlyHint: false, destructiveHint: true,  idempotentHint: false, openWorldHint: true  };
+const A_DESTRUCTIVE_EXT_IDEM: ToolAnnotations = { readOnlyHint: false, destructiveHint: true,  idempotentHint: true,  openWorldHint: true  };
+
+const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
+  // ── platform: apps / deployments ──────────────────────────────────────────
+  impreza_list_servers: A_READ,
+  impreza_list_apps: A_READ,
+  impreza_list_deployments: A_READ,
+  impreza_get_logs: A_READ,
+  impreza_git_webhook_status: A_READ,
+  // Deploys pull public images / clone public git and make Let's Encrypt issue
+  // a cert → EXT. Additive (a new deployment), and NOT idempotent: a second
+  // call is a second deployment attempt.
+  impreza_deploy_catalog_app: A_WRITE_EXT,
+  impreza_deploy_custom: A_WRITE_EXT,
+  // Rebuild in place: re-pulls from the public registry / git HEAD, keeps
+  // domain, host port and data volumes. Non-destructive by design — it is the
+  // tool that exists so nobody uninstalls to redeploy — but not idempotent,
+  // since HEAD moves under it.
+  impreza_redeploy_deployment: A_WRITE_EXT,
+  impreza_restart_deployment: A_WRITE_IDEM,
+  impreza_change_domain: A_WRITE_EXT_IDEM,
+  impreza_add_onion: A_WRITE_EXT_IDEM,
+  // Both touch the hook on GitHub; disconnect documents itself as idempotent
+  // and connect re-wires to the same end state.
+  impreza_git_webhook_connect: A_WRITE_EXT_IDEM,
+  impreza_git_webhook_disconnect: A_WRITE_EXT_IDEM,
+  // purge_data:true wipes the volume. Idempotent: a no-op success on an
+  // already-removed deployment.
+  impreza_uninstall_deployment: A_DESTRUCTIVE_IDEM,
+
+  // ── account + balance ─────────────────────────────────────────────────────
+  impreza_account_info: A_READ,
+  // The catalogue is a local lookup; api_call can reach reads that DO leave
+  // our boundary (a registry lookup, a provider status probe).
+  // Wave 6 DX. Our own docs, pure computation, and a read-only diagnosis.
+  // Minting and revoking WRITE — they create and kill credentials — however
+  // narrow their effect.
+  // §8.1 dark previews. Retiring one is destructive: the hidden-service keys
+  // are deleted, not parked, so the address never comes back.
+  impreza_privacy_report: A_READ,
+  impreza_list_previews: A_READ,
+  impreza_configure_previews: A_WRITE_IDEM,
+  impreza_retire_preview: A_DESTRUCTIVE,
+  impreza_mint_subcredential: A_WRITE,
+  impreza_list_credentials: A_READ,
+  impreza_revoke_credential: A_WRITE_IDEM,
+  impreza_agent_activity: A_READ,
+  impreza_search_docs: A_READ,
+  impreza_validate_manifest: A_READ,
+  impreza_doctor: A_READ,
+  impreza_api_search: A_READ,
+  impreza_api_call: A_READ_EXT,
+  // Saving vars touches the control plane only; the container sees them on the
+  // next deploy, so nothing external moves and a repeat lands the same state.
+  impreza_set_deployment_vars: A_WRITE_IDEM,
+  // Power and rescue interrupt a running machine at the provider.
+  impreza_cloud_power: A_DESTRUCTIVE_EXT,
+  impreza_cloud_rescue: A_DESTRUCTIVE_EXT,
+  // AutoSSL asks cPanel to talk to Let's Encrypt; re-running it is the same
+  // request, not a second certificate.
+  impreza_hosting_autossl: A_WRITE_EXT_IDEM,
+  // Contact-field write on our own DB: not destructive, no external call, and
+  // re-sending the same values lands the same state.
+  impreza_update_account: A_WRITE_IDEM,
+  impreza_vps_set_hostname: A_WRITE_EXT_IDEM,
+  // Not destructive to DATA, but it breaks every existing login at once.
+  impreza_vps_reset_password: A_DESTRUCTIVE_EXT,
+  impreza_vps_create_backup_schedule: A_WRITE_EXT,
+  impreza_vps_delete_backup_schedule: A_DESTRUCTIVE_EXT_IDEM,
+  impreza_cloud_resize: A_DESTRUCTIVE_EXT,
+  impreza_cloud_create_image: A_WRITE_EXT,
+  impreza_cloud_restore_image: A_DESTRUCTIVE_EXT,
+  impreza_cloud_delete_image: A_DESTRUCTIVE_EXT_IDEM,
+  impreza_cloud_add_ssh_key: A_WRITE_EXT_IDEM,
+  impreza_dedicated_firewall: A_WRITE_EXT_IDEM,
+  impreza_dedicated_kvm: A_WRITE_EXT_IDEM,
+  impreza_dedicated_reinstall: A_DESTRUCTIVE_EXT,
+  impreza_domain_transfer: A_WRITE_EXT,
+  impreza_domain_lock: A_WRITE_EXT_IDEM,
+  impreza_domain_id_protection: A_WRITE_EXT,
+  impreza_domain_registrar_action: A_WRITE_EXT_IDEM,
+  impreza_list_services: A_READ,
+  impreza_list_invoices: A_READ,
+  impreza_topup_status: A_READ,
+  // Raises an AddFunds invoice routed to btcpayinline. Additive and
+  // account-local at this point (nothing is charged, no external invoice yet),
+  // but a second call raises a second invoice.
+  impreza_topup: A_WRITE,
+  // NOT read-only despite its 'read' scope: the control plane creates the
+  // mod_btcpayinline_orders record + the BTCPay invoice when they don't exist
+  // yet, then reuses them on later calls.
+  impreza_topup_payment: A_WRITE_EXT_IDEM,
+  // Draws the balance down for good.
+  impreza_pay_invoice: A_DESTRUCTIVE,
+
+  // ── domains / DNS ─────────────────────────────────────────────────────────
+  impreza_domain_check: A_READ_EXT, // registry
+  impreza_domain_details: A_READ_EXT, // registrar
+  impreza_domain_pricing: A_READ, // our price list
+  impreza_list_dns: A_READ, // our own zone
+  // Irreversible spend + a registration in the global namespace.
+  impreza_register_domain: A_DESTRUCTIVE_EXT,
+  // Publishing a record changes what every resolver on the internet sees →
+  // EXT. Adding is additive; updating and deleting overwrite or remove what
+  // was there, and set_nameservers can take a domain off the air entirely.
+  impreza_add_dns_record: A_WRITE_EXT,
+  impreza_update_dns_record: A_DESTRUCTIVE_EXT_IDEM,
+  impreza_delete_dns_record: A_DESTRUCTIVE_EXT_IDEM,
+  impreza_set_nameservers: A_DESTRUCTIVE_EXT_IDEM,
+
+  // ── VPS lifecycle (Proxmox) ───────────────────────────────────────────────
+  impreza_vps_status: A_READ,
+  impreza_vps_list_backups: A_READ,
+  impreza_vps_list_templates: A_READ,
+  impreza_vps_list_snapshots: A_READ,
+  impreza_vps_list_backup_schedules: A_READ,
+  impreza_vps_create_backup: A_WRITE,
+  impreza_vps_create_snapshot: A_WRITE,
+  // 'stop' is a hard power-off and 'reboot' is not repeat-safe, so the tool as
+  // a whole is destructive and non-idempotent.
+  impreza_vps_power: A_DESTRUCTIVE,
+  impreza_vps_reinstall: A_DESTRUCTIVE, // erases the disk
+  impreza_vps_rollback_snapshot: A_DESTRUCTIVE, // loses newer data
+  impreza_vps_restore_backup: A_DESTRUCTIVE, // loses newer data
+  // Deleting a restore point is irreversible but repeat-safe.
+  impreza_vps_delete_snapshot: A_DESTRUCTIVE_IDEM,
+  impreza_vps_delete_backup: A_DESTRUCTIVE_IDEM,
+
+  // ── catalog + ordering ────────────────────────────────────────────────────
+  impreza_list_products: A_READ,
+  // Both spend account credit and change what the customer is billed.
+  impreza_order_vps: A_DESTRUCTIVE,
+  impreza_upgrade_service: A_DESTRUCTIVE,
+  // Destructive in both modes, for different reasons: 'Immediate' destroys the
+  // disk, and even 'End of Billing Period' gives up a paid service the customer
+  // would otherwise keep. Not idempotent — a second call files a second request.
+  impreza_cancel_service: A_DESTRUCTIVE,
+
+  // ── dedicated / bare metal ────────────────────────────────────────────────
+  impreza_list_dedicated: A_READ,
+  impreza_dedicated_info: A_READ,
+  impreza_dedicated_status: A_READ,
+  impreza_dedicated_ips: A_READ,
+  impreza_dedicated_bandwidth: A_READ,
+  impreza_dedicated_power: A_DESTRUCTIVE, // interrupts a live box
+  // Replaces the PTR published for that IP in global reverse DNS.
+  impreza_dedicated_set_rdns: A_DESTRUCTIVE_EXT_IDEM,
+
+  // ── mailboxes ─────────────────────────────────────────────────────────────
+  impreza_titan_details: A_READ_EXT,
+  impreza_titan_dns: A_READ_EXT,
+  // Mints a fresh one-time sign-in link at Titan on every call, so it changes
+  // nothing of ours but is not repeat-stable either.
+  impreza_titan_webmail: A_READ_EXT,
+  impreza_google_details: A_READ_EXT,
+  impreza_google_dns: A_READ, // static, same for every domain
+  // Creates a real administrator account at Google out of the customer's own
+  // name and contact details. Not undoable from here.
+  impreza_google_setup_admin: A_DESTRUCTIVE_EXT,
+
+  // ── cloud reverse DNS ─────────────────────────────────────────────────────
+  impreza_cloud_rdns: A_READ,
+  impreza_cloud_set_rdns: A_DESTRUCTIVE_EXT_IDEM,
+  impreza_cloud_delete_rdns: A_DESTRUCTIVE_EXT_IDEM,
+};
+
+// Fail loudly at load rather than shipping a tool whose hints fall back to the
+// spec defaults — "destructive and open-world unless stated" would make every
+// new tool look dangerous, and the reverse mistake (a real destructive tool
+// listed as safe) is worse still.
+// ─────────────────────────────────────────────────────────────────────
+// MCP Apps (io.modelcontextprotocol/ui) — the panel for the money path
+// ─────────────────────────────────────────────────────────────────────
+// A crypto address is the one value here that plain chat text handles badly:
+// text gets re-wrapped, truncated and summarised, and a model that has read a
+// hostile page can be talked into altering it. The panel renders the address
+// from structuredContent, which never passes through the model's output.
+//
+// The HTML is GENERATED from the hosted server's canonical copy
+// (lib/ui/topup-card.html in the imprezaAPI repo) — see src/ui-assets.ts. Do
+// not edit it here; the drift gate compares the two byte for byte.
+
+const UI_EXTENSION = 'io.modelcontextprotocol/ui';
+const UI_MIME = 'text/html;profile=mcp-app';
+
+/** The rendering contract we ask the host for. Every value is a narrowing. */
+const UI_RENDER_META = {
+  // Empty on every axis, declared rather than omitted: this panel fetches
+  // nothing — no fonts, no CDN, no analytics, no images, no nested frames.
+  // Everything it shows arrives over the host bridge.
+  csp: { connectDomains: [], resourceDomains: [], frameDomains: [], baseUriDomains: [] },
+  // The only permission asked for anywhere. Copying an address by hand is how
+  // money reaches the wrong place; the panel feature-detects it regardless.
+  permissions: { clipboardWrite: {} },
+  prefersBorder: true,
+  // `domain` is deliberately absent: a stable dedicated sandbox origin is
+  // useful for OAuth callbacks and API-key allowlists, and it is also a handle
+  // that correlates a viewer across conversations. We need neither.
+} as const;
+
+const UI_PANELS = [
+  {
+    tool: 'impreza_topup_payment',
+    uri: 'ui://impreza/topup-card',
+    name: 'Top-up payment card',
+    description:
+      'The crypto payment card for a top-up invoice: the exact amount, the destination address in ' +
+      'verifiable groups, and the paid/pending state. Renders the address from structured data so ' +
+      'it never passes through chat text.',
+    html: TOPUP_CARD_HTML,
+  },
+  {
+    tool: 'impreza_vps_status',
+    uri: 'ui://impreza/server-card',
+    name: 'Server card',
+    description:
+      'The control panel for one VPS: power state, CPU and memory against their real limits, the ' +
+      'hardware identity, power controls with a confirming second click, and the apps deployed on ' +
+      'it. No clientarea login needed.',
+    html: SERVER_CARD_HTML,
+  },
+  {
+    tool: 'impreza_list_apps',
+    uri: 'ui://impreza/deploy-wizard',
+    name: 'Deploy wizard',
+    description:
+      'Pick an app from the catalogue, choose the server, set a domain and the Tor mirror, then ' +
+      'watch the deploy through to running. Offers only the options each app declares it supports.',
+    html: DEPLOY_WIZARD_HTML,
+  },
+] as const;
+
+/**
+ * Should this client be offered panels?
+ *
+ * A `_meta.ui.resourceUri` on a tool definition changes no response shape —
+ * base MCP requires hosts to ignore unknown `_meta`, and every tool here
+ * returns meaningful text regardless — so silence is not a refusal. The one
+ * case that IS a refusal: a client that advertises the extension and lists
+ * mime types excluding ours has told us it cannot render this.
+ */
+function wantsUi(): boolean {
+  const caps = server.getClientCapabilities() as
+    | { extensions?: Record<string, unknown> | string[] }
+    | undefined;
+  const ext = caps?.extensions;
+  if (!ext) return true; // said nothing about extensions — offering costs it nothing
+  if (Array.isArray(ext)) return ext.includes(UI_EXTENSION);
+  if (!(UI_EXTENSION in ext)) return true; // advertised others, not this one
+  const settings = ext[UI_EXTENSION] as { mimeTypes?: unknown } | undefined;
+  const mimes = settings?.mimeTypes;
+  if (!Array.isArray(mimes)) return true;
+  const norm = (m: string) =>
+    m
+      .toLowerCase()
+      .split(';')
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .join(';');
+  return mimes.some((m) => typeof m === 'string' && norm(m) === norm(UI_MIME));
+}
+
+function panelFor(tool: string): string | undefined {
+  return UI_PANELS.find((p) => p.tool === tool)?.uri;
+}
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  resources: UI_PANELS.map((p) => ({
+    uri: p.uri,
+    name: p.name,
+    description: p.description,
+    mimeType: UI_MIME,
+    _meta: { ui: UI_RENDER_META },
+  })),
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+  // Refusing anything outside the table is the point: the uri is
+  // caller-controlled and must never reach a file path.
+  const panel = UI_PANELS.find((p) => p.uri === req.params.uri);
+  if (!panel) throw new Error(`No such resource: ${req.params.uri}. List them with resources/list.`);
+  return {
+    contents: [{ uri: panel.uri, mimeType: UI_MIME, text: panel.html, _meta: { ui: UI_RENDER_META } }],
+  };
+});
+
+const ANNOTATED_TOOLS = TOOLS.map((tool) => {
+  const annotations = TOOL_ANNOTATIONS[tool.name];
+  if (!annotations) throw new Error(`Tool ${tool.name} has no entry in TOOL_ANNOTATIONS`);
+  return { ...tool, annotations };
+});
+
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const offer = wantsUi();
+  const tools = ANNOTATED_TOOLS.map((tool) => {
+    const uri = offer ? panelFor(tool.name) : undefined;
+    // The nested `ui.resourceUri`, not the flat `_meta["ui/resourceUri"]`:
+    // the spec deprecated the flat key and removes it before GA.
+    return uri ? { ...tool, _meta: { ui: { resourceUri: uri } } } : tool;
+  });
+  return { tools: tools as unknown as typeof TOOLS[number][] };
+});
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: rawArgs } = req.params;
@@ -1085,7 +2078,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const query: Record<string, string> = {};
         if (typeof args.search === 'string') query.search = args.search;
         if (typeof args.category === 'string') query.category = args.category;
-        return toResult(await impreza.get<{ apps: App[]; total: number }>('/v1/platform/apps', query));
+        // Panelled: the deploy wizard reads the catalogue from structuredContent.
+        return toStructuredResult(
+          await impreza.get<{ apps: App[]; total: number }>('/v1/platform/apps', query),
+        );
       }
 
       case 'impreza_list_deployments': {
@@ -1265,6 +2261,432 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_account_info':
         return toResult(await impreza.get<unknown>('/v1/account'));
 
+      case 'impreza_set_deployment_vars': {
+        const dep = String(args.deployment_id ?? '').trim();
+        if (!dep) throw new Error('deployment_id is required (from impreza_list_deployments).');
+        const body: Record<string, unknown> = {};
+        if (args.set && typeof args.set === 'object' && !Array.isArray(args.set)) body.set = args.set;
+        if (Array.isArray(args.unset)) body.unset = args.unset;
+        if (Object.keys(body).length === 0) {
+          throw new Error(
+            'Provide `set` (variables to add or update) and/or `unset` (names to remove). Read the ' +
+              `current ones with impreza_api_call on /platform/deployments/custom/${dep}/vars.`,
+          );
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/vars`, body),
+        );
+      }
+
+      case 'impreza_cloud_power': {
+        const vm = String(args.vm_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        const action = String(args.action ?? '').toLowerCase();
+        if (!['boot', 'shutdown', 'reboot', 'poweroff'].includes(action)) {
+          throw new Error('action must be one of: boot, shutdown, reboot, poweroff.');
+        }
+        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/${action}`, {}));
+      }
+
+      case 'impreza_cloud_rescue': {
+        const vm = String(args.vm_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        const path = `/v1/vps/cloud/${encodeURIComponent(vm)}/rescue`;
+        return toResult(
+          args.enable ? await impreza.post<unknown>(path, {}) : await impreza.del<unknown>(path),
+        );
+      }
+
+      case 'impreza_hosting_autossl': {
+        const sid = Number(args.service_id ?? 0);
+        if (!sid) throw new Error('service_id is required — the hosting service id from impreza_list_services.');
+        return toResult(await impreza.post<unknown>(`/v1/hosting/${sid}/autossl`, {}));
+      }
+
+      case 'impreza_vps_set_hostname':
+      case 'impreza_vps_reset_password': {
+        const sid = Number(args.service_id ?? 0);
+        if (!sid) throw new Error('service_id is required (from impreza_list_services).');
+        const isHostname = name === 'impreza_vps_set_hostname';
+        const field = isHostname ? 'hostname' : 'password';
+        const value = String(args[field] ?? '').trim();
+        if (!value) throw new Error(`${field} is required.`);
+        if (!isHostname && value.length < 8) {
+          throw new Error(
+            'password must be at least 8 characters. Generate a strong one rather than asking the customer to invent it.',
+          );
+        }
+        // Which VPS family this service belongs to comes from the API, not from
+        // a guess here: GET /account/services/{id} reports `vps_backend`, and
+        // that is the same detector the clientarea uses. Guessing would route a
+        // real machine to the wrong provider's API.
+        const svc = await impreza.get<{ vps_backend?: string | null }>(`/v1/account/services/${sid}`);
+        const family = svc?.vps_backend ?? null;
+        if (family !== 'proxmox' && family !== 'cloud') {
+          throw new Error(
+            `Service ${sid} is not an Impreza VPS (vps_backend=${family ?? 'null'}). A dedicated server or a ` +
+              'hosting account is a different product and this tool does not drive them — check impreza_list_services.',
+          );
+        }
+        const base = family === 'cloud' ? `/v1/vps/cloud/${sid}` : `/v1/vps/proxmox/${sid}`;
+        return toResult(await impreza.put<unknown>(`${base}/${field}`, { [field]: value }));
+      }
+
+      case 'impreza_vps_create_backup_schedule': {
+        const sid = Number(args.service_id ?? 0);
+        if (!sid) throw new Error('service_id is required (from impreza_list_services).');
+        const body: Record<string, unknown> = {};
+        for (const k of ['frequency', 'hour', 'keep', 'day']) {
+          if (args[k] !== undefined && args[k] !== '') body[k] = args[k];
+        }
+        if (Object.keys(body).length === 0) {
+          throw new Error(
+            'Describe the schedule — at least frequency (e.g. "daily") and hour. Read an existing one with ' +
+              'impreza_vps_list_backup_schedules to see the shape this install accepts.',
+          );
+        }
+        return toResult(await impreza.post<unknown>(`/v1/vps/proxmox/${sid}/backup-schedules`, body));
+      }
+
+      case 'impreza_vps_delete_backup_schedule': {
+        const sid = Number(args.service_id ?? 0);
+        const sch = Number(args.schedule_id ?? 0);
+        if (!sid) throw new Error('service_id is required (from impreza_list_services).');
+        if (!sch) throw new Error('schedule_id is required (from impreza_vps_list_backup_schedules).');
+        return toResult(await impreza.del<unknown>(`/v1/vps/proxmox/${sid}/backup-schedules/${sch}`));
+      }
+
+      case 'impreza_cloud_resize': {
+        const vm = String(args.vm_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        const size = String(args.instance_size ?? '').trim();
+        if (!size) {
+          throw new Error('instance_size is required — list the options with impreza_api_call on /vps/cloud/sizes.');
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/resize`, { instance_size: size }),
+        );
+      }
+
+      case 'impreza_cloud_create_image': {
+        const vm = String(args.vm_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/images`, {}));
+      }
+
+      case 'impreza_cloud_restore_image': {
+        const vm = String(args.vm_id ?? '').trim();
+        const img = String(args.image_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        if (!img) {
+          throw new Error(`image_id is required — list them with impreza_api_call on /vps/cloud/${vm}/images.`);
+        }
+        return toResult(
+          await impreza.post<unknown>(
+            `/v1/vps/cloud/${encodeURIComponent(vm)}/images/${encodeURIComponent(img)}/restore`,
+            {},
+          ),
+        );
+      }
+
+      case 'impreza_cloud_delete_image': {
+        const img = String(args.image_id ?? '').trim();
+        if (!img) {
+          throw new Error('image_id is required — list them with impreza_api_call on /vps/cloud/{vmId}/images.');
+        }
+        return toResult(await impreza.del<unknown>(`/v1/vps/cloud/images/${encodeURIComponent(img)}`));
+      }
+
+      case 'impreza_cloud_add_ssh_key': {
+        const vm = String(args.vm_id ?? '').trim();
+        if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
+        const keys = Array.isArray(args.ssh_keys) ? args.ssh_keys : [];
+        if (keys.length === 0) {
+          throw new Error(
+            'ssh_keys is required — key ids from impreza_api_call on /vps/cloud/ssh-keys. Only PUBLIC keys ever belong here.',
+          );
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/ssh-keys`, { ssh_keys: keys }),
+        );
+      }
+
+      case 'impreza_dedicated_firewall': {
+        const sid = Number(args.service_id ?? 0);
+        const ip = String(args.ip ?? '').trim();
+        if (!sid) throw new Error('service_id is required (from impreza_list_dedicated).');
+        if (!ip) throw new Error('ip is required — which IP of the server to change, from impreza_dedicated_ips.');
+        const body: Record<string, unknown> = { ip };
+        for (const k of ['state', 'sensitivity']) {
+          if (args[k] !== undefined && args[k] !== '') body[k] = args[k];
+        }
+        if (Object.keys(body).length === 1) {
+          throw new Error(
+            'Set state and/or sensitivity — with neither, there is nothing to change. Read the current values ' +
+              `with impreza_api_call on /dedicated/${sid}/firewall.`,
+          );
+        }
+        return toResult(await impreza.put<unknown>(`/v1/dedicated/${sid}/firewall`, body));
+      }
+
+      case 'impreza_dedicated_kvm': {
+        const sid = Number(args.service_id ?? 0);
+        if (!sid) throw new Error('service_id is required (from impreza_list_dedicated).');
+        return toResult(
+          args.enable
+            ? await impreza.post<unknown>(`/v1/dedicated/${sid}/kvm/enable`, {})
+            : await impreza.del<unknown>(`/v1/dedicated/${sid}/kvm`),
+        );
+      }
+
+      case 'impreza_dedicated_reinstall': {
+        const sid = Number(args.service_id ?? 0);
+        const os = String(args.os_id ?? '').trim();
+        if (!sid) throw new Error('service_id is required (from impreza_list_dedicated).');
+        if (!os) {
+          throw new Error(`os_id is required — list the images with impreza_api_call on /dedicated/${sid}/os-images.`);
+        }
+        return toResult(await impreza.post<unknown>(`/v1/dedicated/${sid}/reinstall`, { os_id: os, confirm: true }));
+      }
+
+      case 'impreza_domain_transfer': {
+        const d = String(args.domain ?? '').trim().toLowerCase();
+        const epp = String(args.epp_code ?? '').trim();
+        if (!d) throw new Error('domain is required.');
+        if (!epp) throw new Error('epp_code is required — the customer gets it from their CURRENT registrar.');
+        return toResult(await impreza.post<unknown>('/v1/domains/transfer', { domain: d, epp_code: epp }));
+      }
+
+      case 'impreza_domain_lock': {
+        const d = String(args.domain ?? '').trim().toLowerCase();
+        if (!d) throw new Error('domain is required.');
+        if (!('lock' in args)) {
+          throw new Error('lock is required: true to lock (safe), false to unlock for a deliberate transfer out.');
+        }
+        const path = `/v1/domains/${encodeURIComponent(d)}/lock`;
+        return toResult(args.lock ? await impreza.post<unknown>(path, {}) : await impreza.del<unknown>(path));
+      }
+
+      case 'impreza_domain_id_protection': {
+        const d = String(args.domain ?? '').trim().toLowerCase();
+        if (!d) throw new Error('domain is required.');
+        return toResult(await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(d)}/id-protection`, {}));
+      }
+
+      case 'impreza_domain_registrar_action': {
+        const d = String(args.domain ?? '').trim().toLowerCase();
+        if (!d) throw new Error('domain is required.');
+        const seg: Record<string, string> = {
+          raa_verify: 'raa-verify',
+          gdpr_auth: 'gdpr-auth',
+          transfer_approval: 'transfer-approval',
+          activate_dns: 'dns/activate',
+        };
+        const action = String(args.action ?? '').toLowerCase();
+        if (!seg[action]) {
+          throw new Error('action must be one of: raa_verify, gdpr_auth, transfer_approval, activate_dns.');
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(d)}/${seg[action]}`, {}),
+        );
+      }
+
+      case 'impreza_mint_subcredential': {
+        if (!Array.isArray(args.scopes) || args.scopes.length === 0) {
+          return toError('scopes is required: name what the child may do, e.g. ["read"]');
+        }
+        const body: Record<string, unknown> = { scopes: args.scopes };
+        if (args.ttl_seconds !== undefined) body.ttl_seconds = args.ttl_seconds;
+        if (args.spend_cap_cents !== undefined) body.spend_cap_cents = args.spend_cap_cents;
+        if (args.resources !== undefined) body.resources = args.resources;
+        if (typeof args.label === 'string') body.label = args.label;
+        return toResult(await impreza.post<unknown>('/v1/credentials', body));
+      }
+
+      case 'impreza_privacy_report':
+        return toResult(await impreza.get<unknown>('/v1/privacy/report'));
+
+      case 'impreza_list_previews': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required (the PARENT deployment, dpl_...)');
+        return toResult(await impreza.get<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/previews`));
+      }
+
+      case 'impreza_configure_previews': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required (dpl_...)');
+        const body: Record<string, unknown> = {};
+        if (args.enabled !== undefined) body.previews_enabled = Boolean(args.enabled);
+        if (args.ttl_hours !== undefined) body.previews_ttl_hours = Number(args.ttl_hours);
+        if (args.max !== undefined) body.previews_max = Number(args.max);
+        return toResult(await impreza.post<unknown>(
+          `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/previews/settings`, body));
+      }
+
+      case 'impreza_retire_preview': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required (the PREVIEW id from impreza_list_previews)');
+        return toResult(await impreza.del<unknown>(`/v1/platform/previews/${encodeURIComponent(dep)}`));
+      }
+
+      case 'impreza_list_credentials':
+        return toResult(await impreza.get<unknown>('/v1/credentials'));
+
+      case 'impreza_revoke_credential': {
+        const id = typeof args.credential_id === 'number' ? args.credential_id : Number(args.credential_id);
+        if (!Number.isFinite(id) || id <= 0) return toError('credential_id is required (a number from impreza_list_credentials)');
+        return toResult(await impreza.del<unknown>(`/v1/credentials/${encodeURIComponent(String(id))}`));
+      }
+
+      case 'impreza_agent_activity': {
+        const query: Record<string, string> = {};
+        if (args.credential_id !== undefined) query.credential_id = String(args.credential_id);
+        if (args.limit !== undefined) query.limit = String(args.limit);
+        return toResult(await impreza.get<unknown>('/v1/credentials/activity', query));
+      }
+
+      case 'impreza_search_docs': {
+        const query: Record<string, string> = {};
+        if (typeof args.query === 'string' && args.query) query.query = args.query;
+        if (typeof args.section === 'string' && args.section) query.section = args.section;
+        if (args.limit !== undefined) query.limit = String(args.limit);
+        if (!query.query && !query.section) return toError('query is required, or pass section to read one whole section');
+        return toResult(await impreza.get<unknown>('/v1/docs/search', query));
+      }
+
+      case 'impreza_validate_manifest': {
+        // Sent to the server rather than linted here: the rules live next to
+        // the validator that would reject the deploy, and a second copy in
+        // TypeScript would drift the first time either side was touched.
+        if (typeof args.manifest !== 'object' || args.manifest === null) {
+          return toError('manifest is required (the object you would pass to impreza_deploy_custom)');
+        }
+        return toResult(await impreza.post<unknown>('/v1/platform/manifest/validate', { manifest: args.manifest }));
+      }
+
+      case 'impreza_doctor': {
+        const body: Record<string, unknown> = {};
+        if (typeof args.client_time === 'string' && args.client_time) body.client_time = args.client_time;
+        return toResult(await impreza.post<unknown>('/v1/doctor', body));
+      }
+
+      case 'impreza_api_search': {
+        // The catalogue is fetched from the API rather than bundled here: a
+        // bundled copy is a copy that drifts, and this one has to agree with
+        // the routing table exactly for `impreza_api_call` to be usable.
+        const ops = await apiCatalog(impreza);
+        const terms = String(args.query ?? '')
+          .toLowerCase()
+          .split(/[^a-z0-9]+/i)
+          .filter(Boolean);
+        const limit = Math.max(1, Math.min(50, Number(args.limit ?? 15) || 15));
+
+        const scored = ops
+          .map((op) => {
+            let score = 0;
+            for (const t of terms) {
+              if (op.path.toLowerCase().includes(t)) score += 3;
+              if ((op.tag ?? '').toLowerCase().includes(t)) score += 2;
+              if ((op.summary ?? '').toLowerCase().includes(t)) score += 2;
+            }
+            return { score, op };
+          })
+          .filter((s) => (terms.length === 0 ? true : s.score > 0))
+          .sort((a, b) => b.score - a.score || a.op.path.localeCompare(b.op.path))
+          .slice(0, limit);
+
+        if (scored.length === 0) {
+          return toResult({
+            query: args.query ?? '',
+            results: [],
+            note:
+              'Nothing matched. Try a plainer word (e.g. "backup", "dns", "firewall", "usage"). ' +
+              'This catalogue is READ endpoints only — to change something, look for a named tool.',
+          });
+        }
+
+        return toResult({
+          query: args.query ?? '',
+          results: scored.map((s) => ({
+            path: s.op.path,
+            summary: s.op.summary,
+            group: s.op.tag,
+            placeholders: [...s.op.path.matchAll(/\{([a-zA-Z_]+)\}/g)].map((m) => m[1]),
+          })),
+          how_to_call:
+            'Pass one of these paths to impreza_api_call with every {placeholder} replaced by a real id. ' +
+            'Ids come from the listing tools (impreza_list_services, impreza_list_servers, impreza_list_dedicated).',
+          note: 'Read-only. Anything that CHANGES state has its own named tool.',
+        });
+      }
+
+      case 'impreza_api_call': {
+        const raw = String(args.path ?? '').trim();
+        if (!raw) {
+          throw new Error(
+            'path is required — a concrete endpoint path like "/vps/proxmox/732/resources". Find one with impreza_api_search.',
+          );
+        }
+        const path = '/' + (raw.split('?')[0] ?? '').replace(/^\/+|\/+$/g, '');
+        if (path.includes('..') || /%2f/i.test(path)) {
+          throw new Error('That path is not a valid endpoint path.');
+        }
+
+        // Resolve against the catalogue, so the callable set is exactly the
+        // searchable set — the same rule the hosted server enforces.
+        const ops = await apiCatalog(impreza);
+        const hit = ops.find((op) => {
+          const rx = new RegExp(
+            '^' +
+              op.path
+                .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                .replace(/\\\{[a-zA-Z_]+\\\}/g, '[^/]+') +
+              '$',
+          );
+          return rx.test(path);
+        });
+        if (!hit) {
+          throw new Error(
+            `No readable endpoint matches "${path}". This tool reads catalogued GET endpoints only — ` +
+              'to CHANGE something use the named tool for it. Use impreza_api_search to find the right path, ' +
+              'then fill in its {placeholders}.',
+          );
+        }
+
+        const query: Record<string, string> = {};
+        if (args.query && typeof args.query === 'object' && !Array.isArray(args.query)) {
+          for (const [k, v] of Object.entries(args.query as Record<string, unknown>)) {
+            if (v === null || v === undefined || typeof v === 'object') continue;
+            query[k] = typeof v === 'boolean' ? String(v) : String(v);
+          }
+        }
+
+        return toResult(await impreza.get<unknown>('/v1' + path, query));
+      }
+
+      case 'impreza_update_account': {
+        // Only the registrant allowlist is forwarded; the API rejects anything
+        // else with a 400 rather than ignoring it, and echoing the caller's
+        // whole argument object would turn that into a confusing failure.
+        const fields = [
+          'first_name',
+          'last_name',
+          'company',
+          'address1',
+          'address2',
+          'city',
+          'state',
+          'postcode',
+          'country',
+          'phone_number',
+        ];
+        const body: Record<string, unknown> = {};
+        for (const f of fields) {
+          if (f in args) body[f] = args[f];
+        }
+        return toResult(await impreza.patch<unknown>('/v1/account', body));
+      }
+
       case 'impreza_list_services': {
         const query: Record<string, string> = {};
         if (typeof args.status === 'string') query.status = args.status;
@@ -1292,7 +2714,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (!invoiceId) return toError('invoice_id is required');
         const query: Record<string, string> = {};
         if (typeof args.crypto === 'string' && args.crypto) query.crypto = args.crypto;
-        return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}/payment`, query));
+        // structuredContent, so the panel renders from data rather than
+        // re-parsing our text block. Only the panelled tools get it: on the
+        // rest it would duplicate the payload the model already reads.
+        return toStructuredResult(
+          await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}/payment`, query),
+        );
       }
 
       // ── Catalog + ordering ───────────────────────────────────────────
@@ -1392,7 +2819,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_vps_status': {
         const sid = svcId(args);
         if (!sid) return toError('service_id is required (numeric)');
-        return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/status`));
+        // structuredContent, so the server card renders from data rather than
+        // re-parsing our text block. Panelled tools only.
+        return toStructuredResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/status`));
       }
 
       case 'impreza_vps_power': {
@@ -1545,6 +2974,30 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             service_id: sid,
             new_product_id: newProductId,
             billing_cycle: billingCycle,
+          }),
+        );
+      }
+
+      case 'impreza_cancel_service': {
+        const sid = Number(args.service_id ?? 0);
+        const cancelType = String(args.type ?? '').trim();
+        const reason = String(args.reason ?? '').trim();
+        if (!Number.isInteger(sid) || sid < 1) {
+          return toError('service_id is required (get it from impreza_list_services or impreza_list_dedicated)');
+        }
+        // Checked here as well as in the schema: the two modes differ by "the
+        // box is destroyed now" vs "it runs out its paid period", so a mistyped
+        // value must never fall through to a default.
+        if (cancelType !== 'End of Billing Period' && cancelType !== 'Immediate') {
+          return toError(
+            'type is required and must be exactly "End of Billing Period" (stop renewing, keep it until the paid ' +
+              'period ends) or "Immediate" (tear it down now, data is lost). Ask the customer which one.',
+          );
+        }
+        return toResult(
+          await impreza.post<unknown>(`/v1/services/${sid}/cancel`, {
+            type: cancelType,
+            ...(reason ? { reason } : {}),
           }),
         );
       }
@@ -1786,6 +3239,32 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
  * string) to a numeric string, or '' when it isn't a plain positive integer —
  * so the caller returns a clean error instead of building a bad path.
  */
+type CatalogOp = { path: string; tag?: string; summary?: string };
+
+/**
+ * The read catalogue, fetched from the API and cached for this process.
+ *
+ * Not bundled with the package on purpose. The catalogue has to agree with the
+ * server's routing table exactly — `impreza_api_call` refuses any path that is
+ * not in it — and a copy shipped in npm would be a copy that drifts every time
+ * a route lands. One fetch per process is cheap; being wrong is not.
+ */
+let catalogCache: CatalogOp[] | null = null;
+
+async function apiCatalog(impreza: ImprezaClient): Promise<CatalogOp[]> {
+  if (catalogCache) return catalogCache;
+  const res = await impreza.get<{ operations?: CatalogOp[] }>('/v1/api-catalog');
+  const ops = Array.isArray(res?.operations) ? res.operations : [];
+  if (ops.length === 0) {
+    throw new Error(
+      'The API returned an empty read catalogue. Your Impreza deployment may predate impreza_api_search — ' +
+        'use the named tools instead.',
+    );
+  }
+  catalogCache = ops;
+  return ops;
+}
+
 function svcId(args: Record<string, unknown>): string {
   const raw = args.service_id;
   const s = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim();
@@ -1795,6 +3274,16 @@ function svcId(args: Record<string, unknown>): string {
 function toResult(payload: unknown): { content: Array<{ type: 'text'; text: string }> } {
   return {
     content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+  };
+}
+
+function toStructuredResult(payload: unknown): {
+  content: Array<{ type: 'text'; text: string }>;
+  structuredContent: Record<string, unknown>;
+} {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    structuredContent: (payload ?? {}) as Record<string, unknown>,
   };
 }
 

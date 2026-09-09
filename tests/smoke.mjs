@@ -105,6 +105,29 @@ async function main() {
   if (tools.length < 10) fail(`expected ≥10 tools (Iteration B), got ${tools.length}`, tools);
   const names = tools.map((t) => t.name).sort();
   console.log(`  ✓ tools/list → ${tools.length} tools`);
+
+  // 2b. every tool must carry explicit behaviour annotations. The spec
+  // defaults are hostile — an omitted destructiveHint or openWorldHint reads
+  // as TRUE — so a tool that falls through TOOL_ANNOTATIONS would be
+  // advertised to every AI client as destructive and open-world. The reverse
+  // mistake is worse: a real disk-wiping tool labelled safe.
+  const badAnnotations = [];
+  for (const t of tools) {
+    const a = t.annotations;
+    if (!a) { badAnnotations.push(`${t.name}: no annotations`); continue; }
+    for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint']) {
+      if (typeof a[hint] !== 'boolean') badAnnotations.push(`${t.name}: ${hint} is not a boolean`);
+    }
+    // idempotentHint only has meaning for writes: present on those, absent on reads.
+    const hasIdem = Object.prototype.hasOwnProperty.call(a, 'idempotentHint');
+    if (hasIdem !== (a.readOnlyHint === false)) {
+      badAnnotations.push(`${t.name}: idempotentHint present=${hasIdem} but readOnlyHint=${a.readOnlyHint}`);
+    }
+  }
+  if (badAnnotations.length) fail('tools with bad annotations', badAnnotations);
+  const destructive = tools.filter((t) => t.annotations.destructiveHint).map((t) => t.name);
+  console.log(`  ✓ annotations on all ${tools.length} tools (${destructive.length} destructive)`);
+
   for (const n of names) console.log(`     · ${n}`);
 
   // 3. tools/call → impreza_list_servers
