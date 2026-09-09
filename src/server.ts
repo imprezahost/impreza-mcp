@@ -2054,14 +2054,50 @@ const ANNOTATED_TOOLS = TOOLS.map((tool) => {
   return { ...tool, annotations };
 });
 
+/**
+ * Which tools this account should not be shown.
+ *
+ * The hosted server filters `tools/list` by what the account owns — about 42
+ * of the tools only make sense if you have the product behind them, and an
+ * account with one VPS was carrying twenty-five that could only ever answer
+ * "not found".
+ *
+ * This process has no database, so it asks for the ANSWER rather than the
+ * rules. A copy of the prefix-to-family map here would drift the first time a
+ * family is added server-side, and would need an npm release to catch up.
+ *
+ * Fails open in every direction — a request that errors, times out, or comes
+ * back malformed hides nothing. Too many tools is the behaviour we shipped
+ * yesterday; too few silently removes capability the customer pays for, and
+ * they would have no way to tell why.
+ */
+async function hiddenTools(): Promise<Set<string>> {
+  try {
+    const res = await impreza.get<{ hidden?: unknown; known?: unknown }>('/v1/entitlements');
+    if (res?.known !== true || !Array.isArray(res.hidden)) {
+      return new Set();
+    }
+    return new Set(res.hidden.filter((n): n is string => typeof n === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   const offer = wantsUi();
-  const tools = ANNOTATED_TOOLS.map((tool) => {
-    const uri = offer ? panelFor(tool.name) : undefined;
-    // The nested `ui.resourceUri`, not the flat `_meta["ui/resourceUri"]`:
-    // the spec deprecated the flat key and removes it before GA.
-    return uri ? { ...tool, _meta: { ui: { resourceUri: uri } } } : tool;
-  });
+  // Fetched per call rather than cached for the process: a stdio session
+  // outlives a purchase, and a customer who buys a VPS mid-session should see
+  // its tools on the next listing rather than after a restart. tools/list is
+  // called rarely enough that the extra round trip does not matter.
+  const hidden = await hiddenTools();
+  const tools = ANNOTATED_TOOLS
+    .filter((tool) => !hidden.has(tool.name))
+    .map((tool) => {
+      const uri = offer ? panelFor(tool.name) : undefined;
+      // The nested `ui.resourceUri`, not the flat `_meta["ui/resourceUri"]`:
+      // the spec deprecated the flat key and removes it before GA.
+      return uri ? { ...tool, _meta: { ui: { resourceUri: uri } } } : tool;
+    });
   return { tools: tools as unknown as typeof TOOLS[number][] };
 });
 

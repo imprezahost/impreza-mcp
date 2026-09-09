@@ -48,6 +48,30 @@ generates ready-to-paste config snippets for 5 AI tools.
 The local (`npx`) server and the hosted OAuth connector expose the **same 97
 tools**, so nothing is lost by picking either path.
 
+### New in 0.6.1
+
+**`tools/list` now reflects what your account actually owns.** About a third of
+the tools only make sense if you have the machine behind them — VPS power
+controls with no VPS can only ever answer "not found" — so those are left out
+of the listing until you own one. Typical accounts see around 70 tools instead
+of 97, which is roughly six thousand fewer tokens of context spent before you
+ask anything.
+
+Three things worth knowing about how it behaves:
+
+- **The purchase path is never filtered.** An account that owns nothing is the
+  one that needs to buy something, so ordering, top-up, invoices and the
+  catalogue are always listed.
+- **Buying something grows the list mid-session.** The server sends
+  `notifications/tools/list_changed` on the same response as the order, so a
+  client that honours it picks up the new tools without reconnecting.
+- **It fails open.** If this server cannot reach the API to ask, it lists
+  everything rather than guess.
+
+Hiding a tool is not an authorization boundary — the API still refuses anything
+your account does not own. This only stops the listing from carrying tools that
+could never work for you.
+
 ### New in 0.6.0
 
 Four things that only make sense on a host built for anonymity:
