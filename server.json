@@ -3,7 +3,7 @@
   "name": "io.github.imprezahost/impreza-mcp",
   "title": "Impreza Host",
   "description": "No-KYC offshore hosting an AI agent runs end-to-end: no-email signup, crypto, VPS, deploy, Tor.",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "websiteUrl": "https://docs.imprezahost.com/tutorials/ai-mcp-integration.html",
   "repository": {
     "url": "https://github.com/imprezahost/impreza-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "impreza-mcp",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [

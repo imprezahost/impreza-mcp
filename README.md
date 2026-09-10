@@ -37,7 +37,7 @@ ticket away from being linked to a legal name.
 
 ## Status
 
-**Full surface live.** All 114 tools shipped — app deployment plus account +
+**Full surface live.** All 116 tools shipped — app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -48,8 +48,46 @@ restore into the customer's **own** S3 bucket, a timer on an app with its
 output kept, outbound webhooks so you stop polling, and reading the app's own
 files to find out why it behaves as if it were not configured.
 
-The local (`npx`) server and the hosted OAuth connector expose the **same 114
+On top of that, everything an app needs after it is running: backup and
+restore into the customer's **own** S3 bucket, a timer on an app with its
+output kept, outbound webhooks so you stop polling, reading the app's own
+files, and running the app's own command line.
+
+The local (`npx`) server and the hosted OAuth connector expose the **same 116
 tools**, so nothing is lost by picking either path.
+
+### New in 0.11.0
+
+**Run the app's own command line.** WP-CLI for WordPress, `occ` for
+Nextcloud, `gitea admin` for Gitea, and the database client for a dump —
+`impreza_app_cli` to run, `impreza_get_cli_run` to collect the output. Call
+`impreza_get_cli_run` with no `run_id` first: it names the command lines the
+app has, says what each is for, and gives one example that works.
+
+- **No docker socket, and that is measured rather than claimed.** The command
+  runs in a separate container built from the app's own image, joined to the
+  app's own network, with its data mounted — the shape the official CLI
+  images are designed for. `cap_drop: ALL`, and no new privilege on the
+  machine.
+- **Arguments are a list, never a string.** Each element becomes one `argv`
+  entry through `execve`, so nothing is split, globbed or substituted:
+  quoting is not your problem, and a `$` or a `;` inside a value is just
+  that. Verified against a live site — `option update blogname
+  'dollars $HOME and a ; semicolon'` reads back exactly as sent.
+- **Destructive, and treated as such.** A command line can do anything the
+  app itself can, so it needs the `manage` scope and is confirmation-gated.
+  Arguments are free rather than allowlisted: that is the same ceiling
+  `uninstall` with `purge_data` already sits at, and a list of `wp`
+  subcommands would age badly while protecting nothing the confirmation gate
+  does not.
+- **The CLI version follows the app.** Where the command line is the app's
+  own image it is taken from that deployment, so a catalog bump carries it —
+  running `occ` from an older Nextcloud against a newer database is how a
+  maintenance command corrupts an install.
+
+Custom deployments have no command line here: it is your own image and the
+platform cannot know what it ships. Use a scheduled task of kind `command`
+for those.
 
 ### New in 0.10.0
 
