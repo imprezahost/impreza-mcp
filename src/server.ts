@@ -248,6 +248,73 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_backup_app',
+    description:
+      "Back up a running deployment's data into the customer's OWN Impreza S3 bucket. Packs the app's data directory and uploads it in chunks with a per-chunk SHA-256 manifest written alongside it, so the backup stays verifiable with the customer's own S3 credentials and without us. Returns immediately with a backup_id — a large app takes minutes, so poll impreza_list_backups for the outcome. Needs an active S3 service on the account; without one it answers NO_STORAGE. One job at a time per app.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id to back up.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_list_backups',
+    description:
+      "List this account's app backups and restores, newest first — id, kind, status, chunk count, size, and any error. This is how you find out whether a job started with impreza_backup_app or impreza_restore_app has finished. A `replaced_path` on a restore means the data it displaced is STILL on the server using disk until impreza_discard_replaced removes it. Pass deployment_id to narrow to one app. Not the same as impreza_vps_list_backups, which is Proxmox snapshots of a whole VPS.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'Optional — only this app\'s jobs.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_restore_app',
+    description:
+      "Restore a completed backup over its app's current data, then restart the app. Every chunk's SHA-256 is checked BEFORE anything is touched, and the data being replaced is moved aside rather than deleted — so restoring the wrong backup is recoverable. That saved copy keeps using disk until impreza_discard_replaced removes it. Returns a job id; poll impreza_list_backups. This overwrites the app's current state: confirm which backup the customer means before calling.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        backup_id: { type: 'string', description: 'The completed backup to restore, from impreza_list_backups.' },
+      },
+      required: ['backup_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_discard_replaced',
+    description:
+      "Permanently delete the copy of the old data that a restore set aside, freeing that disk on the server. Pass the RESTORE job's id — the one whose replaced_path is set. Irreversible, and that copy is the customer's way back from a restore they may not have wanted, so only call it once they confirm the restored app is the one they want.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        backup_id: { type: 'string', description: 'The restore job that set data aside.' },
+      },
+      required: ['backup_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_backup_schedule',
+    description:
+      "Change how often an app is backed up automatically and how many copies are kept. Every running app is already on a schedule by DEFAULT — daily, keeping 3 — even with nothing configured, so this changes an existing policy rather than creating one; to read the current setting, call impreza_list_backups with that deployment_id. Set enabled=false to stop automatic backups for the app (manual ones still work). Old copies are removed only after a NEWER one has completed and been verified, and only automatic copies are ever pruned — a backup taken by hand stays until someone deletes it.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose schedule changes.' },
+        enabled: { type: 'boolean', description: 'Whether automatic backups run at all. Default true.' },
+        frequency: { type: 'string', enum: ['daily', 'weekly'], description: 'How often. Default daily.' },
+        keep: { type: 'integer', description: 'How many automatic copies to keep, 1-30. Default 3.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_restart_deployment',
     description:
       'Restart a deployment\'s docker-compose stack (non-destructive). The container is stopped + started; data volumes preserved. Status flips to `installing` briefly then back to `running`. Works for both catalog and custom deployments.',
@@ -1782,6 +1849,11 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // since HEAD moves under it.
   impreza_redeploy_deployment: A_WRITE_EXT,
   impreza_restart_deployment: A_WRITE_IDEM,
+  impreza_backup_app: A_WRITE_EXT,
+  impreza_list_backups: A_READ,
+  impreza_restore_app: A_DESTRUCTIVE,
+  impreza_discard_replaced: A_DESTRUCTIVE,
+  impreza_backup_schedule: A_WRITE_IDEM,
   impreza_change_domain: A_WRITE_EXT_IDEM,
   impreza_add_onion: A_WRITE_EXT_IDEM,
   // Both touch the hook on GitHub; disconnect documents itself as idempotent
@@ -2168,6 +2240,45 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             `/v1/platform/deployments/${encodeURIComponent(dep)}/logs`,
             body,
           ),
+        );
+      }
+
+      case 'impreza_backup_app': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        return toResult(await impreza.post('/v1/backups', { deployment_id: dep }));
+      }
+
+      case 'impreza_backup_schedule': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        const body: Record<string, unknown> = {};
+        for (const k of ['enabled', 'frequency', 'keep'] as const) {
+          if (k in args) body[k] = args[k];
+        }
+        return toResult(
+          await impreza.post(`/v1/backups/schedule/${encodeURIComponent(dep)}`, body),
+        );
+      }
+
+      case 'impreza_list_backups': {
+        const dep = String(args.deployment_id ?? '');
+        return toResult(
+          await impreza.get(`/v1/backups${dep ? `?deployment_id=${encodeURIComponent(dep)}` : ''}`),
+        );
+      }
+
+      case 'impreza_restore_app': {
+        const bid = String(args.backup_id ?? '');
+        if (!bid) return toError('backup_id is required');
+        return toResult(await impreza.post(`/v1/backups/${encodeURIComponent(bid)}/restore`, {}));
+      }
+
+      case 'impreza_discard_replaced': {
+        const bid = String(args.backup_id ?? '');
+        if (!bid) return toError('backup_id is required');
+        return toResult(
+          await impreza.post(`/v1/backups/${encodeURIComponent(bid)}/discard-previous`, {}),
         );
       }
 
