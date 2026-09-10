@@ -299,6 +299,69 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_list_tasks',
+    description:
+      "List the scheduled tasks on an app — what runs, how often, and whether it is on. Pass a task_id to get that task's RUN HISTORY as well, including each run's captured output and exit code: that is how you find out whether a timer is actually working, which is the whole point of it. Two catalog apps need a timer to behave correctly at all — Nextcloud wants its cron every five minutes, and WordPress's wp-cron does not fire on a site with no visitors.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: "Optional — only this app's tasks." },
+        task_id: { type: 'string', description: 'Optional — this task plus its run history and output.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_schedule_task',
+    description:
+      "Create or change a scheduled task on an app. Omit task_id to create; pass it to edit, and any field left out keeps its current value. Two kinds: `http` requests a PATH ON THE APP ITSELF (the common case — `/cron.php` for Nextcloud, `/wp-cron.php` for WordPress) and counts 2xx/3xx as success; `command` runs a shell command in an image you name, on the app's network. The request reaches the app at its own address inside the server, so it works even for an app with no public hostname. Cadence is a fixed set, not a cron expression. Nothing runs inside the app's own container — that needs root on the host, which is deliberately not offered.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'Omit to create; pass to edit.' },
+        deployment_id: { type: 'string', description: 'The dpl_... id the task belongs to.' },
+        name: { type: 'string', description: 'What this task is for, in a few words.' },
+        kind: { type: 'string', enum: ['http', 'command'], description: 'Default http.' },
+        http_path: { type: 'string', description: 'Path on the app, starting with / — e.g. /cron.php.' },
+        http_method: { type: 'string', enum: ['GET', 'POST'], description: 'Default GET.' },
+        image: { type: 'string', description: 'Container image. command kind only.' },
+        command: { type: 'string', description: 'Single-line shell command, no double quotes. command kind only.' },
+        schedule: {
+          type: 'string',
+          enum: ['every_5m', 'every_15m', 'every_30m', 'hourly', 'daily', 'weekly'],
+          description: 'Default hourly.',
+        },
+        at_hour: { type: 'integer', description: 'Hour in UTC, 0-23, for daily/weekly.' },
+        at_weekday: { type: 'integer', description: 'Day of week, 0=Sunday, for weekly.' },
+        enabled: { type: 'boolean', description: 'Set false to pause without deleting.' },
+        keep_runs: { type: 'integer', description: 'How many past runs to keep, 1-200. Default 10.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_run_task',
+    description:
+      "Run a scheduled task once, right now, without waiting for its next slot. This is how you confirm a task you just wrote does what was meant — an untested timer quietly does the wrong thing for a month. Returns a run id immediately; read the output with impreza_list_tasks once it lands.",
+    inputSchema: {
+      type: 'object',
+      properties: { task_id: { type: 'string', description: 'The task to run now.' } },
+      required: ['task_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_delete_task',
+    description:
+      'Delete a scheduled task and its run history. Irreversible. To stop a task without losing what it did, call impreza_schedule_task with enabled=false — that is almost always what someone means by "turn it off".',
+    inputSchema: {
+      type: 'object',
+      properties: { task_id: { type: 'string', description: 'The task to delete.' } },
+      required: ['task_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_backup_schedule',
     description:
       "Change how often an app is backed up automatically and how many copies are kept. Every running app is already on a schedule by DEFAULT — daily, keeping 3 — even with nothing configured, so this changes an existing policy rather than creating one; to read the current setting, call impreza_list_backups with that deployment_id. Set enabled=false to stop automatic backups for the app (manual ones still work). Old copies are removed only after a NEWER one has completed and been verified, and only automatic copies are ever pruned — a backup taken by hand stays until someone deletes it.",
@@ -1854,6 +1917,10 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_restore_app: A_DESTRUCTIVE,
   impreza_discard_replaced: A_DESTRUCTIVE,
   impreza_backup_schedule: A_WRITE_IDEM,
+  impreza_list_tasks: A_READ,
+  impreza_schedule_task: A_WRITE_IDEM,
+  impreza_run_task: A_WRITE_EXT,
+  impreza_delete_task: A_DESTRUCTIVE,
   impreza_change_domain: A_WRITE_EXT_IDEM,
   impreza_add_onion: A_WRITE_EXT_IDEM,
   // Both touch the hook on GitHub; disconnect documents itself as idempotent
@@ -2247,6 +2314,46 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
         return toResult(await impreza.post('/v1/backups', { deployment_id: dep }));
+      }
+
+      case 'impreza_list_tasks': {
+        const tid = String(args.task_id ?? '');
+        if (tid) {
+          return toResult(await impreza.get(`/v1/tasks/${encodeURIComponent(tid)}/runs`));
+        }
+        const dep = String(args.deployment_id ?? '');
+        return toResult(
+          await impreza.get(`/v1/tasks${dep ? `?deployment_id=${encodeURIComponent(dep)}` : ''}`),
+        );
+      }
+
+      case 'impreza_schedule_task': {
+        const tid = String(args.task_id ?? '');
+        const body: Record<string, unknown> = {};
+        for (const k of [
+          'deployment_id', 'name', 'kind', 'http_path', 'http_method',
+          'image', 'command', 'schedule', 'at_hour', 'at_weekday',
+          'enabled', 'keep_runs',
+        ] as const) {
+          if (k in args) body[k] = args[k];
+        }
+        return toResult(
+          tid
+            ? await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}`, body)
+            : await impreza.post('/v1/tasks', body),
+        );
+      }
+
+      case 'impreza_run_task': {
+        const tid = String(args.task_id ?? '');
+        if (!tid) return toError('task_id is required');
+        return toResult(await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}/run`, {}));
+      }
+
+      case 'impreza_delete_task': {
+        const tid = String(args.task_id ?? '');
+        if (!tid) return toError('task_id is required');
+        return toResult(await impreza.del(`/v1/tasks/${encodeURIComponent(tid)}`));
       }
 
       case 'impreza_backup_schedule': {

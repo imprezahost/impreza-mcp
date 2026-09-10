@@ -39,7 +39,7 @@ ticket away from being linked to a legal name.
 
 ## Status
 
-**Full surface live.** All 102 tools shipped — app deployment plus account +
+**Full surface live.** All 106 tools shipped — app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
