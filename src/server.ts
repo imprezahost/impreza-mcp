@@ -626,6 +626,110 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_list_webhooks',
+    description:
+      'Every webhook subscription on this account: where each one posts, which events it asked for, whether ' +
+      'it is active, and how the last delivery went. Read this before creating another — the cap is per ' +
+      'account, and a broken endpoint usually wants fixing rather than replacing. Secrets are never returned ' +
+      'here; they exist only in the response that created or rotated them.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'impreza_create_webhook',
+    description:
+      'Subscribe an HTTPS endpoint to events on this account, so you stop polling. Everything here is ' +
+      'asynchronous — a deploy, a backup, a scheduled task all finish minutes after the call that started ' +
+      'them — and this is how you find out. A delivery probe (webhook.test) is sent immediately, so ' +
+      'impreza_webhook_deliveries tells you within seconds whether the endpoint really works. The HMAC secret ' +
+      'is returned ONCE and never again: hand it to the person to put in their server\'s environment or ' +
+      'vault, and do not repeat it back in conversation. Sign-verify every delivery with it; an endpoint that ' +
+      'trusts an unsigned payload is an endpoint anyone can post a fake "invoice.paid" to. The URL must be ' +
+      'public — private, loopback and link-local targets are refused.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'https:// endpoint that will receive the POSTs. Must resolve to a public address. Max 500 characters.' },
+        events: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Event types to receive. Subscribe to what you will act on, not to everything. Valid: webhook.test, topup.paid, invoice.created, invoice.paid, order.created, service.activated, service.suspended, service.cancelled, domain.registered, domain.transferred, domain.expiring_soon, domain.expired, vps.power_state_changed, vps.backup_completed, vps.snapshot_created, vps.reinstall_completed, dedicated.power.changed, dedicated.rdns.updated, dedicated.rdns.reset, dedicated.reinstall.queued, dedicated.kvm.enabled, dedicated.kvm.disabled, dedicated.firewall.updated, deployment.created, deployment.installed, deployment.failed, deployment.domain_changed, deployment.uninstalled, deployment.git_redeployed, deployment.preview_ready. ' +
+            'Wildcards: "*" for all, or a prefix like "vps.*", "deployment.*", "domain.*".',
+        },
+        description: { type: 'string', description: 'Optional label so a human can tell subscriptions apart later. Max 200 characters.' },
+      },
+      required: ['url', 'events'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_update_webhook',
+    description:
+      'Change where a subscription posts, which events it wants, its label, or switch it off without deleting ' +
+      'it. Pause with active:false while an endpoint is being repaired — that keeps the secret alive, where ' +
+      "deleting and recreating would force a new one into the customer's deployment. Only the fields you pass " +
+      'change.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        webhook_id: { type: 'number', description: 'The id from impreza_list_webhooks.' },
+        url: { type: 'string', description: 'New endpoint. Same rules as on create: public https, max 500 characters.' },
+        events: { type: 'array', items: { type: 'string' }, description: 'Replaces the whole list, it does not add to it. Same vocabulary as impreza_create_webhook.' },
+        description: { type: 'string', description: 'New label. Max 200 characters.' },
+        active: { type: 'boolean', description: 'false pauses delivery and keeps the subscription and its secret; true resumes.' },
+      },
+      required: ['webhook_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_delete_webhook',
+    description:
+      'Remove a subscription and drop its pending deliveries. The secret goes with it, so this is not a way ' +
+      "to pause: recreating means a new secret and a change on the customer's server. Use " +
+      'impreza_update_webhook with active:false when the endpoint is only temporarily down.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        webhook_id: { type: 'number', description: 'The id from impreza_list_webhooks.' },
+      },
+      required: ['webhook_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_rotate_webhook_secret',
+    description:
+      'Issue a fresh HMAC secret for a subscription. The old one stops verifying the instant this returns, so ' +
+      'every delivery fails signature checks until the new value is live on the receiving server — do this ' +
+      'when the secret may have leaked, and be ready to deploy the new one immediately. Returned ONCE, like ' +
+      'on create: give it to the person for their vault, do not echo it back.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        webhook_id: { type: 'number', description: 'The id from impreza_list_webhooks.' },
+      },
+      required: ['webhook_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_webhook_deliveries',
+    description:
+      'The last 100 delivery attempts for one subscription: event type, how many tries, the HTTP code we got ' +
+      'back, the error when there was one, and whether it eventually landed. This is how you debug a ' +
+      'subscription that "is not firing" — usually the events did fire and the endpoint answered 4xx, or TLS ' +
+      'failed. Check it right after creating a subscription: the webhook.test probe should already be here.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        webhook_id: { type: 'number', description: 'The id from impreza_list_webhooks.' },
+      },
+      required: ['webhook_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_search_docs',
     description:
       'Search the Impreza documentation and get the actual paragraph back. Use this BEFORE guessing an ' +
@@ -1948,6 +2052,12 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_list_credentials: A_READ,
   impreza_revoke_credential: A_WRITE_IDEM,
   impreza_agent_activity: A_READ,
+  impreza_list_webhooks: A_READ,
+  impreza_webhook_deliveries: A_READ,
+  impreza_create_webhook: A_WRITE_EXT,
+  impreza_update_webhook: A_WRITE_EXT_IDEM,
+  impreza_delete_webhook: A_DESTRUCTIVE_IDEM,
+  impreza_rotate_webhook_secret: A_DESTRUCTIVE,
   impreza_search_docs: A_READ,
   impreza_validate_manifest: A_READ,
   impreza_doctor: A_READ,
@@ -2797,6 +2907,54 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (args.credential_id !== undefined) query.credential_id = String(args.credential_id);
         if (args.limit !== undefined) query.limit = String(args.limit);
         return toResult(await impreza.get<unknown>('/v1/credentials/activity', query));
+      }
+
+      case 'impreza_list_webhooks':
+        return toResult(await impreza.get<unknown>('/v1/webhooks'));
+
+      case 'impreza_create_webhook': {
+        const url = String(args.url ?? '').trim();
+        if (!url) return toError('url is required (a public https endpoint).');
+        if (!Array.isArray(args.events) || args.events.length === 0) {
+          return toError('events is required — an array of event types, or ["*"] for all of them.');
+        }
+        const body: Record<string, unknown> = { url, events: args.events };
+        if (args.description !== undefined) body.description = String(args.description);
+        return toResult(await impreza.post<unknown>('/v1/webhooks', body));
+      }
+
+      case 'impreza_update_webhook': {
+        const wid = Number(args.webhook_id ?? 0);
+        if (!wid) return toError('webhook_id is required (from impreza_list_webhooks).');
+        const body: Record<string, unknown> = {};
+        if (args.url !== undefined) body.url = String(args.url);
+        if (args.events !== undefined) body.events = args.events;
+        if (args.description !== undefined) body.description = String(args.description);
+        // `active` on the tool, `is_active` on the route — the tool name is the
+        // one a model guesses, and the route name is not changing.
+        if (args.active !== undefined) body.is_active = Boolean(args.active);
+        if (Object.keys(body).length === 0) {
+          return toError('Nothing to change. Pass at least one of url, events, description or active.');
+        }
+        return toResult(await impreza.patch<unknown>(`/v1/webhooks/${wid}`, body));
+      }
+
+      case 'impreza_delete_webhook': {
+        const wid = Number(args.webhook_id ?? 0);
+        if (!wid) return toError('webhook_id is required (from impreza_list_webhooks).');
+        return toResult(await impreza.del<unknown>(`/v1/webhooks/${wid}`));
+      }
+
+      case 'impreza_rotate_webhook_secret': {
+        const wid = Number(args.webhook_id ?? 0);
+        if (!wid) return toError('webhook_id is required (from impreza_list_webhooks).');
+        return toResult(await impreza.post<unknown>(`/v1/webhooks/${wid}/rotate-secret`, {}));
+      }
+
+      case 'impreza_webhook_deliveries': {
+        const wid = Number(args.webhook_id ?? 0);
+        if (!wid) return toError('webhook_id is required (from impreza_list_webhooks).');
+        return toResult(await impreza.get<unknown>(`/v1/webhooks/${wid}/deliveries`));
       }
 
       case 'impreza_search_docs': {

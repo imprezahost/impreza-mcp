@@ -1,7 +1,5 @@
 # impreza-mcp
 
-[![smithery badge](https://smithery.ai/badge/imprezahost/impreza-mcp)](https://smithery.ai/servers/imprezahost/impreza-mcp)
-
 [Model Context Protocol](https://modelcontextprotocol.io) server for
 [Impreza Host](https://imprezahost.com). Lets AI coding tools (Claude
 Code, Cursor, Codex CLI, Continue, Zed, ...) deploy customer-built
@@ -39,7 +37,7 @@ ticket away from being linked to a legal name.
 
 ## Status
 
-**Full surface live.** All 106 tools shipped — app deployment plus account +
+**Full surface live.** All 112 tools shipped — app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
