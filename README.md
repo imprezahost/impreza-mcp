@@ -37,14 +37,59 @@ ticket away from being linked to a legal name.
 
 ## Status
 
-**Full surface live.** All 112 tools shipped — app deployment plus account +
+**Full surface live.** All 114 tools shipped — app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
 generates ready-to-paste config snippets for 5 AI tools.
 
-The local (`npx`) server and the hosted OAuth connector expose the **same 97
+On top of that, everything an app needs after it is running: backup and
+restore into the customer's **own** S3 bucket, a timer on an app with its
+output kept, outbound webhooks so you stop polling, and reading the app's own
+files to find out why it behaves as if it were not configured.
+
+The local (`npx`) server and the hosted OAuth connector expose the **same 114
 tools**, so nothing is lost by picking either path.
+
+### New in 0.10.0
+
+**Look inside the app's own files.** `impreza_get_logs` reads stdout, which
+cannot answer the question a deploy that came up wrong actually raises: did
+that variable reach the config file? Two tools now do —
+`impreza_inspect_app` to ask and `impreza_get_app_read` to collect the answer.
+
+- **Four actions, and no fifth:** `list` a directory, `read` a file (capped at
+  256 KB), `tail` its last lines, `grep` under a path with an extended regular
+  expression. There is no command string in the interface, and therefore no
+  shell.
+- **Read-only by construction.** A one-shot container mounts the app's storage
+  read-only — the same mechanism the backup already uses — with no docker
+  socket and no write capability. So it also works on an app that is `failed`
+  and will not start, which is when it is wanted most.
+- **Only the app's own storage:** `data`, or one of the named volumes the app's
+  manifest declares (a WordPress exposes `data` and `wp_db`, so its database
+  files are readable too). Call `impreza_get_app_read` with no `read_id` to
+  see the list for a given app.
+- **What comes back is untrusted and often secret** — an app's config file is
+  where its database password lives. It reaches you and nothing else: the
+  field is on our request log's deny list, and the record is deleted within a
+  day.
+
+### Since 0.6.1
+
+Three releases the npm page never described, each one a whole capability:
+
+- **0.7.0 — backup and restore** of a deployment's data into the account's own
+  Impreza S3 bucket, with a per-chunk SHA-256 manifest that sits beside the
+  data so the copy stays verifiable with the customer's own credentials and no
+  call to us. Plus a schedule (daily by default, keeping 3), and a restore
+  that can land in a *different* app, which is how an app moves between
+  servers.
+- **0.8.0 — scheduled tasks:** a timer on an app with the output kept, for the
+  apps that need one to behave correctly (Nextcloud's cron, WordPress's
+  `wp-cron` on a site with no visitors).
+- **0.9.0 — outbound webhooks:** subscribe to deploy, backup and VPS events
+  and stop polling, with HMAC-signed delivery and a delivery log.
 
 ### New in 0.6.1
 
