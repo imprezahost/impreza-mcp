@@ -851,6 +851,19 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_prepare_project',
+    description: 'Analyze supplied package.json and/or Dockerfile before deploying. Returns framework hints, available script commands, declared final-stage ports and review findings. Does not fetch Git, execute code or create resources. Send configuration text only, never .env or credentials.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        package_json: { type: 'string', maxLength: 32768 },
+        dockerfile: { type: 'string', maxLength: 32768 },
+        dockerfile_path: { type: 'string', maxLength: 255 },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_validate_manifest',
     description:
       'Check a custom-deploy manifest BEFORE deploying it. Returns `errors` — the exact reasons the deploy ' +
@@ -2171,6 +2184,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_delete_webhook: A_DESTRUCTIVE_IDEM,
   impreza_rotate_webhook_secret: A_DESTRUCTIVE,
   impreza_search_docs: A_READ,
+  impreza_prepare_project: A_READ,
   impreza_validate_manifest: A_READ,
   impreza_doctor: A_READ,
   impreza_api_search: A_READ,
@@ -3140,6 +3154,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (args.limit !== undefined) query.limit = String(args.limit);
         if (!query.query && !query.section) return toError('query is required, or pass section to read one whole section');
         return toResult(await impreza.get<unknown>('/v1/docs/search', query));
+      }
+
+      case 'impreza_prepare_project': {
+        const body: Record<string, unknown> = {};
+        for (const field of ['package_json', 'dockerfile', 'dockerfile_path']) {
+          if (args[field] !== undefined) body[field] = args[field];
+        }
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepare', body));
       }
 
       case 'impreza_validate_manifest': {

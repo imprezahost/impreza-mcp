@@ -10,6 +10,19 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Prepare project configuration
+
+Use `impreza_prepare_project` with `package_json`, `dockerfile`, and optional
+`dockerfile_path` before deploying. It returns framework hints, available build
+and start commands, explicit ports from the final Dockerfile stage, and findings
+to review. Each file is limited to 32 KiB. Review files for credentials before
+sending; never submit .env files or secrets.
+
+This is advisory analysis of supplied text. It does not fetch a repository,
+execute code, generate a Dockerfile or deploy resources. Git deploys still need
+a Dockerfile. The analysis ID identifies metadata, not an executable plan.
+Requires an API exposing /v1/platform/deployments/custom/prepare.
+
 ## Why this host and not a mainstream one
 
 Any provider can run your app. This one is built so an **agent can obtain and
@@ -57,7 +70,7 @@ Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
 ## Status
 
-**Published package: 0.12.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.13.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
