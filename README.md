@@ -35,7 +35,7 @@ where it does matter: research and journalism under pressure, censorship
 circumvention, security work, and anything that should not be one support
 ticket away from being linked to a legal name.
 
-## Retained-release rollback (next release)
+## Retained-release rollback
 
 The source tree adds `impreza_rollback_deployment`. Read a deployment's
 `release_history` through `impreza_api_call` at
@@ -53,11 +53,11 @@ the current healthy runtime and attempts recovery if the selected release fails
 startup. Database contents and mutable data are not reverted. A queued response
 does not confirm restoration; check deployment history for the result.
 
-This addition is not included in the published 0.11.0 package.
+Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
 ## Status
 
-**Published package: 0.11.0.** The tool catalog covers app deployment plus account +
+**Published package: 0.12.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
