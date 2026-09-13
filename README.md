@@ -35,9 +35,29 @@ where it does matter: research and journalism under pressure, censorship
 circumvention, security work, and anything that should not be one support
 ticket away from being linked to a legal name.
 
+## Retained-release rollback (next release)
+
+The source tree adds `impreza_rollback_deployment`. Read a deployment's
+`release_history` through `impreza_api_call` at
+`/platform/deployments/{id}`, then choose a `rel_...` entry with
+`rollback_supported: true`.
+
+Explain the selected release and possible interruption to the customer before
+calling the tool with `deployment_id`, `target_version` and `confirm: true`.
+The hosted connector uses its two-call `confirm_token` flow instead.
+The operation requires `manage` scope and a compatible API and agent.
+
+A historical release may no longer be retained. The agent checks local images
+and unchanged ports, storage and routing before replacing containers. It saves
+the current healthy runtime and attempts recovery if the selected release fails
+startup. Database contents and mutable data are not reverted. A queued response
+does not confirm restoration; check deployment history for the result.
+
+This addition is not included in the published 0.11.0 package.
+
 ## Status
 
-**Full surface live.** All 116 tools shipped — app deployment plus account +
+**Published package: 0.11.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that

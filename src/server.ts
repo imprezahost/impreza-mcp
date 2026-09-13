@@ -493,6 +493,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_rollback_deployment',
+    description: 'Restore a retained release from deployment release_history with rollback_supported=true. Requires manage scope and explicit customer confirmation. May interrupt the app; does not revert databases or mutable data. target_version is an exact rel_ snapshot ID, not a semantic version. Requires a compatible agent.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string' },
+        target_version: { type: 'string', pattern: '^rel_[A-Za-z0-9._-]{1,100}$' },
+        confirm: { type: 'boolean', const: true, description: 'True only after customer confirmation.' },
+      },
+      required: ['deployment_id', 'target_version', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_change_domain',
     description:
       'Re-route a RUNNING deployment to a new clearnet hostname without touching its container or data. The agent regenerates its Caddy fragment + reloads zero-downtime; Let\'s Encrypt issues a fresh cert on the first hit. Use to migrate from an auto-subdomain to a custom domain, or vice-versa, or just to rename. Deployment must be in status=running (Phase 9.19).',
@@ -2112,6 +2126,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // tool that exists so nobody uninstalls to redeploy — but not idempotent,
   // since HEAD moves under it.
   impreza_redeploy_deployment: A_WRITE_EXT,
+  impreza_rollback_deployment: A_DESTRUCTIVE,
   impreza_restart_deployment: A_WRITE_IDEM,
   impreza_backup_app: A_WRITE_EXT,
   impreza_list_backups: A_READ,
@@ -2682,6 +2697,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             body,
           ),
         );
+      }
+
+      case 'impreza_rollback_deployment': {
+        const dep = String(args.deployment_id ?? '');
+        const target = String(args.target_version ?? '');
+        if (!dep || !/^rel_[A-Za-z0-9._-]{1,100}$/.test(target)) return toError('Valid deployment_id and release target_version are required');
+        if (args.confirm !== true) return toError('Explicit customer confirmation is required');
+        return toResult(await impreza.post('/v1/platform/deployments/' + encodeURIComponent(dep) + '/rollback', { target_version: target, confirm: true }));
       }
 
       case 'impreza_change_domain': {
