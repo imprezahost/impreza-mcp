@@ -10,6 +10,24 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Node.js npm builds
+
+Deploy a root npm HTTP application without a repository Dockerfile using
+`impreza_deploy_custom` with `mode: "dockerfile"`, `build_strategy: "node_npm"`,
+`git_url` (or local `dir`), and `target_port` (usually 3000).
+The API generates a Node 24 recipe: npm ci, optional build script, production
+pruning and npm start as a non-root user. Root package.json, package-lock.json
+and a production start script are required. Docker Compose 2.17+ and BuildKit
+must be available on the server. Workspaces, private npm configuration and build
+secrets require a custom Dockerfile. The app must listen on 0.0.0.0 and the
+configured port. Keep runtime PORT consistent with that port.
+
+Git redeploys and previews reuse the recipe snapshot. Uploaded contexts retain
+the existing one-use restriction. The recipe excludes .git, node_modules, .env,
+.env.* and .npmrc from the source copy; this does not scan arbitrary secrets.
+Keep credentials out of source code. The HTTP startup probe accepts responses
+below 500 at / and is not a functional application test.
+
 ## Prepare project configuration
 
 Use `impreza_prepare_project` with `package_json`, `dockerfile`, and optional
@@ -19,8 +37,7 @@ to review. Each file is limited to 32 KiB. Review files for credentials before
 sending; never submit .env files or secrets.
 
 This is advisory analysis of supplied text. It does not fetch a repository,
-execute code, generate a Dockerfile or deploy resources. Git deploys still need
-a Dockerfile. The analysis ID identifies metadata, not an executable plan.
+execute code, generate a Dockerfile or deploy resources. Git deploys use a Dockerfile by default; supported npm projects can opt into the Node recipe. The analysis ID identifies metadata, not an executable plan.
 Requires an API exposing /v1/platform/deployments/custom/prepare.
 
 ## Why this host and not a mainstream one
@@ -70,7 +87,7 @@ Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
 ## Status
 
-**Package version: 0.13.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.14.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
