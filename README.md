@@ -10,6 +10,16 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Cancel a deployment
+
+Use `impreza_cancel_deployment` with the deployment ID and exact
+`last_operation.command_id`. Requires manage permission. Queued cancellation
+is immediate; running preparation needs agent 0.6.5+. A running pull/build
+finishes its step before the agent confirms cancellation and restores
+configuration. `requested` is not `cancelled`. Replacement/recovery cannot
+be cancelled. Cancelling a tracking Task remains separate.
+Read [the cancellation guide](https://docs.imprezahost.com/deployment-cancellation.html).
+
 ## Runtime health and deployment operations
 
 `impreza_list_deployments` returns `runtime` and `last_operation` separately.

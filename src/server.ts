@@ -507,6 +507,11 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_cancel_deployment',
+    description: "Cancel an exact deploy command before container replacement. Read last_operation.command_id and cancellation first. Pending work is cancelled immediately; preparation returns requested until the current pull/build step finishes and the agent restores configuration. Requires manage scope; running cancellation requires agent 0.6.5+. Once replacement or recovery starts it cannot be cancelled. This does not cancel an MCP tracking Task. Poll last_operation until cancelled or another terminal result; never treat requested as confirmation.",
+    inputSchema: {type:'object',properties:{deployment_id:{type:'string'},command_id:{type:'string',pattern:'^cmd_[A-Za-z0-9_-]{1,28}$',description:'Exact command_id observed on this deployment.'}},required:['deployment_id','command_id'],additionalProperties:false},
+  },
+  {
     name: 'impreza_rollback_deployment',
     description: 'Restore a retained release from deployment release_history with rollback_supported=true. Requires manage scope and explicit customer confirmation. May interrupt the app; does not revert databases or mutable data. target_version is an exact rel_ snapshot ID, not a semantic version. Requires a compatible agent.',
     inputSchema: {
@@ -2179,6 +2184,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // tool that exists so nobody uninstalls to redeploy — but not idempotent,
   // since HEAD moves under it.
   impreza_redeploy_deployment: A_WRITE_EXT,
+  impreza_cancel_deployment: A_WRITE_EXT,
   impreza_rollback_deployment: A_DESTRUCTIVE,
   impreza_restart_deployment: A_WRITE_IDEM,
   impreza_backup_app: A_WRITE_EXT,
@@ -2759,6 +2765,13 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             body,
           ),
         );
+      }
+
+      case 'impreza_cancel_deployment': {
+        const dep=String(args.deployment_id ?? '');
+        const command=args.command_id;
+        if (!dep || typeof command !== 'string' || (!/^cmd_[A-Za-z0-9_-]{1,28}$/.test(command) || command.trim() !== command)) return toError('deployment_id and an exact command_id are required');
+        return toResult(await impreza.post('/v1/platform/deployments/'+encodeURIComponent(dep)+'/cancel',{command_id:command}));
       }
 
       case 'impreza_rollback_deployment': {
