@@ -213,6 +213,7 @@ const TOOLS = [
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
         build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static'], description: 'node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        healthcheck_path: { type: 'string', minLength: 1, maxLength: 200, pattern: '^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$', description: 'node_npm only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for the legacy / check accepting status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy.' },
         public_build_vars: { type: 'object', maxProperties: 20, additionalProperties: { type: 'string', maxLength: 4096 }, description: 'Public values for npm run build only. Names start with VITE_, NEXT_PUBLIC_ or PUBLIC_; 20 keys max, 128 chars per key, 4 KiB per value, 16 KiB total. Values can appear in bundles/image metadata; never supply secrets. Saved at creation and inherited by previews/redeploys. Separate from runtime vars and npm install.' },
         project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm recipes only: . (default) or relative app folder with its own package.json and lockfile. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
         static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
@@ -3752,6 +3753,7 @@ interface DeployCustomBody {
   git_pat?: string;
   dockerfile_path?: string;
   build_strategy?: string;
+  healthcheck_path?: string;
   public_build_vars?: Record<string, string>;
   project_dir?: string;
   static_output_dir?: string;
@@ -3771,6 +3773,12 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if ((args.static_output_dir !== undefined || args.static_spa !== undefined) && args.build_strategy !== 'node_npm_static') throw new Error('Static options require node_npm_static');
   if (args.project_dir !== undefined && !['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated npm recipe');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.healthcheck_path !== undefined) {
+    if (args.build_strategy !== 'node_npm') throw new Error('healthcheck_path requires node_npm');
+    const path = args.healthcheck_path;
+    if (typeof path !== 'string' || path !== path.trim() || path.length > 200 || !/^\/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*\/?)?$/.test(path)) throw new Error('healthcheck_path must be / or an HTTP path such as /health, up to 200 ASCII characters; no URL, query, fragment, escape or parent segments');
+    body.healthcheck_path = path;
+  }
   if (args.public_build_vars !== undefined) {
     if (!['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('public_build_vars requires a generated npm recipe');
     const vars=args.public_build_vars;
