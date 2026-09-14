@@ -10,6 +10,17 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Deployment progress and agent restarts
+
+Read `last_operation.progress` from `impreza_list_deployments` for the last
+reported step and timestamp. Agent 0.6.6+ saves final results before sending them;
+after restart it resends the same receipt without repeating the deploy.
+`recovery=required` means execution was interrupted without a saved result:
+contact support to reconcile it before retrying. A long-running build can
+continue after the agent exits. Progress is not a live percentage or proof of
+current runtime health. Existing agents update explicitly before the next deploy.
+See [deployment progress](https://docs.imprezahost.com/deployment-progress.html).
+
 ## Cancel a deployment
 
 Use `impreza_cancel_deployment` with the deployment ID and exact

@@ -225,7 +225,7 @@ export interface Deployment {
     last_reported_state: string | null;
     counts: Record<string, number> | null;
   };
-  last_operation?: { command_id: string; kind: string; status: string; created_at: string; completed_at: string | null; cancellation?: {state: "none" | "requested" | "cancelled"; phase: string; can_cancel: boolean; requested_at: string | null; confirmed_at: string | null; reason: string | null} } | null;
+  last_operation?: { progress?: {supported: boolean; step: string; label: string; reported_at: string | null; age_seconds: number | null; recovery: "none" | "resending_result" | "required"; reason: string | null}; command_id: string; kind: string; status: string; created_at: string; completed_at: string | null; cancellation?: {state: "none" | "requested" | "cancelled"; phase: string; can_cancel: boolean; requested_at: string | null; confirmed_at: string | null; reason: string | null} } | null;
   last_error?: string | null;
 }
 

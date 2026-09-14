@@ -171,7 +171,7 @@ const TOOLS = [
     name: 'impreza_list_deployments',
     description:
       'List the customer\'s currently-installed app deployments (catalog + custom). ' +
-      'Runtime observations (agent 0.6.4+) and last_operation are separate. Read runtime.state, reason, observed_at and age_seconds; unknown/stale/offline is not healthy. Running without a healthcheck is not proven healthy. Container health does not verify the public URL. status and its filter are legacy deployment lifecycle fields, not current availability. Optionally narrow to a single server via `agent_id`. ' +
+      'Runtime observations (agent 0.6.4+) and last_operation are separate. Read runtime.state, reason, observed_at and age_seconds; unknown/stale/offline is not healthy. Running without a healthcheck is not proven healthy. Container health does not verify the public URL. status and its filter are legacy deployment lifecycle fields, not current availability. Read last_operation.progress for the last reported step and timestamp (agent 0.6.6+), not a live percentage. recovery=resending_result replays a saved result without re-execution; recovery=required needs support reconciliation. Never retry an interrupted job based only on a timeout. Optionally narrow to a single server via `agent_id`. ' +
       'Use to inspect deployments before adding more, or to find a `deployment_id` to uninstall/restart.',
     inputSchema: {
       type: 'object',
