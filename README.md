@@ -12,12 +12,12 @@ back the URL.
 
 ## Node.js npm builds
 
-Deploy a root npm HTTP application without a repository Dockerfile using
+Deploy an independent npm HTTP application without a repository Dockerfile using
 `impreza_deploy_custom` with `mode: "dockerfile"`, `build_strategy: "node_npm"`,
 `git_url` (or local `dir`), and `target_port` (usually 3000).
 The API generates a Node 24 recipe: npm ci, optional build script, production
-pruning and npm start as a non-root user. Root package.json, package-lock.json
-and a production start script are required. Docker Compose 2.17+ and BuildKit
+pruning and npm start as a non-root user. The selected project folder must contain package.json, package-lock.json
+and a production start script. Docker Compose 2.17+ and BuildKit
 must be available on the server. Workspaces, private npm configuration and build
 secrets require a custom Dockerfile. The app must listen on 0.0.0.0 and the
 configured port. Keep runtime PORT consistent with that port.
@@ -27,6 +27,12 @@ the existing one-use restriction. The recipe excludes .git, node_modules, .env,
 .env.* and .npmrc from the source copy; this does not scan arbitrary secrets.
 Keep credentials out of source code. The HTTP startup probe accepts responses
 below 500 at / and is not a functional application test.
+
+## Apps in project subfolders
+
+Deploy an independent npm app from a subfolder: set project_dir (default .) with node_npm or node_npm_static, or choose Project folder in the portal. For example, apps/site must contain its own package.json and matching package-lock.json; static_output_dir is relative to that folder. Only the selected folder is copied into /app for npm installation and builds. The repository/upload remains the Docker build context, so its root .dockerignore still applies. Paths allow up to 120 characters and five non-hidden segments; parent, node_modules and symlink components are refused. Missing folders or failed builds retain the previous healthy runtime. The project_dir value is returned by deployment reads, saved at creation and inherited by new previews; redeploy reuses the saved recipe. Existing snapshots default to .; changing the folder requires a new deployment. This supports independent apps in one repository, not shared workspaces or dependencies outside the folder; use a custom Dockerfile for those. The analyzer does not discover subfolders: supply the selected app metadata and review Project folder yourself. Local MCP requires 0.17.0+; no agent upgrade is required beyond the existing build executor.
+
+See the [project folder guide](https://docs.imprezahost.com/tutorials/agent-apps-panels.html#project-folder).
 
 ## Prepare project configuration
 
@@ -87,11 +93,11 @@ Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
 ## Static npm sites
 
-Static npm sites: choose build_strategy=node_npm_static with a Git/context source (mode=dockerfile), or Static site + npm in the portal. Requires a single root npm package, matching package-lock.json and a build script producing dist/index.html. Node 24 installs dependencies and runs the build; unprivileged Nginx serves only dist with SPA fallback. No start script is required. Default target_port is 8080. Compose 2.17+ and BuildKit required. No SSR, server functions, workspaces, private npm configuration or build-time variables. Runtime variables (including VITE_* and PORT) do not rewrite static bundles or change the configured Nginx port. Use static_output_dir (default dist) to choose a relative output folder containing index.html, and static_spa (boolean, default true) to choose SPA fallback or 404 for unknown routes. The portal exposes both fields. Paths are limited to 120 characters and five segments, without hidden, parent or node_modules segments; symlinks in the output or its parent path are refused. These settings are chosen at creation, stored in the recipe snapshot, exposed as static_options and carried to new previews. Redeploy reuses the saved recipe; changing these settings on existing deployments requires creating a new deployment. Existing snapshots keep their original recipe. Local MCP option inputs require 0.16.0+. Use a custom Dockerfile for build-time configuration. Source .env/.env.*/.npmrc/.git/node_modules are excluded; review all generated files because dist is public. Missing index.html and symlink output fail the build. Existing preview/redeploy snapshots preserve the strategy. Local MCP requires 0.15.0+; no agent upgrade is needed beyond the existing build executor. The analyzer returns static_npm_recipe and conditional deployment_options; metadata is not proof of a static, working build.
+Static npm sites: choose build_strategy=node_npm_static with a Git/context source (mode=dockerfile), or Static site + npm in the portal. Requires an independent npm package in the selected project folder, matching package-lock.json and a build script producing index.html in the selected output folder. Node 24 installs dependencies and runs the build; unprivileged Nginx serves only the selected output folder with configurable SPA fallback. No start script is required. Default target_port is 8080. Compose 2.17+ and BuildKit required. No SSR, server functions, workspaces, private npm configuration or build-time variables. Runtime variables (including VITE_* and PORT) do not rewrite static bundles or change the configured Nginx port. Use static_output_dir (default dist) to choose a relative output folder containing index.html, and static_spa (boolean, default true) to choose SPA fallback or 404 for unknown routes. The portal exposes both fields. Paths are limited to 120 characters and five segments, without hidden, parent or node_modules segments; symlinks in the output or its parent path are refused. These settings are chosen at creation, stored in the recipe snapshot, exposed as static_options and carried to new previews. Redeploy reuses the saved recipe; changing these settings on existing deployments requires creating a new deployment. Existing snapshots keep their original recipe. Local MCP option inputs require 0.16.0+. Use a custom Dockerfile for build-time configuration. Source .env/.env.*/.npmrc/.git/node_modules are excluded; review all generated files because the output folder is public. Missing index.html and symlink output fail the build. Existing preview/redeploy snapshots preserve the strategy. Local MCP requires 0.15.0+; no agent upgrade is needed beyond the existing build executor. The analyzer returns static_npm_recipe and conditional deployment_options; metadata is not proof of a static, working build.
 
 ## Status
 
-**Package version: 0.16.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.17.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that

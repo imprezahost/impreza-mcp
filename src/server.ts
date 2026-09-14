@@ -212,8 +212,9 @@ const TOOLS = [
         git_ref: { type: 'string', description: 'Branch / tag / commit for git_url (default main).' },
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
-        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static'], description: 'node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require root package.json, package-lock.json and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
-        static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: relative output folder containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
+        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static'], description: 'node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm recipes only: . (default) or relative app folder with its own package.json and lockfile. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
+        static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
         static_spa: { type: 'boolean', description: 'Static npm only: true (default) uses index.html for unknown routes; false returns 404.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
         manifest: { type: 'object', description: 'Required when mode=manifest. Full app manifest object.' },
@@ -3750,6 +3751,7 @@ interface DeployCustomBody {
   git_pat?: string;
   dockerfile_path?: string;
   build_strategy?: string;
+  project_dir?: string;
   static_output_dir?: string;
   static_spa?: boolean;
   manifest?: unknown;
@@ -3765,7 +3767,9 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
 
   if (['node_npm','node_npm_static'].includes(String(args.build_strategy)) && mode !== 'dockerfile') throw new Error('Node npm requires Dockerfile mode with a Git or directory source');
   if ((args.static_output_dir !== undefined || args.static_spa !== undefined) && args.build_strategy !== 'node_npm_static') throw new Error('Static options require node_npm_static');
+  if (args.project_dir !== undefined && !['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated npm recipe');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.project_dir !== undefined) { if (typeof args.project_dir !== 'string') throw new Error('project_dir must be a string'); body.project_dir = args.project_dir; }
   if (args.static_output_dir !== undefined) { if (typeof args.static_output_dir !== 'string') throw new Error('static_output_dir must be a string'); body.static_output_dir = args.static_output_dir; }
   if (args.static_spa !== undefined) { if (typeof args.static_spa !== 'boolean') throw new Error('static_spa must be boolean'); body.static_spa = args.static_spa; }
   if (typeof args.domain === 'string') body.domain = args.domain;
