@@ -44,6 +44,34 @@ Deploy an independent npm app from a subfolder: set project_dir (default .) with
 
 See the [project folder guide](https://docs.imprezahost.com/tutorials/agent-apps-panels.html#project-folder).
 
+## Import a Compose stack
+
+Use `impreza_prepare_compose` with `compose_yaml`, then explicitly select
+`web_service` and the integer `target_port`. Review services, persistent
+volumes, required variables, changes and blockers before deploying with
+`impreza_deploy_custom`, `mode: "compose"`, the same YAML/service/port and
+`compose_review_id` set to the returned `analysis_id`.
+
+Supports self-contained public-image stacks with up to 12 services, private
+bridge networks, local named volumes and service dependencies. Original host
+port bindings are removed; only the selected HTTP service joins the proxy and
+receives a managed loopback port. Container and volume names become specific
+to the deployment. Declare CPU/memory limits per service in YAML.
+
+The review does not fetch images, execute code or reserve resources. Builds,
+local files, env_file, aliases, profiles, host privileges and external resources
+are outside this import subset. Reference uppercase variables instead of
+embedding secrets. Runtime values must be single-line strings up to 4 KiB,
+without surrounding whitespace, quotes, backslashes, dollar signs or space
+followed by #. Variables supply explicit references, not every service's
+environment. Required values are checked at creation, editing and redeploy.
+
+The imported source is saved as a manifest. Redeploy reuses it and the named
+data; changing the source/topology requires a new deployment. Failure recovery
+uses the existing agent policy and does not undo database writes. Local MCP
+support requires 0.21.0+. No agent update is required for this import flow.
+See the [Compose import guide](https://docs.imprezahost.com/compose-import.html).
+
 ## Prepare project configuration
 
 Use `impreza_prepare_project` with `package_json`, `dockerfile`, and optional

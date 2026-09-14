@@ -185,13 +185,14 @@ const TOOLS = [
   {
     name: 'impreza_deploy_custom',
     description:
-      'Deploy a custom (non-catalog) app to an Impreza VPS. Three modes — pick exactly one:\n' +
+      'Deploy a custom (non-catalog) app to an Impreza VPS. Four modes — pick exactly one:\n' +
       '  • `mode: "image"` — public Docker image URL (`image: "ghcr.io/user/app:tag"`).\n' +
       '  • `mode: "dockerfile"` — build from a Dockerfile, sourced from EITHER a local project directory ' +
       '(`dir: "/abs/path/to/project"`; the MCP tars + uploads it) OR a git repo (`git_url`). For a private ' +
       'repo set `git_auth_method`: `deploy_key` (SSH URL; the response returns `git_auth.public_key` to add ' +
       'to the repo as a read-only Deploy Key) or `pat` (https URL + `git_pat`).\n' +
       '  • `mode: "manifest"` — a full docker-compose manifest object (advanced; same schema as catalog apps).\n' +
+      '  • `mode: "compose"` — reviewed Compose YAML using compose_yaml, web_service, target_port and compose_review_id from impreza_prepare_compose. Public images only; stored as a frozen manifest.\n' +
       'Always required: `name`, `agent_id`. Use `impreza_list_servers` to find a valid `agent_id`.\n' +
       'When the customer says "deploy this" with a project open, Dockerfile mode is the right choice.',
     inputSchema: {
@@ -199,7 +200,7 @@ const TOOLS = [
       properties: {
         name: { type: 'string', description: 'Per-account-unique deploy name (3-100 chars, [a-z0-9_-]).' },
         agent_id: { type: 'string', description: 'Target VPS agent_id (from impreza_list_servers).' },
-        mode: { type: 'string', enum: ['image', 'dockerfile', 'manifest'], description: 'Source mode.' },
+        mode: { type: 'string', enum: ['image', 'dockerfile', 'manifest', 'compose'], description: 'Source mode.' },
         domain: { type: 'string', description: 'Public hostname. Omit when `onion: true` for an onion-only deploy.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service. Default false.' },
         cpus: { type: 'number', description: 'CPU limit (cores; 1.0 = one core). Default 1.0 server-side.' },
@@ -221,6 +222,9 @@ const TOOLS = [
         static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
         static_spa: { type: 'boolean', description: 'Static npm only: true (default) uses index.html for unknown routes; false returns 404.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
+        compose_yaml: { type: 'string', maxLength: 65536, description: 'mode=compose: self-contained YAML reviewed with impreza_prepare_compose.' },
+        web_service: { type: 'string', maxLength: 63, description: 'mode=compose: selected HTTP service; target_port is its integer container port.' },
+        compose_review_id: { type: 'string', description: 'mode=compose: analysis_id from the exact YAML, HTTP service and port review.' },
         manifest: { type: 'object', description: 'Required when mode=manifest. Full app manifest object.' },
       },
       required: ['name', 'agent_id', 'mode'],
@@ -856,6 +860,17 @@ const TOOLS = [
         section: { type: 'string', description: 'Instead of searching, return one whole section by the heading a previous result gave you. Use when the excerpt was cut short.' },
       },
       additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_prepare_compose',
+    description: 'Review a self-contained Compose YAML before deploying. Public images only; no builds, file dependencies, aliases, profiles, host privileges or external volumes/networks. Returns services, TCP port hints, variable names, changes and blockers without executing or fetching anything. Select web_service and target_port explicitly. Original published ports are removed; only the HTTP service joins the proxy and receives a loopback port. Names and volumes become deployment-specific. Use the returned analysis_id as compose_review_id with the same YAML/service/port in impreza_deploy_custom mode=compose after review. Never paste secrets: reference uppercase vars instead. This is a configuration review, not an executable stored plan or a health check.',
+    inputSchema: {
+      type: 'object', properties: {
+        compose_yaml: { type: 'string', minLength: 1, maxLength: 65536 },
+        web_service: { type: 'string', maxLength: 63 },
+        target_port: { type: 'integer', minimum: 1, maximum: 65535 },
+      }, required: ['compose_yaml'], additionalProperties: false,
     },
   },
   {
@@ -2192,6 +2207,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_delete_webhook: A_DESTRUCTIVE_IDEM,
   impreza_rotate_webhook_secret: A_DESTRUCTIVE,
   impreza_search_docs: A_READ,
+  impreza_prepare_compose: A_READ,
   impreza_prepare_project: A_READ,
   impreza_validate_manifest: A_READ,
   impreza_doctor: A_READ,
@@ -3164,6 +3180,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.get<unknown>('/v1/docs/search', query));
       }
 
+      case 'impreza_prepare_compose': {
+        const body: Record<string, unknown> = {};
+        for (const field of ['compose_yaml', 'web_service', 'target_port']) if (args[field] !== undefined) body[field] = args[field];
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/compose/prepare', body));
+      }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};
         for (const field of ['package_json', 'dockerfile', 'dockerfile_path']) {
@@ -3762,6 +3783,9 @@ interface DeployCustomBody {
   project_dir?: string;
   static_output_dir?: string;
   static_spa?: boolean;
+  compose_yaml?: string;
+  web_service?: string;
+  compose_review_id?: string;
   manifest?: unknown;
 }
 
@@ -3877,6 +3901,14 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
       break;
     }
 
+    case 'compose':
+      if (typeof args.compose_yaml !== 'string' || !args.compose_yaml || Buffer.byteLength(args.compose_yaml) > 65536) throw new Error('mode=compose requires Compose YAML up to 64 KiB');
+      if (typeof args.web_service !== 'string' || !args.web_service || typeof args.compose_review_id !== 'string' || !args.compose_review_id) throw new Error('Run impreza_prepare_compose and review the selected service and port first');
+      if (typeof args.target_port !== 'number' || !Number.isInteger(args.target_port) || args.target_port < 1 || args.target_port > 65535) throw new Error('Compose target_port must be an integer from 1 to 65535');
+      for (const field of ['image', 'manifest', 'git_url', 'dir', 'context_id', 'dockerfile']) if (args[field] !== undefined) throw new Error('Compose cannot be combined with another deployment source');
+      body.compose_yaml = args.compose_yaml; body.web_service = args.web_service; body.compose_review_id = args.compose_review_id;
+      break;
+
     case 'manifest':
       if (!args.manifest || typeof args.manifest !== 'object') {
         throw new Error('mode=manifest requires `manifest` (object with runtime.type + runtime.compose_yaml)');
@@ -3885,7 +3917,7 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
       break;
 
     default:
-      throw new Error(`unknown mode "${mode}" (expected image / dockerfile / manifest)`);
+      throw new Error(`unknown mode "${mode}" (expected image / dockerfile / manifest / compose)`);
   }
 
   const created = await impreza.post<Deployment>('/v1/platform/deployments/custom', body);
