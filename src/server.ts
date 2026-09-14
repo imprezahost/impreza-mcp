@@ -212,7 +212,7 @@ const TOOLS = [
         git_ref: { type: 'string', description: 'Branch / tag / commit for git_url (default main).' },
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
-        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm'], description: 'node_npm uses the Node 24 npm recipe without a repository Dockerfile. Requires root package.json, package-lock.json, production start script and Compose 2.17+ with BuildKit. No workspaces or private npm configuration.' },
+        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static'], description: 'node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require root package.json, package-lock.json and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
         manifest: { type: 'object', description: 'Required when mode=manifest. Full app manifest object.' },
       },
@@ -3759,7 +3759,7 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
     throw new Error('name, agent_id, and mode are required');
   }
 
-  if (args.build_strategy === 'node_npm' && mode !== 'dockerfile') throw new Error('Node npm requires Dockerfile mode with a Git or directory source');
+  if (['node_npm','node_npm_static'].includes(String(args.build_strategy)) && mode !== 'dockerfile') throw new Error('Node npm requires Dockerfile mode with a Git or directory source');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
   if (typeof args.domain === 'string') body.domain = args.domain;
   if (typeof args.onion === 'boolean') body.onion = args.onion;
@@ -3780,7 +3780,7 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
 
     case 'dockerfile': {
       if (args.build_strategy !== undefined) {
-        if (!['dockerfile', 'node_npm'].includes(String(args.build_strategy))) throw new Error('Invalid build_strategy');
+        if (!['dockerfile', 'node_npm', 'node_npm_static'].includes(String(args.build_strategy))) throw new Error('Invalid build_strategy');
         body.build_strategy = String(args.build_strategy);
       }
       const gitURL = typeof args.git_url === 'string' ? args.git_url : '';

@@ -85,9 +85,13 @@ does not confirm restoration; check deployment history for the result.
 
 Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
+## Static npm sites
+
+Static npm sites: choose build_strategy=node_npm_static with a Git/context source (mode=dockerfile), or Static site + npm in the portal. Requires a single root npm package, matching package-lock.json and a build script producing dist/index.html. Node 24 installs dependencies and runs the build; unprivileged Nginx serves only dist with SPA fallback. No start script is required. Default target_port is 8080. Compose 2.17+ and BuildKit required. No SSR, server functions, workspaces, private npm configuration or build-time variables. Runtime variables (including VITE_* and PORT) do not rewrite static bundles or change the configured Nginx port. Use a custom Dockerfile for other output directories or build-time configuration. Source .env/.env.*/.npmrc/.git/node_modules are excluded; review all generated files because dist is public. Missing index.html and symlink output fail the build. Existing preview/redeploy snapshots preserve the strategy. Local MCP requires 0.15.0+; no agent upgrade is needed beyond the existing build executor. The analyzer returns static_npm_recipe and conditional deployment_options; metadata is not proof of a static, working build.
+
 ## Status
 
-**Package version: 0.14.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.15.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
