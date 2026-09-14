@@ -10,6 +10,15 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Runtime health and deployment operations
+
+`impreza_list_deployments` returns `runtime` and `last_operation` separately.
+A failed build can leave the previous application healthy. Read runtime state,
+observation time and reason; old or missing readings remain unknown.
+Running without a confirmed healthcheck is not healthy. This requires agent
+0.6.4+ for observations and does not verify external HTTP/DNS/TLS. Existing
+servers update explicitly. See [runtime health](https://docs.imprezahost.com/runtime-health.html).
+
 ## Retained source uploads
 
 Use `impreza_upload_context` with `dir` and an optional `label` to upload an immutable

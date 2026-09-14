@@ -1397,8 +1397,8 @@ function el(id) { return document.getElementById(id); }
 
   function appState(status) {
     var s = String(status || '').toLowerCase();
-    if (s === 'running') { return ['ok', s]; }
-    if (s === 'failed') { return ['bad', s]; }
+    if (s === 'running' || s === 'healthy') { return ['ok', s]; }
+    if (s === 'failed' || s === 'degraded') { return ['bad', s]; }
     if (s === 'uninstalled') { return ['gone', s]; }
     return ['work', s || 'unknown'];
   }
@@ -1432,11 +1432,16 @@ function el(id) { return document.getElementById(id); }
       }
       row.appendChild(left);
 
-      var pair = appState(d.status);
+      var runtime = d.runtime || {};
+      var pair = appState(runtime.state || "unknown");
       var st = document.createElement('div');
       st.className = 'app-state';
       st.dataset.state = pair[0];
-      st.textContent = pair[1];
+      st.textContent = 'Runtime: ' + pair[1];
+      st.title = 'Observed: ' + (runtime.observed_at || 'not reported') + '. Last operation: ' + ((d.last_operation || {}).status || d.status || 'unknown') + '. Containers only.';
+      if (runtime.state && runtime.state !== 'unknown') {
+        setTimeout(function () { st.textContent = 'Runtime: unknown'; st.dataset.state = 'work'; }, Math.max(0, 120 - Number(runtime.age_seconds || 0)) * 1000);
+      }
       row.appendChild(st);
 
       box.appendChild(row);
@@ -2401,14 +2406,14 @@ function el(id) { return document.getElementById(id); }
 
         if (st === 'running') {
           setChip('ok', 'Running');
-          step('ok', 'done', 'Deployed and healthy.');
+          step('ok', 'done', 'Deployment completed. Observed runtime: ' + String((row.runtime || {}).state || 'unknown') + '.');
           busy = false;
           el('again').hidden = false;
           return;
         }
         if (st === 'failed') {
           setChip('error', 'Failed');
-          step('bad', 'failed', String(row.last_error || 'The deploy failed.').slice(0, 240));
+          step('bad', 'failed', String(row.last_error || 'The deploy failed.').slice(0, 240) + ' Observed runtime: ' + String((row.runtime || {}).state || 'unknown') + '.');
           busy = false;
           el('again').hidden = false;
           return;

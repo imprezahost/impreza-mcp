@@ -213,7 +213,19 @@ export interface Deployment {
   memory_mb?: number;
   vars?: Record<string, unknown>;
   created_at: string;
+  /** Historical deployment receipt; use runtime for current container health. */
   last_health_at?: string | null;
+  runtime?: {
+    state: 'healthy' | 'running' | 'starting' | 'degraded' | 'stopped' | 'unknown';
+    reason: string | null;
+    observed_at: string | null;
+    age_seconds: number | null;
+    fresh_for_seconds: number;
+    scope: 'containers';
+    last_reported_state: string | null;
+    counts: Record<string, number> | null;
+  };
+  last_operation?: { command_id: string; kind: string; status: string; created_at: string; completed_at: string | null } | null;
   last_error?: string | null;
 }
 
