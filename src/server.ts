@@ -213,6 +213,8 @@ const TOOLS = [
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
         build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static'], description: 'node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        require_healthy_start: { type: 'boolean', description: 'node_npm only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys.' },
+        startup_timeout_seconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Required healthy start only: 30-600 second startup observation budget, default 60; build/recovery time is separate.' },
         healthcheck_path: { type: 'string', minLength: 1, maxLength: 200, pattern: '^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$', description: 'node_npm only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for the legacy / check accepting status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy.' },
         public_build_vars: { type: 'object', maxProperties: 20, additionalProperties: { type: 'string', maxLength: 4096 }, description: 'Public values for npm run build only. Names start with VITE_, NEXT_PUBLIC_ or PUBLIC_; 20 keys max, 128 chars per key, 4 KiB per value, 16 KiB total. Values can appear in bundles/image metadata; never supply secrets. Saved at creation and inherited by previews/redeploys. Separate from runtime vars and npm install.' },
         project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm recipes only: . (default) or relative app folder with its own package.json and lockfile. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
@@ -3753,6 +3755,8 @@ interface DeployCustomBody {
   git_pat?: string;
   dockerfile_path?: string;
   build_strategy?: string;
+  require_healthy_start?: boolean;
+  startup_timeout_seconds?: number;
   healthcheck_path?: string;
   public_build_vars?: Record<string, string>;
   project_dir?: string;
@@ -3773,6 +3777,17 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if ((args.static_output_dir !== undefined || args.static_spa !== undefined) && args.build_strategy !== 'node_npm_static') throw new Error('Static options require node_npm_static');
   if (args.project_dir !== undefined && !['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated npm recipe');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.require_healthy_start !== undefined || args.startup_timeout_seconds !== undefined) {
+    if (args.build_strategy !== 'node_npm') throw new Error('Healthy start options require node_npm');
+    if (args.require_healthy_start !== undefined && typeof args.require_healthy_start !== 'boolean') throw new Error('require_healthy_start must be boolean');
+    if (args.require_healthy_start === true && typeof args.healthcheck_path !== 'string') throw new Error('Required healthy start needs an explicit healthcheck_path');
+    if (args.startup_timeout_seconds !== undefined) {
+      const seconds = args.startup_timeout_seconds;
+      if (args.require_healthy_start !== true || typeof seconds !== 'number' || !Number.isInteger(seconds) || seconds < 30 || seconds > 600) throw new Error('startup_timeout_seconds requires healthy start and an integer from 30 to 600');
+      body.startup_timeout_seconds = seconds;
+    }
+    if (args.require_healthy_start !== undefined) body.require_healthy_start = args.require_healthy_start;
+  }
   if (args.healthcheck_path !== undefined) {
     if (args.build_strategy !== 'node_npm') throw new Error('healthcheck_path requires node_npm');
     const path = args.healthcheck_path;
