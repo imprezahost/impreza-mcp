@@ -284,7 +284,7 @@ export async function tarProjectDir(projectDir: string): Promise<{ bytes: Uint8A
 }
 
 const EXCLUDED_DIRS = new Set(['.git', '.svn', '.hg', '.bzr', 'node_modules', '__pycache__', '.venv', 'venv', '.impreza']);
-const EXCLUDED_FILES = new Set(['.DS_Store', 'Thumbs.db']);
+const EXCLUDED_FILES = new Set(['.DS_Store', 'Thumbs.db', '.npmrc', '.pypirc']);
 
 function isExcluded(relPath: string): boolean {
   const normalized = relPath.replace(/^\.[\\/]+/, '').replace(/\\/g, '/');
@@ -294,6 +294,7 @@ function isExcluded(relPath: string): boolean {
   }
   const base = parts[parts.length - 1] ?? '';
   if (EXCLUDED_FILES.has(base)) return true;
+  if (base === '.env' || (base.startsWith('.env.') && !['.env.example', '.env.sample', '.env.template'].includes(base))) return true;
   if (base.endsWith('.pyc')) return true;
   return false;
 }

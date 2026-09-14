@@ -222,6 +222,7 @@ const TOOLS = [
         static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
         static_spa: { type: 'boolean', description: 'Static npm only: true (default) uses index.html for unknown routes; false returns 404.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
+        context_id: { type: 'string', description: 'mode=dockerfile: uploaded source ID, mutually exclusive with dir or git_url. Retained archives support redeploy.' },
         compose_yaml: { type: 'string', maxLength: 65536, description: 'mode=compose: self-contained YAML reviewed with impreza_prepare_compose.' },
         web_service: { type: 'string', maxLength: 63, description: 'mode=compose: selected HTTP service; target_port is its integer container port.' },
         compose_review_id: { type: 'string', description: 'mode=compose: analysis_id from the exact YAML, HTTP service and port review.' },
@@ -493,11 +494,12 @@ const TOOLS = [
   {
     name: 'impreza_redeploy_deployment',
     description:
-      'Rebuild a CUSTOM deployment in place from its current source — re-pull the image, re-clone the watched git ref at its new HEAD, or rebuild — and swap the container with near-zero downtime. Reuses the same deployment, so the domain, host port, and URL never change. This is the in-place way to ship a new build of a running custom app the customer changed — PREFER it over uninstall + recreate. Optional `vars` are merged into the stored environment before the rebuild (rotate a secret / add a var without a teardown); system vars (DEPLOYMENT_ID, DOMAIN_URL, HOST_PORT, ...) are preserved. The source itself is not changed here — to change the image ref or git URL, recreate under the same name (the *.imprezaapps.com domain is preserved either way). Custom deployments only; returns the deployment flipped to `updating` — poll impreza_list_deployments for running/failed.',
+      'Rebuild a CUSTOM deployment in place from its current source — re-pull the image, re-clone the watched git ref at its new HEAD, or rebuild — using the existing startup and recovery policy. Reuses the same deployment, so the domain, host port, and URL never change. This is the in-place way to ship a new build of a running custom app the customer changed — PREFER it over uninstall + recreate. Optional `vars` are merged into the stored environment before the rebuild (rotate a secret / add a var without a teardown); system vars (DEPLOYMENT_ID, DOMAIN_URL, HOST_PORT, ...) are preserved. Uploaded-source apps can select a retained context_id for a newer archive; omission rebuilds the current retained archive. Build recipe, paths and public build settings stay fixed. After a failed replacement, the running release can use an earlier source; check deployment history. Image and Git source changes require a new app. Custom deployments only; returns the deployment flipped to `updating` — poll impreza_list_deployments for running/failed.',
     inputSchema: {
       type: 'object',
       properties: {
         deployment_id: { type: 'string', description: 'The dpl_... id of the custom deployment to rebuild.' },
+        context_id: { type: 'string', description: 'Optional retained archive version for an app created from an upload.' },
         vars: { type: 'object', description: 'Optional env vars merged into the deployment before the rebuild. System vars are preserved.' },
       },
       required: ['deployment_id'],
@@ -861,6 +863,21 @@ const TOOLS = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: 'impreza_upload_context',
+    description: 'Upload a local project folder as an immutable retained source version. Does not deploy. Returns context_id, SHA256, size and expiry for impreza_deploy_custom or impreza_redeploy_deployment. Excludes common local-only files, but is not a secret scanner: review the project first. Sources in use remain available; unused versions expire seven days after upload or their last deploy request. Account quotas include retained versions. Requires deploy scope.',
+    inputSchema: { type: 'object', properties: { dir: { type: 'string' }, label: { type: 'string', maxLength: 120 } }, required: ['dir'], additionalProperties: false },
+  },
+  {
+    name: 'impreza_list_contexts',
+    description: 'List uploaded source versions or inspect one context_id. Returns label, SHA256, size, retention, expiry and references; no archive bytes or storage paths. Retained sources in use do not expire. Use a listed context_id to create or redeploy an uploaded-source app.',
+    inputSchema: { type: 'object', properties: { context_id: { type: 'string' } }, additionalProperties: false },
+  },
+  {
+    name: 'impreza_delete_context',
+    description: 'Permanently remove an unused source upload after customer confirmation. Refuses versions referenced by apps. Does not uninstall apps or remove app volumes. Requires manage scope.',
+    inputSchema: { type: 'object', properties: { context_id: { type: 'string' }, confirm: { type: 'boolean', const: true } }, required: ['context_id', 'confirm'], additionalProperties: false },
   },
   {
     name: 'impreza_prepare_compose',
@@ -2207,6 +2224,9 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_delete_webhook: A_DESTRUCTIVE_IDEM,
   impreza_rotate_webhook_secret: A_DESTRUCTIVE,
   impreza_search_docs: A_READ,
+  impreza_upload_context: A_WRITE_EXT,
+  impreza_list_contexts: A_READ,
+  impreza_delete_context: A_DESTRUCTIVE,
   impreza_prepare_compose: A_READ,
   impreza_prepare_project: A_READ,
   impreza_validate_manifest: A_READ,
@@ -2719,7 +2739,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_redeploy_deployment': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
-        const body: { vars?: Record<string, unknown> } = {};
+        const body: { vars?: Record<string, unknown>; context_id?: string } = {};
+        if (args.context_id !== undefined) {
+          if (typeof args.context_id !== "string" || !/^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) return toError("Invalid context_id");
+          body.context_id = args.context_id;
+        }
         if (args.vars && typeof args.vars === 'object') {
           body.vars = args.vars as Record<string, unknown>;
         }
@@ -3180,6 +3204,17 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.get<unknown>('/v1/docs/search', query));
       }
 
+      case 'impreza_upload_context':
+        if (typeof args.dir !== 'string' || !args.dir) return toError('dir is required');
+        return toResult(await uploadSourceContext(args.dir, args.label));
+      case 'impreza_list_contexts': {
+        const context = args.context_id;
+        if (context !== undefined && (typeof context !== 'string' || !/^ctx_[a-f0-9]{1,36}$/.test(context))) return toError('Invalid context_id');
+        return toResult(await impreza.get('/v1/platform/deployments/custom/contexts' + (context ? '/' + encodeURIComponent(context) : '')));
+      }
+      case 'impreza_delete_context':
+        if (args.confirm !== true || typeof args.context_id !== 'string' || !/^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) return toError('Valid context_id and confirm=true are required');
+        return toResult(await impreza.del('/v1/platform/deployments/custom/contexts/' + encodeURIComponent(args.context_id)));
       case 'impreza_prepare_compose': {
         const body: Record<string, unknown> = {};
         for (const field of ['compose_yaml', 'web_service', 'target_port']) if (args[field] !== undefined) body[field] = args[field];
@@ -3789,6 +3824,13 @@ interface DeployCustomBody {
   manifest?: unknown;
 }
 
+async function uploadSourceContext(dir: string, label: unknown = ''): Promise<CustomDeployContextUpload> {
+  if (typeof label !== 'string' || Buffer.byteLength(label) > 120 || /[\x00-\x1f\x7f]/.test(label)) throw new Error('label must be text up to 120 UTF-8 bytes without control characters');
+  const packed = await tarProjectDir(dir);
+  try { return await impreza.postRaw<CustomDeployContextUpload>('/v1/platform/deployments/custom/contexts?retain=true&label=' + encodeURIComponent(label), 'application/gzip', packed.bytes); }
+  finally { await packed.cleanup(); }
+}
+
 async function deployCustom(args: Record<string, unknown>): Promise<Deployment & { _trace?: string }> {
   const name = String(args.name ?? '');
   const agentId = String(args.agent_id ?? '');
@@ -3855,6 +3897,8 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
         if (!['dockerfile', 'node_npm', 'node_npm_static'].includes(String(args.build_strategy))) throw new Error('Invalid build_strategy');
         body.build_strategy = String(args.build_strategy);
       }
+      const sourceCount = [args.git_url, args.dir, args.context_id].filter(value => value !== undefined && value !== '').length;
+      if (sourceCount !== 1) throw new Error('Choose exactly one of git_url, dir or context_id');
       const gitURL = typeof args.git_url === 'string' ? args.git_url : '';
       if (gitURL) {
         // Git source — the agent clones at deploy time; no local upload.
@@ -3878,23 +3922,14 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
           method === 'deploy_key'
             ? ' (deploy_key — add the returned git_auth.public_key to your repo as a read-only Deploy Key, then redeploy)'
             : ` (git: ${gitURL})`;
+      } else if (typeof args.context_id === 'string' && /^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) {
+        body.context_id = args.context_id;
+        if (typeof args.dockerfile_path === 'string' && args.dockerfile_path) body.dockerfile_path = args.dockerfile_path;
       } else if (typeof args.dir === 'string' && args.dir) {
-        // Local dir — tar + upload to /custom/contexts → get a context_id.
-        const packed = await tarProjectDir(args.dir);
-        try {
-          const upload = await impreza.postRaw<CustomDeployContextUpload>(
-            '/v1/platform/deployments/custom/contexts',
-            'application/gzip',
-            packed.bytes,
-          );
-          body.context_id = upload.context_id;
-          if (typeof args.dockerfile_path === 'string' && args.dockerfile_path && args.dockerfile_path !== 'Dockerfile') {
-            body.dockerfile_path = args.dockerfile_path;
-          }
-          traceTail = ` (uploaded ${packed.sizeBytes} B → ${upload.context_id})`;
-        } finally {
-          await packed.cleanup();
-        }
+        const upload = await uploadSourceContext(args.dir);
+        body.context_id = upload.context_id;
+        if (typeof args.dockerfile_path === 'string' && args.dockerfile_path) body.dockerfile_path = args.dockerfile_path;
+        traceTail = ' (retained source ' + upload.context_id + ')';
       } else {
         throw new Error('mode=dockerfile requires `dir` (local project directory) OR `git_url` (git repo)');
       }

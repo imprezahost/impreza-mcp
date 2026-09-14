@@ -10,6 +10,35 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Retained source uploads
+
+Use `impreza_upload_context` with `dir` and an optional `label` to upload an immutable
+source version without deploying. The response includes its `context_id`, SHA256,
+size and expiry. List or inspect versions with `impreza_list_contexts`.
+
+Create an app with `impreza_deploy_custom`, `mode: "dockerfile"` and `context_id`
+(or deploy a local `dir` directly). Rebuild it with `impreza_redeploy_deployment`
+and optionally another retained `context_id`. The app identity, domain, host port,
+volumes and build recipe stay fixed. The selected source can differ from the
+running release after failure or rollback; inspect deployment history.
+
+Sources in use remain available. Unreferenced versions expire seven days after
+upload or their last deployment request, not seven days after detachment. Default
+quotas are 10 unexpired/referenced archives, 300 MiB per account and 100 MiB per
+archive; referenced sources count. Delete an unused version with
+`impreza_delete_context`, `context_id` and `confirm: true` after customer confirmation.
+Metadata requires read scope, upload requires deploy, and deletion requires
+manage. Resource-confined credentials cannot manage account uploads.
+
+The packer excludes common dependency/VCS folders, .env and .env.* (except
+example/sample/template files), .npmrc and .pypirc. It does not scan arbitrary
+secrets or interpret .gitignore/.dockerignore; review what you upload. Portal
+archives are sent unchanged. Legacy REST uploads remain temporary unless they
+opt into `retain=true`. Older uploaded-source apps can migrate by selecting a
+fresh retained context on redeploy. These MCP tools require 0.22.0+; no agent
+update is needed solely for source retention. See the
+[source upload guide](https://docs.imprezahost.com/source-uploads.html).
+
 ## Node.js npm builds
 
 Deploy an independent npm HTTP application without a repository Dockerfile using
@@ -22,8 +51,8 @@ must be available on the server. Workspaces, private npm configuration and build
 secrets require a custom Dockerfile. The app must listen on 0.0.0.0 and the
 configured port. Keep runtime PORT consistent with that port.
 
-Git redeploys and previews reuse the recipe snapshot. Uploaded contexts retain
-the existing one-use restriction. The recipe excludes .git, node_modules, .env,
+Git redeploys and previews reuse the recipe snapshot. Retained uploaded sources
+support reuse and source-version selection; older temporary uploads remain single-use. The recipe excludes .git, node_modules, .env,
 .env.* and .npmrc from the source copy; this does not scan arbitrary secrets.
 Keep credentials out of source code. The HTTP startup probe accepts responses
 below 500 at / and is not a functional application test.
@@ -291,6 +320,9 @@ and `impreza_api_search` finds anything not named here.
 | `impreza_list_servers` | `GET /v1/platform/servers` |
 | `impreza_list_apps` | `GET /v1/platform/apps` |
 | `impreza_list_deployments` | `GET /v1/platform/deployments` + `/custom` (merged) |
+| `impreza_upload_context` | `POST /v1/platform/deployments/custom/contexts?retain=true` |
+| `impreza_list_contexts` | `GET /v1/platform/deployments/custom/contexts[/{context_id}]` |
+| `impreza_delete_context` | `DELETE /v1/platform/deployments/custom/contexts/{context_id}` |
 | `impreza_deploy_custom` | `POST /v1/platform/deployments/custom` (3 modes) |
 | `impreza_deploy_catalog_app` | `POST /v1/platform/deployments` |
 | `impreza_uninstall_deployment` | `POST .../uninstall` |
