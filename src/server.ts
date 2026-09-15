@@ -1028,6 +1028,138 @@ const TOOLS = [
   }
 },
   {
+  "name": "impreza_prepare_project_deployment",
+  "description": "Save an immutable reviewed deployment configuration from a retained-upload plan option. Uses real deployment validation without creating an app, queue job or DNS record. Freezes source/build/server/runtime settings and encrypts environment values; summaries return variable names only. At most 20 pending records, expiring no later than the source plan (24 hours maximum). Review the returned configuration and configuration_digest, then call impreza_apply_project_deployment. Does not reserve domains, ports or capacity. Requires deploy scope and account credentials without resource restrictions.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "plan_id": {
+        "type": "string",
+        "pattern": "^plan_[a-f0-9]{24}$",
+        "description": "Saved plan ID belonging to this account."
+      },
+      "option_index": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "name": {
+        "type": "string",
+        "description": "Per-account-unique deploy name (3-100 chars, [a-z0-9_-])."
+      },
+      "agent_id": {
+        "type": "string",
+        "description": "Target VPS agent_id (from impreza_list_servers)."
+      },
+      "domain": {
+        "type": "string",
+        "description": "Hostname to use, or omit to propose a managed subdomain. No DNS record is created until apply. Omit with onion=true for onion-only."
+      },
+      "vars": {
+        "type": "object",
+        "description": "Runtime environment values, encrypted in the prepared record. Do not use reserved system/routing names. Summaries show names only.",
+        "additionalProperties": {
+          "type": "string",
+          "maxLength": 32768
+        },
+        "maxProperties": 100
+      },
+      "cpus": {
+        "type": "number",
+        "description": "CPU limit (cores; 1.0 = one core). Default 1.0.",
+        "exclusiveMinimum": 0,
+        "maximum": 64
+      },
+      "memory_mb": {
+        "type": "integer",
+        "description": "Memory limit in MB. Default 512.",
+        "minimum": 1,
+        "maximum": 524288
+      },
+      "target_port": {
+        "type": "integer",
+        "description": "HTTP port. Omit to use the selected saved option; review the returned effective target_port.",
+        "minimum": 1,
+        "maximum": 65535
+      },
+      "volumes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Absolute container paths to persist as named Docker volumes (data survives redeploys), e.g. [\"/var/lib/app/data\",\"/app/uploads\"]."
+      },
+      "onion": {
+        "type": "boolean",
+        "description": "Also publish a Tor v3 hidden service. Default false."
+      },
+      "healthcheck_path": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$",
+        "description": "node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."
+      },
+      "require_healthy_start": {
+        "type": "boolean",
+        "description": "node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."
+      },
+      "startup_timeout_seconds": {
+        "type": "integer",
+        "minimum": 30,
+        "maximum": 600,
+        "description": "Required healthy start only: startup observation budget in seconds, default 60. Separate from source/build and recovery time."
+      }
+    },
+    "required": [
+      "plan_id",
+      "option_index",
+      "name",
+      "agent_id"
+    ],
+    "additionalProperties": false
+  }
+},
+  {
+  "name": "impreza_list_prepared_deployments",
+  "description": "List the latest 20 prepared deployments or retrieve one execution_id. Shows immutable configuration with environment variable names only, confirmation digest, expiry and accepted receipt. Reading never deploys. Accepted receipts remain available after expiry so uncertain requests can be retried safely. Ready status does not certify current source/target availability; apply rechecks it. Requires read scope and account credentials without resource restrictions.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "execution_id": {
+        "type": "string",
+        "pattern": "^pdep_[a-f0-9]{24}$",
+        "description": "Saved prepared deployment ID belonging to this account."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  }
+},
+  {
+  "name": "impreza_apply_project_deployment",
+  "description": "Apply exactly the saved deployment after the customer reviews its configuration. Send only execution_id and the returned configuration_digest. Revalidates ownership, source integrity, expiry, deployment rules and target. Commits one application, queue job and receipt together. Repeating the same ID/digest returns the original receipt, even after expiry or app removal; it never restarts a failed job or creates another app. Accepted means queued, not healthy: inspect deployment status. No settings overrides; prepare a new record to change configuration. Requires deploy scope and account credentials without resource restrictions.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "execution_id": {
+        "type": "string",
+        "pattern": "^pdep_[a-f0-9]{24}$",
+        "description": "Saved prepared deployment ID belonging to this account."
+      },
+      "configuration_digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$",
+        "description": "Digest from the customer-reviewed saved configuration."
+      }
+    },
+    "required": [
+      "execution_id",
+      "configuration_digest"
+    ],
+    "additionalProperties": false
+  }
+},
+  {
     name: 'impreza_prepare_project',
     description: 'Analyze supplied package.json, requirements_txt with start_command, composer_json with php_document_root, and/or Dockerfile before deploying. Returns framework hints, available script commands, declared final-stage ports and review findings. Does not fetch Git, execute code or create resources. Send configuration text only, never .env or credentials.',
     inputSchema: {
@@ -2373,6 +2505,9 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_plan_project: A_WRITE,
   impreza_list_project_plans: A_READ,
   impreza_deploy_project_plan: A_WRITE_EXT,
+  impreza_prepare_project_deployment: A_WRITE,
+  impreza_list_prepared_deployments: A_READ,
+  impreza_apply_project_deployment: A_WRITE_EXT_IDEM,
   impreza_prepare_project: A_READ,
   impreza_validate_manifest: A_READ,
   impreza_doctor: A_READ,
@@ -3383,6 +3518,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
         const { plan_id, ...body } = args;
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/deploy', body));
+      }
+      case 'impreza_prepare_project_deployment': {
+        if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
+        const { plan_id, ...body } = args;
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/prepare-deployment', body));
+      }
+      case 'impreza_list_prepared_deployments': {
+        const execution = args.execution_id;
+        if (execution !== undefined && (typeof execution !== 'string' || !/^pdep_[a-f0-9]{24}$/.test(execution))) return toError('Invalid execution_id');
+        return toResult(await impreza.get('/v1/platform/deployments/custom/prepared' + (execution ? '/' + encodeURIComponent(execution) : '')));
+      }
+      case 'impreza_apply_project_deployment': {
+        if (typeof args.execution_id !== 'string' || !/^pdep_[a-f0-9]{24}$/.test(args.execution_id)) return toError('Invalid execution_id');
+        const { execution_id, ...body } = args;
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepared/' + encodeURIComponent(execution_id) + '/apply', body));
       }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};

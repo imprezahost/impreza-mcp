@@ -43,31 +43,46 @@ Running without a confirmed healthcheck is not healthy. This requires agent
 0.6.4+ for observations and does not verify external HTTP/DNS/TLS. Existing
 servers update explicitly. See [runtime health](https://docs.imprezahost.com/runtime-health.html).
 
-## Saved project plans
+## Saved project plans and safe retries
 
-With MCP 0.31.0+, call `impreza_plan_project` with a retained `context_id` to
-inspect the archive inventory and selected configuration files. Optionally choose
-`project_dir`, `dockerfile_path`, a Python `start_command` or `php_document_root`.
-Review the findings and `analysis.deployment_options`, then call
-`impreza_deploy_project_plan` with `plan_id`, zero-based `option_index`, `name`,
-`agent_id` and the runtime settings you want. `impreza_list_project_plans` lists
-saved plans or retrieves one `plan_id`.
+Use `impreza_plan_project` with a retained `context_id` to inspect the archive
+inventory and selected configuration files. Choose `project_dir`,
+`dockerfile_path`, a Python `start_command` or `php_document_root` as needed.
+Review the findings and `analysis.deployment_options`.
 
-Plans keep the uploaded source SHA256 and build options for at most 24 hours.
-Execution rechecks source integrity, ownership, plan validity and target agent
-availability before using the regular deployment pipeline. Source/build fields
-cannot override the selected plan option. Runtime settings are chosen at deploy
-time. There is no capacity reservation, dependency resolution or build guarantee.
+With MCP **0.32.0+**, call `impreza_prepare_project_deployment` with `plan_id`,
+zero-based `option_index`, app name, server and runtime settings. It validates
+and saves the effective configuration without creating an app, job or DNS
+record. Review the returned configuration, then call
+`impreza_apply_project_deployment` with only `execution_id` and
+`configuration_digest`. Later form/request changes cannot override that record.
 
-Each successful deployment call creates a new app. Plans are reusable, not
-idempotency keys: check your app list before retrying an uncertain response.
-Deleting or expiring the source, or changing inspection rules, requires a fresh
-inspection. At most 20 unexpired plans per account. Inspection rejects unsafe
-archive entries and never executes the project or scans for secrets. These tools
-require unrestricted account credentials; creation/deployment requires deploy
-scope and listing requires read scope. No agent update is needed solely for plans;
-individual recipe requirements still apply. See the
-[project plan guide](https://docs.imprezahost.com/project-plans.html).
+A repeat of the same saved deployment returns its original acceptance receipt,
+including after expiry or app removal. The receipt, app and queue job commit
+together. After an uncertain response, retry the same ID and digest instead of
+preparing another deployment. Acceptance means queued; inspect app status,
+logs and health. This does not restart a failed job or update an existing app.
+
+`impreza_list_prepared_deployments` lists the latest 20 saved configurations or
+retrieves one `execution_id`. Environment values are encrypted in the prepared
+record, omitted from review responses and cleared from that record on acceptance;
+the app then uses its normal environment storage. Reviews show variable names.
+Use at most 100 string values, with no system/routing variable overrides.
+
+At most 20 pending records per account, valid no longer than the source plan
+and for at most 24 hours. Source, rules, target availability/IP and effective
+settings are rechecked before first apply. There is no domain, port or capacity
+reservation, dependency pinning or build guarantee. DNS is external to the app
+transaction and can remain after an interrupted attempt. Expired pending records
+are removed on the account's next preparation; accepted receipts are retained.
+
+Source inspection remains available in MCP 0.31.0+. The older
+`impreza_deploy_project_plan` creates directly from an option and is not
+idempotent. Plan creation requires deploy scope; listing requires read scope;
+preparation/apply require deploy scope. These account-wide tools require
+credentials without resource restrictions. No agent update is needed solely for
+this flow; recipe requirements still apply. See the
+[project plan and review guide](https://docs.imprezahost.com/project-plans.html).
 
 ## Retained source uploads
 
