@@ -898,6 +898,136 @@ const TOOLS = [
     },
   },
   {
+  "name": "impreza_plan_project",
+  "description": "Inspect an existing retained source upload and save account-owned build options for up to 24 hours. Reads bounded tar paths and selected configuration files, never executes code or fetches Git. Verifies source SHA256, package-lock/composer.lock presence and PHP public entry presence; does not verify lockfile consistency, dependencies, ignore rules or runtime. At most 20 active plans. Review findings and choose an option before impreza_deploy_project_plan. No capacity reservation; deletion or expiry of the source invalidates the plan. Do not put credentials in start_command.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "context_id": {
+        "type": "string",
+        "pattern": "^ctx_[a-f0-9]{1,36}$"
+      },
+      "project_dir": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "dockerfile_path": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "start_command": {
+        "type": "string",
+        "maxLength": 1000
+      },
+      "php_document_root": {
+        "type": "string",
+        "maxLength": 120
+      }
+    },
+    "required": [
+      "context_id"
+    ],
+    "additionalProperties": false
+  }
+},
+  {
+  "name": "impreza_list_project_plans",
+  "description": "List this account's latest 20 saved upload inspection plans, or retrieve one plan_id. Returns source SHA256, findings, options, expiry and current lifecycle status. No archive contents or private storage paths. Plans are reusable and do not reserve capacity.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "plan_id": {
+        "type": "string",
+        "pattern": "^plan_[a-f0-9]{24}$",
+        "description": "Saved plan ID belonging to this account."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  }
+},
+  {
+  "name": "impreza_deploy_project_plan",
+  "description": "Create a new application from an explicitly reviewed plan option and the selected server/runtime settings. Revalidates plan expiry, inspection rules, source hash, ownership and a recent online target heartbeat. Source and build settings come only from the saved option. Each successful call creates an app; reusable plans are not idempotency keys and do not reserve capacity. Build success is not guaranteed; inspect status/readiness after deployment. Requires deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "plan_id": {
+        "type": "string",
+        "pattern": "^plan_[a-f0-9]{24}$",
+        "description": "Saved plan ID belonging to this account."
+      },
+      "option_index": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "name": {
+        "type": "string",
+        "description": "Per-account-unique deploy name (3-100 chars, [a-z0-9_-])."
+      },
+      "agent_id": {
+        "type": "string",
+        "description": "Target VPS agent_id (from impreza_list_servers)."
+      },
+      "domain": {
+        "type": "string",
+        "description": "Public hostname. Omit when onion:true for onion-only."
+      },
+      "vars": {
+        "type": "object",
+        "description": "Environment variables to inject into the container."
+      },
+      "cpus": {
+        "type": "number",
+        "description": "CPU limit (cores; 1.0 = one core). Default 1.0."
+      },
+      "memory_mb": {
+        "type": "number",
+        "description": "Memory limit in MB. Default 512."
+      },
+      "target_port": {
+        "type": "number",
+        "description": "Port the container listens on (default 80)."
+      },
+      "volumes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Absolute container paths to persist as named Docker volumes (data survives redeploys), e.g. [\"/var/lib/app/data\",\"/app/uploads\"]. Ignored for mode=manifest (declare volumes in your compose)."
+      },
+      "onion": {
+        "type": "boolean",
+        "description": "Also publish a Tor v3 hidden service. Default false."
+      },
+      "healthcheck_path": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$",
+        "description": "node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."
+      },
+      "require_healthy_start": {
+        "type": "boolean",
+        "description": "node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."
+      },
+      "startup_timeout_seconds": {
+        "type": "integer",
+        "minimum": 30,
+        "maximum": 600,
+        "description": "Required healthy start only: startup observation budget in seconds, default 60. Separate from source/build and recovery time."
+      }
+    },
+    "required": [
+      "plan_id",
+      "option_index",
+      "name",
+      "agent_id"
+    ],
+    "additionalProperties": false
+  }
+},
+  {
     name: 'impreza_prepare_project',
     description: 'Analyze supplied package.json, requirements_txt with start_command, composer_json with php_document_root, and/or Dockerfile before deploying. Returns framework hints, available script commands, declared final-stage ports and review findings. Does not fetch Git, execute code or create resources. Send configuration text only, never .env or credentials.',
     inputSchema: {
@@ -2240,6 +2370,9 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_list_contexts: A_READ,
   impreza_delete_context: A_DESTRUCTIVE,
   impreza_prepare_compose: A_READ,
+  impreza_plan_project: A_WRITE,
+  impreza_list_project_plans: A_READ,
+  impreza_deploy_project_plan: A_WRITE_EXT,
   impreza_prepare_project: A_READ,
   impreza_validate_manifest: A_READ,
   impreza_doctor: A_READ,
@@ -3238,6 +3371,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const body: Record<string, unknown> = {};
         for (const field of ['compose_yaml', 'web_service', 'target_port']) if (args[field] !== undefined) body[field] = args[field];
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/compose/prepare', body));
+      }
+      case 'impreza_plan_project':
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans', args));
+      case 'impreza_list_project_plans': {
+        const plan = args.plan_id;
+        if (plan !== undefined && (typeof plan !== 'string' || !/^plan_[a-f0-9]{24}$/.test(plan))) return toError('Invalid plan_id');
+        return toResult(await impreza.get('/v1/platform/deployments/custom/plans' + (plan ? '/' + encodeURIComponent(plan) : '')));
+      }
+      case 'impreza_deploy_project_plan': {
+        if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
+        const { plan_id, ...body } = args;
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/deploy', body));
       }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};

@@ -43,6 +43,32 @@ Running without a confirmed healthcheck is not healthy. This requires agent
 0.6.4+ for observations and does not verify external HTTP/DNS/TLS. Existing
 servers update explicitly. See [runtime health](https://docs.imprezahost.com/runtime-health.html).
 
+## Saved project plans
+
+With MCP 0.31.0+, call `impreza_plan_project` with a retained `context_id` to
+inspect the archive inventory and selected configuration files. Optionally choose
+`project_dir`, `dockerfile_path`, a Python `start_command` or `php_document_root`.
+Review the findings and `analysis.deployment_options`, then call
+`impreza_deploy_project_plan` with `plan_id`, zero-based `option_index`, `name`,
+`agent_id` and the runtime settings you want. `impreza_list_project_plans` lists
+saved plans or retrieves one `plan_id`.
+
+Plans keep the uploaded source SHA256 and build options for at most 24 hours.
+Execution rechecks source integrity, ownership, plan validity and target agent
+availability before using the regular deployment pipeline. Source/build fields
+cannot override the selected plan option. Runtime settings are chosen at deploy
+time. There is no capacity reservation, dependency resolution or build guarantee.
+
+Each successful deployment call creates a new app. Plans are reusable, not
+idempotency keys: check your app list before retrying an uncertain response.
+Deleting or expiring the source, or changing inspection rules, requires a fresh
+inspection. At most 20 unexpired plans per account. Inspection rejects unsafe
+archive entries and never executes the project or scans for secrets. These tools
+require unrestricted account credentials; creation/deployment requires deploy
+scope and listing requires read scope. No agent update is needed solely for plans;
+individual recipe requirements still apply. See the
+[project plan guide](https://docs.imprezahost.com/project-plans.html).
+
 ## Retained source uploads
 
 Use `impreza_upload_context` with `dir` and an optional `label` to upload an immutable

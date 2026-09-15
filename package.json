@@ -1,7 +1,7 @@
 {
   "name": "impreza-mcp",
   "mcpName": "io.github.imprezahost/impreza-mcp",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "Model Context Protocol server for Impreza Host — privacy-first, no-KYC hosting an AI agent can run end-to-end: self-onboard its own anonymous account (no e-mail), fund it in Bitcoin/Monero, then deploy customer-built apps to managed Impreza VPSes and manage domains/DNS & VPS lifecycle, all without leaving the chat.",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
     "watch": "tsc -p tsconfig.json --watch",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "npm run build && node tests/run-contracts.mjs",
     "prepare": "npm run build",
     "prebuild": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\""
   },
