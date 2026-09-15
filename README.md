@@ -515,6 +515,12 @@ The IP of the machine running this MCP server (almost always your
 laptop) must be on the API key's whitelist. Manage the whitelist in
 your Impreza clientarea.
 
+## Python deployments
+
+Use `impreza_prepare_project` with `requirements_txt` and an explicit `start_command` to review a Python app. Deploy with `impreza_deploy_custom`, `mode: "dockerfile"` and `build_strategy: "python_pip"`, using Git, a local directory or an uploaded context. The Python 3.13 recipe installs a flat `requirements.txt` from PyPI and runs as a non-root user; choose `project_dir` for an independent application folder. Start a production server on `0.0.0.0` at `target_port` (default 8000), for example `exec gunicorn --bind 0.0.0.0:$PORT app:app`, with Flask and gunicorn declared in requirements. `PORT` and `HOST` are runtime variables. Keep credentials out of the saved command.
+
+The default Python health probe requires HTTP 2xx on `/`; choose `healthcheck_path` for another route. Optional `require_healthy_start` needs an explicit path and agent 0.6.3+, with a 30–600 second startup budget. Previews and redeploys retain the saved recipe. Dependency options, includes, URLs, local projects, private build credentials, system packages and other package managers require a custom Dockerfile. Public build variables remain npm-only. Analysis is advisory; builds resolve actual dependencies on the server. See the [Python deployment guide](https://docs.imprezahost.com/tutorials/agent-apps-panels.html#python-build).
+
 ## Build
 
 ```sh
