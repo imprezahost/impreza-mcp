@@ -213,13 +213,14 @@ const TOOLS = [
         git_ref: { type: 'string', description: 'Branch / tag / commit for git_url (default main).' },
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
-        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static', 'python_pip'], description: 'python_pip uses Python 3.13, a flat requirements.txt of PyPI packages and an explicit start_command. Non-root build/runtime; default port 8000. No dependency options/includes/URLs/local projects, system package installation or private build credentials. Compose 2.17+ and BuildKit required. node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static', 'python_pip', 'php_composer'], description: 'php_composer uses PHP 8.4/Apache and Composer 2, composer.json plus a matching composer.lock, public HTTPS archive dependencies and php_document_root (default public, containing index.php). Non-root runtime, default port 8080 (1024-65535), strict 2xx health. No scripts/plugins, custom repositories, private credentials, asset builds, migrations or .htaccess overrides. python_pip uses Python 3.13, a flat requirements.txt of PyPI packages and an explicit start_command. Non-root build/runtime; default port 8000. No dependency options/includes/URLs/local projects, system package installation or private build credentials. Compose 2.17+ and BuildKit required. node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
         start_command: { type: 'string', minLength: 1, maxLength: 1000, description: 'python_pip only, required: production shell command, one line up to 1000 UTF-8 bytes. Example: exec uvicorn app:app --host 0.0.0.0 --port 8000. PORT and HOST are runtime variables. Do not include credentials. Saved at creation and inherited by previews/redeploys.' },
-        require_healthy_start: { type: 'boolean', description: 'node_npm or python_pip only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys.' },
+        require_healthy_start: { type: 'boolean', description: 'node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys.' },
         startup_timeout_seconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Required healthy start only: 30-600 second startup observation budget, default 60; build/recovery time is separate.' },
-        healthcheck_path: { type: 'string', minLength: 1, maxLength: 200, pattern: '^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$', description: 'node_npm or python_pip only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python requires 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy.' },
+        healthcheck_path: { type: 'string', minLength: 1, maxLength: 200, pattern: '^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$', description: 'node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy.' },
         public_build_vars: { type: 'object', maxProperties: 20, additionalProperties: { type: 'string', maxLength: 4096 }, description: 'Public values for npm run build only. Names start with VITE_, NEXT_PUBLIC_ or PUBLIC_; 20 keys max, 128 chars per key, 4 KiB per value, 16 KiB total. Values can appear in bundles/image metadata; never supply secrets. Saved at creation and inherited by previews/redeploys. Separate from runtime vars and npm install.' },
-        project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm/Python recipes only: . (default) or relative app folder with its own package.json and lockfile, or requirements.txt for Python. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
+        project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm/Python/PHP recipes only: . (default) or relative app folder with its own package.json and lockfile, requirements.txt for Python, or composer.json/composer.lock for PHP. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
         static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
         static_spa: { type: 'boolean', description: 'Static npm only: true (default) uses index.html for unknown routes; false returns 404.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
@@ -898,12 +899,14 @@ const TOOLS = [
   },
   {
     name: 'impreza_prepare_project',
-    description: 'Analyze supplied package.json, requirements_txt with start_command, and/or Dockerfile before deploying. Returns framework hints, available script commands, declared final-stage ports and review findings. Does not fetch Git, execute code or create resources. Send configuration text only, never .env or credentials.',
+    description: 'Analyze supplied package.json, requirements_txt with start_command, composer_json with php_document_root, and/or Dockerfile before deploying. Returns framework hints, available script commands, declared final-stage ports and review findings. Does not fetch Git, execute code or create resources. Send configuration text only, never .env or credentials.',
     inputSchema: {
       type: 'object',
       properties: {
         package_json: { type: 'string', maxLength: 32768 },
+        composer_json: { type: 'string', maxLength: 32768 },
         requirements_txt: { type: 'string', maxLength: 32768 },
+        php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
         start_command: { type: 'string', minLength: 1, maxLength: 1000 },
         dockerfile: { type: 'string', maxLength: 32768 },
         dockerfile_path: { type: 'string', maxLength: 255 },
@@ -3238,7 +3241,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};
-        for (const field of ['package_json', 'requirements_txt', 'start_command', 'dockerfile', 'dockerfile_path']) {
+        for (const field of ['package_json', 'requirements_txt', 'start_command', 'composer_json', 'php_document_root', 'dockerfile', 'dockerfile_path']) {
           if (args[field] !== undefined) body[field] = args[field];
         }
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepare', body));
@@ -3827,6 +3830,7 @@ interface DeployCustomBody {
   git_pat?: string;
   dockerfile_path?: string;
   build_strategy?: string;
+  php_document_root?: string;
   start_command?: string;
   require_healthy_start?: boolean;
   startup_timeout_seconds?: number;
@@ -3856,17 +3860,25 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
     throw new Error('name, agent_id, and mode are required');
   }
 
-  if (['node_npm','node_npm_static','python_pip'].includes(String(args.build_strategy)) && mode !== 'dockerfile') throw new Error('Generated builds require Dockerfile mode with a Git or directory source');
+  if (['node_npm','node_npm_static','python_pip','php_composer'].includes(String(args.build_strategy)) && mode !== 'dockerfile') throw new Error('Generated builds require Dockerfile mode with a Git or directory source');
   if ((args.static_output_dir !== undefined || args.static_spa !== undefined) && args.build_strategy !== 'node_npm_static') throw new Error('Static options require node_npm_static');
-  if (args.project_dir !== undefined && !['node_npm','node_npm_static','python_pip'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated recipe');
+  if (args.project_dir !== undefined && !['node_npm','node_npm_static','python_pip','php_composer'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated recipe');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.build_strategy === 'php_composer') {
+    if (args.php_document_root !== undefined) {
+      const directory = args.php_document_root;
+      if (typeof directory !== 'string' || directory.length > 120 || !/^[A-Za-z0-9_][A-Za-z0-9._-]*(?:\/[A-Za-z0-9_][A-Za-z0-9._-]*){0,4}$/.test(directory) || directory.split('/').some(p => ['vendor', 'node_modules'].includes(p))) throw new Error('Invalid php_document_root: choose a public subfolder without hidden, parent, vendor or node_modules segments');
+      body.php_document_root = directory;
+    }
+    if (args.target_port !== undefined && (typeof args.target_port !== 'number' || !Number.isInteger(args.target_port) || args.target_port < 1024 || args.target_port > 65535)) throw new Error('PHP Apache target_port must be between 1024 and 65535');
+  } else if (args.php_document_root !== undefined) throw new Error('php_document_root requires php_composer');
   if (args.build_strategy === 'python_pip') {
     const command = args.start_command;
     if (typeof command !== 'string' || !command.trim() || Buffer.byteLength(command) > 1000 || /[\x00-\x1f\x7f]/.test(command)) throw new Error('python_pip requires start_command: one line up to 1000 UTF-8 bytes');
     body.start_command = command.trim();
   } else if (args.start_command !== undefined) throw new Error('start_command requires python_pip');
   if (args.require_healthy_start !== undefined || args.startup_timeout_seconds !== undefined) {
-    if (!['node_npm','python_pip'].includes(String(args.build_strategy))) throw new Error('Healthy start options require node_npm or python_pip');
+    if (!['node_npm','python_pip','php_composer'].includes(String(args.build_strategy))) throw new Error('Healthy start options require node_npm, python_pip or php_composer');
     if (args.require_healthy_start !== undefined && typeof args.require_healthy_start !== 'boolean') throw new Error('require_healthy_start must be boolean');
     if (args.require_healthy_start === true && typeof args.healthcheck_path !== 'string') throw new Error('Required healthy start needs an explicit healthcheck_path');
     if (args.startup_timeout_seconds !== undefined) {
@@ -3877,7 +3889,7 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
     if (args.require_healthy_start !== undefined) body.require_healthy_start = args.require_healthy_start;
   }
   if (args.healthcheck_path !== undefined) {
-    if (!['node_npm','python_pip'].includes(String(args.build_strategy))) throw new Error('healthcheck_path requires node_npm or python_pip');
+    if (!['node_npm','python_pip','php_composer'].includes(String(args.build_strategy))) throw new Error('healthcheck_path requires node_npm, python_pip or php_composer');
     const path = args.healthcheck_path;
     if (typeof path !== 'string' || path !== path.trim() || path.length > 200 || !/^\/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*\/?)?$/.test(path)) throw new Error('healthcheck_path must be / or an HTTP path such as /health, up to 200 ASCII characters; no URL, query, fragment, escape or parent segments');
     body.healthcheck_path = path;
@@ -3916,7 +3928,7 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
 
     case 'dockerfile': {
       if (args.build_strategy !== undefined) {
-        if (!['dockerfile', 'node_npm', 'node_npm_static', 'python_pip'].includes(String(args.build_strategy))) throw new Error('Invalid build_strategy');
+        if (!['dockerfile', 'node_npm', 'node_npm_static', 'python_pip', 'php_composer'].includes(String(args.build_strategy))) throw new Error('Invalid build_strategy');
         body.build_strategy = String(args.build_strategy);
       }
       const sourceCount = [args.git_url, args.dir, args.context_id].filter(value => value !== undefined && value !== '').length;

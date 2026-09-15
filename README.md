@@ -515,6 +515,12 @@ The IP of the machine running this MCP server (almost always your
 laptop) must be on the API key's whitelist. Manage the whitelist in
 your Impreza clientarea.
 
+## PHP deployments
+
+Use `impreza_prepare_project` with `composer_json` and optionally `php_document_root` to review a PHP app. Deploy with `impreza_deploy_custom`, `mode: "dockerfile"` and `build_strategy: "php_composer"`, using Git, a local directory or a retained upload. The PHP 8.4/Apache recipe installs production dependencies from `composer.json` and a matching `composer.lock`, without Composer scripts or plugins, and checks actual platform requirements. Choose `project_dir` for the application and `php_document_root` for its public subfolder containing `index.php` (default `public`). Apache runs as a non-root user on `target_port` (default 8080, minimum 1024); it serves public files and sends missing paths to `index.php`.
+
+Health checks require HTTP 2xx without redirects, at `/` or your `healthcheck_path`. Optional `require_healthy_start` needs an explicit path and agent 0.6.3+, with a 30–600 second startup budget. Previews and redeploys keep the saved recipe. Custom repositories, private dependency credentials, installation plugins, extra extensions, `.htaccess` rules, frontend builds and application setup/migrations require a custom Dockerfile. `start_command` and public build variables are not PHP options. Analysis is advisory and does not inspect the lockfile or repository. See the [PHP deployment guide](https://docs.imprezahost.com/tutorials/agent-apps-panels.html#php-build).
+
 ## Python deployments
 
 Use `impreza_prepare_project` with `requirements_txt` and an explicit `start_command` to review a Python app. Deploy with `impreza_deploy_custom`, `mode: "dockerfile"` and `build_strategy: "python_pip"`, using Git, a local directory or an uploaded context. The Python 3.13 recipe installs a flat `requirements.txt` from PyPI and runs as a non-root user; choose `project_dir` for an independent application folder. Start a production server on `0.0.0.0` at `target_port` (default 8000), for example `exec gunicorn --bind 0.0.0.0:$PORT app:app`, with Flask and gunicorn declared in requirements. `PORT` and `HOST` are runtime variables. Keep credentials out of the saved command.
