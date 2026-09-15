@@ -133,8 +133,22 @@ export class ImprezaClient {
           'User-Agent': `impreza-mcp/${VERSION}`,
           ...(init.headers ?? {}),
         },
+        // The credentials above are CUSTOM headers. Fetch strips Authorization,
+        // Cookie and Proxy-Authorization when a redirect crosses to another
+        // origin — it has no idea ours are credentials, so it would carry the
+        // customer's key and secret to whatever host a 3xx names. The API
+        // answers JSON on every endpoint and never redirects, so we take the
+        // redirect ourselves and refuse it.
+        redirect: 'manual',
         signal: ctrl.signal,
       });
+      if (res.status >= 300 && res.status < 400) {
+        throw new Error(
+          `UNEXPECTED_REDIRECT: the API answered HTTP ${res.status} for ${url.pathname}. ` +
+            'Refusing to resend your API credentials to the redirect target. ' +
+            'Check IMPREZA_BASE_URL, or whether something is intercepting the connection.',
+        );
+      }
       return res;
     } finally {
       clearTimeout(timer);
