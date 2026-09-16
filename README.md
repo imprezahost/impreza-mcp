@@ -40,8 +40,9 @@ See [deployment progress](https://docs.imprezahost.com/deployment-progress.html)
 
 Use `impreza_cancel_deployment` with the deployment ID and exact
 `last_operation.command_id`. Requires manage permission. Queued cancellation
-is immediate; running preparation needs agent 0.6.5+. A running pull/build
-finishes its step before the agent confirms cancellation and restores
+is immediate; running preparation needs agent 0.6.5+. Agent 0.6.12+ can interrupt an owned build after the server administrator
+enables controlled builds on supported Ubuntu 24.04 amd64 hosts. Other preparation
+waits for its current step. Confirmation still requires verified cleanup and restored
 configuration. `requested` is not `cancelled`. Replacement/recovery cannot
 be cancelled. Cancelling a tracking Task remains separate.
 Read [the cancellation guide](https://docs.imprezahost.com/deployment-cancellation.html).
@@ -603,6 +604,8 @@ npm run build
 ```
 
 ## Supervised preparation
+
+These legacy worker rules remain in effect unless the administrator enables agent 0.6.12+ [controlled builds](https://docs.imprezahost.com/deployment-cancellation.html#controlled-builds), which add verified executor stop and recovery for new builds.
 
 Agent 0.6.8+: supported Linux/systemd deploys run image pull and build in a separate supervised process. If the agent restarts, it waits for the exact worker receipt without repeating that work. Only a durable successful receipt allows the existing preparation reconciliation: revalidate operation/phase and unchanged containers, restore previous configuration, and close as failed or confirm a previously requested cancellation. recovery=reconciling can include waiting for the original worker. Missing/invalid receipts, worker failure or timeout, host reboot before a receipt, legacy unsupervised work, replacement uncertainty, data ownership and onion preparation still require review. A process or service disappearing is never proof of completion. The customer must wait for the final result before retrying; no automatic deploy retry, immediate build termination, data rollback or runtime-health guarantee is added.
 
