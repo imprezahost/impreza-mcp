@@ -213,14 +213,18 @@ const TOOLS = [
         git_ref: { type: 'string', description: 'Branch / tag / commit for git_url (default main).' },
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
-        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static', 'python_pip', 'php_composer'], description: 'php_composer uses PHP 8.4/Apache and Composer 2, composer.json plus a matching composer.lock, public HTTPS archive dependencies and php_document_root (default public, containing index.php). Non-root runtime, default port 8080 (1024-65535), strict 2xx health. No scripts/plugins, custom repositories, private credentials, asset builds, migrations or .htaccess overrides. python_pip uses Python 3.13, a flat requirements.txt of PyPI packages and an explicit start_command. Non-root build/runtime; default port 8000. No dependency options/includes/URLs/local projects, system package installation or private build credentials. Compose 2.17+ and BuildKit required. node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and package-lock.json in the selected project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. No workspaces or private npm configuration.' },
+        build_strategy: { type: 'string', enum: ['dockerfile', 'node_npm', 'node_npm_static', 'python_pip', 'php_composer'], description: 'php_composer uses PHP 8.4/Apache and Composer 2, composer.json plus a matching composer.lock, public HTTPS archive dependencies and php_document_root (default public, containing index.php). Non-root runtime, default port 8080 (1024-65535), strict 2xx health. No scripts/plugins, custom repositories, private credentials, asset builds, migrations or .htaccess overrides. python_pip uses Python 3.13, a flat requirements.txt of PyPI packages and an explicit start_command. Non-root build/runtime; default port 8000. No dependency options/includes/URLs/local projects, system package installation or private build credentials. Compose 2.17+ and BuildKit required. node_npm uses the Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves static files with Nginx and SPA fallback (build script required, no start script). Runtime variables do not alter browser bundles. Both require package.json and the selected manager lockfile (package-lock.json for default npm) in project_dir, and Compose 2.17+ with BuildKit. node_npm requires production start; node_npm_static requires build. Select npm workspaces with npm_workspace. build_secrets supplies credentials and node_package_manager selects pinned standalone pnpm/Yarn.' },
         php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
         start_command: { type: 'string', minLength: 1, maxLength: 1000, description: 'python_pip only, required: production shell command, one line up to 1000 UTF-8 bytes. Example: exec uvicorn app:app --host 0.0.0.0 --port 8000. PORT and HOST are runtime variables. Do not include credentials. Saved at creation and inherited by previews/redeploys.' },
         require_healthy_start: { type: 'boolean', description: 'node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys.' },
         startup_timeout_seconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Required healthy start only: 30-600 second startup observation budget, default 60; build/recovery time is separate.' },
         healthcheck_path: { type: 'string', minLength: 1, maxLength: 200, pattern: '^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$', description: 'node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy.' },
+        build_secrets: {type:'object',maxProperties:16,additionalProperties:{type:'string',maxLength:65536},description:'Private build-only credentials; encrypted, delivered just-in-time to an agent supporting build-secrets-v1. npmrc installs private npm packages; other names mount during build scripts. Build output withheld. Trusted source only. No automatic preview inheritance.'},
         public_build_vars: { type: 'object', maxProperties: 20, additionalProperties: { type: 'string', maxLength: 4096 }, description: 'Public values for npm run build only. Names start with VITE_, NEXT_PUBLIC_ or PUBLIC_; 20 keys max, 128 chars per key, 4 KiB per value, 16 KiB total. Values can appear in bundles/image metadata; never supply secrets. Saved at creation and inherited by previews/redeploys. Separate from runtime vars and npm install.' },
-        project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm/Python/PHP recipes only: . (default) or relative app folder with its own package.json and lockfile, requirements.txt for Python, or composer.json/composer.lock for PHP. No shared workspaces, hidden/parent/node_modules segments or symlink path components.' },
+        python_package_manager: { type: 'string', enum: ['pip','uv@0.12.15'], description: 'Pinned uv with pyproject.toml and uv.lock under python_pip. Locked non-editable production install, public PyPI only, no uv workspaces or custom indexes. Omit for pip.' },
+        node_package_manager: { type: 'string', maxLength: 40, description: 'Exact pnpm@10/11/12.x.y or yarn@4.x.y pin matching package.json for standalone Node server/static recipes. Omit for npm. Immutable lockfile install; no npm_workspace or custom manager configuration/plugins.' },
+        npm_workspace: { type: 'string', minLength: 1, maxLength: 120, description: 'Declared npm workspace relative to project_dir (npm root). Keeps root lockfile and sibling packages. Builds in workspace declaration order; starts selected app. Static output is relative to the workspace.' },
+        project_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Generated npm/Python/PHP recipes only: . (default) or relative app folder with its own package.json and lockfile, requirements.txt for Python, or composer.json/composer.lock for PHP. Use npm_workspace for shared npm roots. No hidden/parent/node_modules segments or symlink path components.' },
         static_output_dir: { type: 'string', minLength: 1, maxLength: 120, description: 'Static npm only: output folder relative to project_dir containing index.html (default dist). No hidden/parent/node_modules segments or symlinks.' },
         static_spa: { type: 'boolean', description: 'Static npm only: true (default) uses index.html for unknown routes; false returns 404.' },
         dockerfile_path: { type: 'string', description: 'Optional Dockerfile path relative to the dir/repo root (default "Dockerfile").' },
@@ -888,10 +892,11 @@ const TOOLS = [
   },
   {
     name: 'impreza_prepare_compose',
-    description: 'Review a self-contained Compose YAML before deploying. Public images only; no builds, file dependencies, aliases, profiles, host privileges or external volumes/networks. Returns services, TCP port hints, variable names, changes and blockers without executing or fetching anything. Select web_service and target_port explicitly. Original published ports are removed; only the HTTP service joins the proxy and receives a loopback port. Names and volumes become deployment-specific. Use the returned analysis_id as compose_review_id with the same YAML/service/port in impreza_deploy_custom mode=compose after review. Never paste secrets: reference uppercase vars instead. This is a configuration review, not an executable stored plan or a health check.',
+    description: 'Review Compose YAML before deploying. Public images or local builds and auxiliary files from one retained context_id. No remote build contexts, SSH, aliases, profiles, host privileges or external volumes/networks. Uploaded runtime files require an agent supporting compose-source-files-v1. Returns services, TCP port hints, variable names, changes and blockers without executing project code. Select web_service and target_port explicitly. Original published ports are removed; only the HTTP service joins the proxy and receives a loopback port. Names and volumes become deployment-specific. Use the returned analysis_id as compose_review_id with the same YAML/service/port/context_id in impreza_deploy_custom mode=compose after review. Never paste secrets: reference uppercase vars instead. This is a configuration review, not an executable stored plan or a health check.',
     inputSchema: {
       type: 'object', properties: {
         compose_yaml: { type: 'string', minLength: 1, maxLength: 65536 },
+        context_id: { type: 'string', pattern: '^ctx_[a-f0-9]{1,36}$', description: 'Retained source upload for local build contexts and auxiliary files.' },
         web_service: { type: 'string', maxLength: 63 },
         target_port: { type: 'integer', minimum: 1, maximum: 65535 },
       }, required: ['compose_yaml'], additionalProperties: false,
@@ -899,7 +904,7 @@ const TOOLS = [
   },
   {
   "name": "impreza_plan_project",
-  "description": "Inspect an existing retained source upload and save account-owned build options for up to 24 hours. Reads bounded tar paths and selected configuration files, never executes code or fetches Git. Verifies source SHA256, package-lock/composer.lock presence and PHP public entry presence; does not verify lockfile consistency, dependencies, ignore rules or runtime. At most 20 active plans. Review findings and choose an option before impreza_deploy_project_plan. No capacity reservation; deletion or expiry of the source invalidates the plan. Do not put credentials in start_command.",
+  "description": "Inspect a retained upload or capture an HTTPS Git repository at a complete commit SHA. Git credentials are used only for fetching, never saved in the plan; captured bytes consume the account upload quota. Reads bounded tar paths and selected configuration files without executing project code. No submodules, redirects or private network origins. Saves account-owned options for up to 24 hours. Review findings before preparing or deploying. Does not guarantee build success or reserve capacity. Do not put credentials in start_command.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -907,6 +912,11 @@ const TOOLS = [
         "type": "string",
         "pattern": "^ctx_[a-f0-9]{1,36}$"
       },
+      "git_url": { "type": "string", "maxLength": 1024, "description": "HTTPS repository URL, mutually exclusive with context_id." },
+      "git_commit": { "type": "string", "pattern": "^[a-fA-F0-9]{40}$", "description": "Complete commit SHA required with git_url." },
+      "git_username": { "type": "string", "maxLength": 100 },
+      "git_token": { "type": "string", "maxLength": 4096, "description": "Optional access token used only for this fetch." },
+      "npm_workspace": { "type": "string", "minLength": 1, "maxLength": 120 },
       "project_dir": {
         "type": "string",
         "maxLength": 120
@@ -924,8 +934,9 @@ const TOOLS = [
         "maxLength": 120
       }
     },
-    "required": [
-      "context_id"
+    "oneOf": [
+      { "required": ["context_id"], "not": { "required": ["git_url"] } },
+      { "required": ["git_url", "git_commit"], "not": { "required": ["context_id"] } }
     ],
     "additionalProperties": false
   }
@@ -1054,6 +1065,7 @@ const TOOLS = [
         "type": "string",
         "description": "Hostname to use, or omit to propose a managed subdomain. No DNS record is created until apply. Omit with onion=true for onion-only."
       },
+      "build_secrets": {"type":"object","maxProperties":16,"additionalProperties":{"type":"string","maxLength":65536}},
       "vars": {
         "type": "object",
         "description": "Runtime environment values, encrypted in the prepared record. Do not use reserved system/routing names. Summaries show names only.",
@@ -1167,6 +1179,7 @@ const TOOLS = [
       properties: {
         package_json: { type: 'string', maxLength: 32768 },
         composer_json: { type: 'string', maxLength: 32768 },
+        pyproject_toml: { type: 'string', maxLength: 32768, description: 'uv metadata; advisory only. Requires uv.lock in the uploaded source.' },
         requirements_txt: { type: 'string', maxLength: 32768 },
         php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
         start_command: { type: 'string', minLength: 1, maxLength: 1000 },
@@ -1259,6 +1272,11 @@ const TOOLS = [
       required: ['path'],
       additionalProperties: false,
     },
+  },
+  {
+    name:'impreza_rotate_build_secrets',
+    description:'Replace all existing build credential values for a custom deployment without redeploying. Supply exactly its build_secret_names. Refuses active operations. Values are encrypted and never returned. Explicitly redeploy when ready. Requires a control plane supporting build-secrets-v1.',
+    inputSchema:{type:'object',properties:{deployment_id:{type:'string'},build_secrets:{type:'object',maxProperties:16,additionalProperties:{type:'string',maxLength:65536}}},required:['deployment_id','build_secrets'],additionalProperties:false},
   },
   {
     name: 'impreza_set_deployment_vars',
@@ -2515,6 +2533,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_api_call: A_READ_EXT,
   // Saving vars touches the control plane only; the container sees them on the
   // next deploy, so nothing external moves and a repeat lands the same state.
+  impreza_rotate_build_secrets: A_WRITE_IDEM,
   impreza_set_deployment_vars: A_WRITE_IDEM,
   // Power and rescue interrupt a running machine at the provider.
   impreza_cloud_power: A_DESTRUCTIVE_EXT,
@@ -3150,6 +3169,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_account_info':
         return toResult(await impreza.get<unknown>('/v1/account'));
 
+      case 'impreza_rotate_build_secrets': {
+        const dep=String(args.deployment_id??'');
+        if (!/^dpl_[a-f0-9]{1,64}$/.test(dep) || !args.build_secrets || typeof args.build_secrets!=='object' || Array.isArray(args.build_secrets)) throw new Error('Provide deployment_id and a build_secrets object');
+        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/build-secrets`,{build_secrets:args.build_secrets}));
+      }
       case 'impreza_set_deployment_vars': {
         const dep = String(args.deployment_id ?? '').trim();
         if (!dep) throw new Error('deployment_id is required (from impreza_list_deployments).');
@@ -3504,7 +3528,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.del('/v1/platform/deployments/custom/contexts/' + encodeURIComponent(args.context_id)));
       case 'impreza_prepare_compose': {
         const body: Record<string, unknown> = {};
-        for (const field of ['compose_yaml', 'web_service', 'target_port']) if (args[field] !== undefined) body[field] = args[field];
+        for (const field of ['compose_yaml', 'web_service', 'target_port', 'context_id']) if (args[field] !== undefined) body[field] = args[field];
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/compose/prepare', body));
       }
       case 'impreza_plan_project':
@@ -3536,7 +3560,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};
-        for (const field of ['package_json', 'requirements_txt', 'start_command', 'composer_json', 'php_document_root', 'dockerfile', 'dockerfile_path']) {
+        for (const field of ['package_json', 'pyproject_toml', 'requirements_txt', 'start_command', 'composer_json', 'php_document_root', 'dockerfile', 'dockerfile_path']) {
           if (args[field] !== undefined) body[field] = args[field];
         }
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepare', body));
@@ -4131,7 +4155,11 @@ interface DeployCustomBody {
   startup_timeout_seconds?: number;
   healthcheck_path?: string;
   public_build_vars?: Record<string, string>;
+  build_secrets?: Record<string,string>;
   project_dir?: string;
+  npm_workspace?: string;
+  node_package_manager?: string;
+  python_package_manager?: string;
   static_output_dir?: string;
   static_spa?: boolean;
   compose_yaml?: string;
@@ -4157,8 +4185,22 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
 
   if (['node_npm','node_npm_static','python_pip','php_composer'].includes(String(args.build_strategy)) && mode !== 'dockerfile') throw new Error('Generated builds require Dockerfile mode with a Git or directory source');
   if ((args.static_output_dir !== undefined || args.static_spa !== undefined) && args.build_strategy !== 'node_npm_static') throw new Error('Static options require node_npm_static');
+  if (args.build_secrets !== undefined) { if (args.mode!=='dockerfile' || !['dockerfile','node_npm','node_npm_static'].includes(String(args.build_strategy??'dockerfile'))) throw new Error('build_secrets requires a Dockerfile or npm source build'); }
+  if (args.npm_workspace !== undefined && !['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('npm_workspace requires an npm recipe');
   if (args.project_dir !== undefined && !['node_npm','node_npm_static','python_pip','php_composer'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated recipe');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.build_secrets !== undefined) {
+    const values=args.build_secrets;
+    if (!values || typeof values!=='object' || Array.isArray(values) || Object.keys(values).length>16) throw new Error('build_secrets must be an object of at most 16 strings');
+    let bytes=0;
+    for (const [key,value] of Object.entries(values)) {
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key) || typeof value!=='string' || !value || value.includes('\0') || Buffer.byteLength(value)>65536) throw new Error('Invalid build secret name or value');
+      bytes+=Buffer.byteLength(value);
+    }
+    if (bytes>262144) throw new Error('Build secrets exceed 256 KiB');
+    body.build_secrets=values as Record<string,string>;
+  }
+
   if (args.build_strategy === 'php_composer') {
     if (args.php_document_root !== undefined) {
       const directory = args.php_document_root;
@@ -4201,6 +4243,16 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
     if (bytes>16384) throw new Error('Public build variables exceed 16 KiB');
     body.public_build_vars=vars as Record<string,string>;
   }
+  if (args.python_package_manager !== undefined) {
+    if (typeof args.python_package_manager !== 'string' || !['pip','uv@0.12.15'].includes(args.python_package_manager) || args.build_strategy !== 'python_pip') throw new Error('python_package_manager requires python_pip and pip or uv@0.12.15');
+    body.python_package_manager = args.python_package_manager;
+  }
+  if (args.node_package_manager !== undefined) {
+    if (typeof args.node_package_manager !== 'string' || !/^(?:npm|pnpm@(?:10|11|12)\.[0-9]{1,4}\.[0-9]{1,4}|yarn@4\.[0-9]{1,4}\.[0-9]{1,4})$/.test(args.node_package_manager)) throw new Error('node_package_manager requires an exact supported pin');
+    if (!['node_npm','node_npm_static'].includes(String(args.build_strategy)) || (args.node_package_manager !== 'npm' && args.npm_workspace !== undefined)) throw new Error('Pinned pnpm/Yarn requires a standalone Node recipe');
+    body.node_package_manager = args.node_package_manager;
+  }
+  if (args.npm_workspace !== undefined) { if (typeof args.npm_workspace !== 'string') throw new Error('npm_workspace must be a string'); body.npm_workspace = args.npm_workspace; }
   if (args.project_dir !== undefined) { if (typeof args.project_dir !== 'string') throw new Error('project_dir must be a string'); body.project_dir = args.project_dir; }
   if (args.static_output_dir !== undefined) { if (typeof args.static_output_dir !== 'string') throw new Error('static_output_dir must be a string'); body.static_output_dir = args.static_output_dir; }
   if (args.static_spa !== undefined) { if (typeof args.static_spa !== 'boolean') throw new Error('static_spa must be boolean'); body.static_spa = args.static_spa; }
@@ -4269,7 +4321,11 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
       if (typeof args.compose_yaml !== 'string' || !args.compose_yaml || Buffer.byteLength(args.compose_yaml) > 65536) throw new Error('mode=compose requires Compose YAML up to 64 KiB');
       if (typeof args.web_service !== 'string' || !args.web_service || typeof args.compose_review_id !== 'string' || !args.compose_review_id) throw new Error('Run impreza_prepare_compose and review the selected service and port first');
       if (typeof args.target_port !== 'number' || !Number.isInteger(args.target_port) || args.target_port < 1 || args.target_port > 65535) throw new Error('Compose target_port must be an integer from 1 to 65535');
-      for (const field of ['image', 'manifest', 'git_url', 'dir', 'context_id', 'dockerfile']) if (args[field] !== undefined) throw new Error('Compose cannot be combined with another deployment source');
+      for (const field of ['image', 'manifest', 'git_url', 'dir', 'dockerfile']) if (args[field] !== undefined) throw new Error('Compose cannot be combined with another deployment source');
+      if (args.context_id !== undefined) {
+        if (typeof args.context_id !== 'string' || !/^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) throw new Error('Invalid Compose context_id');
+        body.context_id = args.context_id;
+      }
       body.compose_yaml = args.compose_yaml; body.web_service = args.web_service; body.compose_review_id = args.compose_review_id;
       break;
 

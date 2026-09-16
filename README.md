@@ -12,6 +12,18 @@ back the URL.
 
 ## Deployment progress and agent restarts
 
+Compose review and deployment accept
+`context_id` for one retained upload containing local build contexts and runtime
+`env_file`, configs or secrets. The same context must be supplied at review and
+deployment. Runtime files require agent 0.6.11+ with `compose-source-files-v1`.
+
+Custom Node server/static deployments
+accept `node_package_manager`, such as `pnpm@10.26.1` or `yarn@4.9.2`, matching the
+project's exact `packageManager` and committed lockfile. Omit for npm. Supported
+versions are standalone pnpm 10–12 and Yarn 4 projects, without combining
+this field with `npm_workspace`. Inspection infers the pin and saved plans retain
+it. See the deployment documentation for supported inputs and limits.
+
 Read `last_operation.progress` from `impreza_list_deployments` for the last
 reported step and timestamp. Agent 0.6.6+ saves final results before sending them;
 after restart it resends the same receipt without repeating the deploy.
@@ -44,6 +56,16 @@ Running without a confirmed healthcheck is not healthy. This requires agent
 servers update explicitly. See [runtime health](https://docs.imprezahost.com/runtime-health.html).
 
 ## Saved project plans and safe retries
+
+`impreza_plan_project` also accepts
+`git_url` and an exact 40-character `git_commit` instead of `context_id`.
+Optional `git_username` and `git_token` are used only for the fetch. The server
+captures an immutable retained archive, accounts for its upload quota, and
+returns `source.origin` alongside the archive SHA256. Review those values before
+preparing/applying the saved configuration. Only public-network HTTPS on port
+443 is supported; redirects and submodules are refused. Project code is not
+executed by inspection. These options require the corresponding control-plane
+capabilities; update the local MCP package before using them.
 
 Use `impreza_plan_project` with a retained `context_id` to inspect the archive
 inventory and selected configuration files. Choose `project_dir`,
@@ -121,8 +143,9 @@ Deploy an independent npm HTTP application without a repository Dockerfile using
 The API generates a Node 24 recipe: npm ci, optional build script, production
 pruning and npm start as a non-root user. The selected project folder must contain package.json, package-lock.json
 and a production start script. Docker Compose 2.17+ and BuildKit
-must be available on the server. Workspaces, private npm configuration and build
-secrets require a custom Dockerfile. The app must listen on 0.0.0.0 and the
+must be available on the server. Select npm workspaces explicitly with
+`npm_workspace`. Use `build_secrets` for named credentials and the `npmrc` secret
+for private npm installation; agent 0.6.11+ is required. The app must listen on 0.0.0.0 and the
 configured port. Keep runtime PORT consistent with that port.
 
 Git redeploys and previews reuse the recipe snapshot. Retained uploaded sources
@@ -137,7 +160,7 @@ Required healthy start: opt in with require_healthy_start=true, an explicit heal
 
 Node health checks: with build_strategy=node_npm, optionally set healthcheck_path (for example /health or /api/ready), or fill Health check path in the portal. The generated Docker health check sends HTTP GET to 127.0.0.1 on target_port inside the container and requires status 200-299; it does not follow redirects or send credentials. The route must work without login and should report the dependencies your app needs to serve requests. Use / or a path of at most 200 ASCII characters; segments start with a letter, digit, underscore or hyphen and may then include dots or tildes. A trailing slash is allowed. URLs, query strings, fragments, percent escapes, spaces, parent segments and repeated slashes are refused. Omit the field (leave it blank in the portal) to keep the legacy / probe accepting statuses below 500; explicitly setting / requires 2xx. Existing deployment snapshots remain unchanged. The saved healthcheck_path is returned by deployment reads, inherited by new previews and retained on redeploy; changing it requires a new deployment. Static sites keep their index.html probe; custom Dockerfiles define their own HEALTHCHECK. The probe runs every 5 seconds with a 2-second request timeout. With required startup disabled, agents 0.6.2 and later observe startup for up to 60 seconds: a failed replacement recovers a verified healthy previous release when one exists. Without that recovery target, a first install can still complete with a startup warning, so inspect health and logs before treating it as ready. This default policy does not provide continuous rollback, zero-downtime routing or external uptime checks. To enforce a startup deadline, enable required healthy startup with agent 0.6.3+. Local MCP inputs require 0.19.0+; healthcheck_path alone needs no agent update beyond 0.6.2.
 
-Public build settings: generated node_npm and node_npm_static recipes accept public_build_vars, an object of string values available only to npm run build (including its prebuild/postbuild scripts). For example, {"VITE_API_URL":"https://api.example.com"} lets Vite compile a public API URL into the site. Names must start with VITE_, NEXT_PUBLIC_ or PUBLIC_, contain only uppercase letters, digits and underscores, and be at most 128 characters. Limits: 20 entries, 4096 UTF-8 bytes per value and 16384 bytes for names plus values. Empty strings are preserved; NUL is refused. Values are literal data, without shell or variable expansion. The portal exposes Public build variables as KEY=value lines; do not add surrounding quotes, which would become part of the value. These values are public and may appear in bundles, image metadata and logs: never send passwords, tokens or secrets. They are not supplied to npm ci or automatically added to runtime variables. Runtime vars still configure the running container and do not rewrite compiled browser files. Settings are saved at creation, exposed on deployment reads, inherited by new previews and reused on redeploy. Preview runtime inheritance/overrides do not change this build snapshot; create a separate deployment for different public build values. Existing snapshots default to no public build values. Other build settings, private package configuration and secrets require a custom Dockerfile. Local MCP requires 0.18.0+; no agent update is required beyond the existing build executor.
+Public build settings: generated node_npm and node_npm_static recipes accept public_build_vars, an object of string values available only to npm run build (including its prebuild/postbuild scripts). For example, {"VITE_API_URL":"https://api.example.com"} lets Vite compile a public API URL into the site. Names must start with VITE_, NEXT_PUBLIC_ or PUBLIC_, contain only uppercase letters, digits and underscores, and be at most 128 characters. Limits: 20 entries, 4096 UTF-8 bytes per value and 16384 bytes for names plus values. Empty strings are preserved; NUL is refused. Values are literal data, without shell or variable expansion. The portal exposes Public build variables as KEY=value lines; do not add surrounding quotes, which would become part of the value. These values are public and may appear in bundles, image metadata and logs: never send passwords, tokens or secrets. They are not supplied to npm ci or automatically added to runtime variables. Runtime vars still configure the running container and do not rewrite compiled browser files. Settings are saved at creation, exposed on deployment reads, inherited by new previews and reused on redeploy. Preview runtime inheritance/overrides do not change this build snapshot; create a separate deployment for different public build values. Existing snapshots default to no public build values. Use build_secrets for supported build credentials with agent 0.6.11+; unsupported build settings require a custom Dockerfile. Local MCP requires 0.18.0+; no agent update is required beyond the existing build executor.
 
 See the [build configuration guide](https://docs.imprezahost.com/tutorials/agent-apps-panels.html#public-build-settings).
 
@@ -161,8 +184,10 @@ port bindings are removed; only the selected HTTP service joins the proxy and
 receives a managed loopback port. Container and volume names become specific
 to the deployment. Declare CPU/memory limits per service in YAML.
 
-The review does not fetch images, execute code or reserve resources. Builds,
-local files, env_file, aliases, profiles, host privileges and external resources
+The review does not fetch images, execute code or reserve resources. Local build
+contexts and auxiliary files require the same retained context_id at review and
+deploy. Runtime env_file accepts literal assignments only, without interpolation
+or inherited bare keys. Aliases, profiles, host privileges and external resources
 are outside this import subset. Reference uppercase variables instead of
 embedding secrets. Runtime values must be single-line strings up to 4 KiB,
 without surrounding whitespace, quotes, backslashes, dollar signs or space
@@ -172,7 +197,8 @@ environment. Required values are checked at creation, editing and redeploy.
 The imported source is saved as a manifest. Redeploy reuses it and the named
 data; changing the source/topology requires a new deployment. Failure recovery
 uses the existing agent policy and does not undo database writes. Local MCP
-support requires 0.21.0+. No agent update is required for this import flow.
+support for public-image stacks requires 0.21.0+. Retained build/runtime sources
+require MCP 0.34.0+ and agent 0.6.11+.
 See the [Compose import guide](https://docs.imprezahost.com/compose-import.html).
 
 ## Prepare project configuration
@@ -234,7 +260,7 @@ Available in impreza-mcp 0.12.0. Requires a compatible API and agent.
 
 ## Static npm sites
 
-Static npm sites: choose build_strategy=node_npm_static with a Git/context source (mode=dockerfile), or Static site + npm in the portal. Requires an independent npm package in the selected project folder, matching package-lock.json and a build script producing index.html in the selected output folder. Node 24 installs dependencies and runs the build; unprivileged Nginx serves only the selected output folder with configurable SPA fallback. No start script is required. Default target_port is 8080. Compose 2.17+ and BuildKit required. No SSR, server functions, workspaces, private npm configuration or build secrets. Runtime variables (including VITE_* and PORT) do not rewrite static bundles or change the configured Nginx port. Use static_output_dir (default dist) to choose a relative output folder containing index.html, and static_spa (boolean, default true) to choose SPA fallback or 404 for unknown routes. The portal exposes both fields. Paths are limited to 120 characters and five segments, without hidden, parent or node_modules segments; symlinks in the output or its parent path are refused. These settings are chosen at creation, stored in the recipe snapshot, exposed as static_options and carried to new previews. Redeploy reuses the saved recipe; changing these settings on existing deployments requires creating a new deployment. Existing snapshots keep their original recipe. Local MCP option inputs require 0.16.0+. Use public_build_vars for supported public settings; other build-time configuration requires a custom Dockerfile. Source .env/.env.*/.npmrc/.git/node_modules are excluded; review all generated files because the output folder is public. Missing index.html and symlink output fail the build. Existing preview/redeploy snapshots preserve the strategy. Local MCP requires 0.15.0+; no agent upgrade is needed beyond the existing build executor. The analyzer returns static_npm_recipe and conditional deployment_options; metadata is not proof of a static, working build.
+Static npm sites: choose build_strategy=node_npm_static with a Git/context source (mode=dockerfile), or Static site + npm in the portal. Requires an independent npm package in the selected project folder, matching package-lock.json and a build script producing index.html in the selected output folder. Node 24 installs dependencies and runs the build; unprivileged Nginx serves only the selected output folder with configurable SPA fallback. No start script is required. Default target_port is 8080. Compose 2.17+ and BuildKit required. No SSR or server functions. Explicit npm_workspace and build_secrets are supported with their documented source and agent requirements. Runtime variables (including VITE_* and PORT) do not rewrite static bundles or change the configured Nginx port. Use static_output_dir (default dist) to choose a relative output folder containing index.html, and static_spa (boolean, default true) to choose SPA fallback or 404 for unknown routes. The portal exposes both fields. Paths are limited to 120 characters and five segments, without hidden, parent or node_modules segments; symlinks in the output or its parent path are refused. These settings are chosen at creation, stored in the recipe snapshot, exposed as static_options and carried to new previews. Redeploy reuses the saved recipe; changing these settings on existing deployments requires creating a new deployment. Existing snapshots keep their original recipe. Local MCP option inputs require 0.16.0+. Use public_build_vars for supported public settings; other build-time configuration requires a custom Dockerfile. Source .env/.env.*/.npmrc/.git/node_modules are excluded; review all generated files because the output folder is public. Missing index.html and symlink output fail the build. Existing preview/redeploy snapshots preserve the strategy. Local MCP requires 0.15.0+; no agent upgrade is needed beyond the existing build executor. The analyzer returns static_npm_recipe and conditional deployment_options; metadata is not proof of a static, working build.
 
 ## Status
 
@@ -588,3 +614,5 @@ MIT — see `LICENSE`.
 ## Supervised replacement
 
 Agent 0.6.9+: new supported Linux/systemd deploys keep the authorized container replacement, startup checks, lifecycle hooks, routes and normal startup recovery in one supervised worker. If the agent restarts, recovery=reconciling with step=reconciling_replacement waits for that original worker. Its verified durable final receipt is delivered without repeating containers or hooks, including a failed deployment whose previous release was restored. Missing or invalid receipts, worker loss or timeout, host reboot before completion, legacy unsupervised operations, data ownership changes and onion provisioning still require support; keep the private journal and do not retry to unblock the queue. This does not add automatic deployment retries, database rollback or zero-downtime traffic switching. Update the agent explicitly before the next deploy.
+
+Python deployments may select python_package_manager=uv@0.12.15 with python_pip, pyproject.toml and uv.lock. Installation is locked, production-only and non-editable on Python 3.13; public PyPI sources only. Custom uv workspaces/indexes require a Dockerfile. Use MCP 0.34.0+ and a control plane supporting this recipe.

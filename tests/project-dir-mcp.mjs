@@ -20,5 +20,11 @@ try {
  const nodeResult=await client.callTool({name:tool.name,arguments:nodeInput});assert(!nodeResult.isError);const nodeData=JSON.parse(nodeResult.content[0].text);assert.deepEqual(nodeData.body,nodeInput);assert.equal(nodeData.request_count,2);
  const badType=await client.callTool({name:tool.name,arguments:{...nodeInput,project_dir:42}});assert.equal(badType.isError,true);
  const rootInput={...nodeInput,project_dir:'.'};const rootResult=await client.callTool({name:tool.name,arguments:rootInput});assert(!rootResult.isError);const rootData=JSON.parse(rootResult.content[0].text);assert.deepEqual(rootData.body,rootInput);assert.equal(rootData.request_count,3);
+ const workspaceInput={...nodeInput,project_dir:'.',npm_workspace:'apps/web'};const workspace=await client.callTool({name:tool.name,arguments:workspaceInput});assert(!workspace.isError);assert.deepEqual(JSON.parse(workspace.content[0].text).body,workspaceInput);
+ const badWorkspace=await client.callTool({name:tool.name,arguments:{...workspaceInput,build_strategy:'python_pip'}});assert(badWorkspace.isError);
+ const secretsInput={...workspaceInput,build_secrets:{npmrc:'fixture-only'}},privateBuild=await client.callTool({name:tool.name,arguments:secretsInput});assert(!privateBuild.isError);assert.deepEqual(JSON.parse(privateBuild.content[0].text).body,secretsInput);
+ const secretType=await client.callTool({name:tool.name,arguments:{...secretsInput,build_secrets:{npmrc:42}}});assert(secretType.isError);
+ const rotation=tools.tools.find(t=>t.name==='impreza_rotate_build_secrets');assert(rotation);assert.equal(rotation.annotations.readOnlyHint,false);assert.equal(rotation.annotations.idempotentHint,true);
+ const rotate=await client.callTool({name:rotation.name,arguments:{deployment_id:'dpl_aabb',build_secrets:{npmrc:'replacement-fixture'}}});assert(!rotate.isError);const rotated=JSON.parse(rotate.content[0].text);assert.equal(rotated.path,'/v1/platform/deployments/custom/dpl_aabb/build-secrets');assert.deepEqual(rotated.body,{build_secrets:{npmrc:'replacement-fixture'}});
  console.log('PASS: Node/static/root project folders preserve exact API inputs; incompatible modes and invalid types make no deploy requests.');
 } finally { await client.close(); }

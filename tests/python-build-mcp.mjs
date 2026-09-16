@@ -14,8 +14,10 @@ try{
  let count=0;
  async function accepted(input){const result=await client.callTool({name:tool.name,arguments:input});assert(!result.isError,JSON.stringify(result));const data=JSON.parse(result.content[0].text);assert.deepEqual(data.body,input);assert.equal(data.request_count,++count);}
  await accepted(base);
+ await accepted({...base,python_package_manager:'uv@0.12.15'});
+ assert(tool.inputSchema.properties.python_package_manager.enum.includes('uv@0.12.15'));
  await accepted({...base,project_dir:'services/api',healthcheck_path:'/ready',require_healthy_start:true,startup_timeout_seconds:60});
- const invalid=[{start_command:undefined},{start_command:''},{start_command:[]},{start_command:'python app.py\nRUN id'},{start_command:'a'.repeat(1001)},{public_build_vars:{}},{static_spa:false},{mode:'image',image:'nginx:alpine'},{build_strategy:'node_npm'},{require_healthy_start:true}];
+ const invalid=[{python_package_manager:'uv@latest'},{python_package_manager:[]},{python_package_manager:'uv@0.12.15',build_strategy:'dockerfile'},{start_command:undefined},{start_command:''},{start_command:[]},{start_command:'python app.py\nRUN id'},{start_command:'a'.repeat(1001)},{public_build_vars:{}},{static_spa:false},{mode:'image',image:'nginx:alpine'},{build_strategy:'node_npm'},{require_healthy_start:true}];
  for(const options of invalid){const result=await client.callTool({name:tool.name,arguments:{...base,...options}});assert.equal(result.isError,true,JSON.stringify(options));}
  await accepted({...base,target_port:8000});
  const prep=tools.find(t=>t.name==='impreza_prepare_project');assert.equal(prep.inputSchema.properties.requirements_txt.maxLength,32768);

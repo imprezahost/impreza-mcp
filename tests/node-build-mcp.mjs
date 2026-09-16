@@ -14,5 +14,13 @@ try {
  const result=await client.callTool({name:tool.name,arguments:input});assert(!result.isError);
  const data=JSON.parse(result.content[0].text);assert.equal(data.method,'POST');assert.equal(data.path,'/v1/platform/deployments/custom');assert.deepEqual(data.body,input);assert.equal(data.request_count,1);
  const invalid=await client.callTool({name:tool.name,arguments:{...input,mode:'image',image:'busybox:1.37'}});assert.equal(invalid.isError,true);
+ assert(tool.inputSchema.properties.node_package_manager);
+ for(const pin of ['pnpm@10.26.1','pnpm@11.0.0','pnpm@12.4.2','yarn@4.9.2']) {
+  const pinned=await client.callTool({name:tool.name,arguments:{...input,node_package_manager:pin}});
+  assert(!pinned.isError);assert.equal(JSON.parse(pinned.content[0].text).body.node_package_manager,pin);
+ }
+ for(const fields of [{node_package_manager:'pnpm@latest'},{node_package_manager:'yarn@1.22.22'},{node_package_manager:'yarn@4.9.2',npm_workspace:'app'},{node_package_manager:'pnpm@10.26.1',build_strategy:'dockerfile'}]) {
+  assert.equal((await client.callTool({name:tool.name,arguments:{...input,...fields}})).isError,true);
+ }
  console.log('PASS: actual custom-deploy stdio tool accepts Node strategy and sends exact API body.');
 } finally { await client.close(); }
