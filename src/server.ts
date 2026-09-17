@@ -255,6 +255,11 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_probe_deployment',
+    description: 'Check public DNS, certificate validation and the HTTPS HEAD response for an owned deployment hostname. No arbitrary URL, redirects, credentials, body reads or repairs. One attempt per account every 30 seconds. This does not verify application content or dependencies.',
+    inputSchema: {type:'object', properties:{deployment_id:{type:'string',description:'Owned deployment ID.'}}, required:['deployment_id'], additionalProperties:false},
+  },
+  {
     name: 'impreza_get_logs',
     description:
       'Fetch the last N lines of container logs for a deployment. Synchronous — the server enqueues a log-tail command for the agent, then waits up to ~25 seconds for the chunks to come back. Use this to debug a failed deploy (`impreza_list_deployments` showed last_error) or to inspect a running app\'s output. ' +
@@ -1039,6 +1044,276 @@ const TOOLS = [
   }
 },
   {
+  "name": "impreza_list_projects",
+  "description": "List projects, environments and currently owned services. Returns metadata only; no variable values. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "pattern": "^prj_[a-f0-9]{24}$"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_create_project",
+  "description": "Create an account-owned project. Repeating the name returns the existing project. Does not deploy. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,47}$"
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_create_environment",
+  "description": "Create a named environment within a project. Repeating the name returns the existing environment. Does not deploy or copy variables. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "pattern": "^prj_[a-f0-9]{24}$"
+      },
+      "name": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,47}$"
+      }
+    },
+    "required": [
+      "project_id",
+      "name"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_attach_environment_service",
+  "description": "Associate an existing owned application with a component in an environment. Roles are labels, not validation of its engine. Does not deploy, copy variables or change networking. Explicitly detach before moving. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "environment_id": {
+        "type": "string",
+        "pattern": "^env_[a-f0-9]{24}$"
+      },
+      "deployment_id": {
+        "type": "string"
+      },
+      "component": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,47}$"
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "web",
+          "worker",
+          "database",
+          "cache"
+        ]
+      }
+    },
+    "required": [
+      "environment_id",
+      "deployment_id",
+      "component",
+      "role"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_detach_environment_service",
+  "description": "Remove an application association after explicit confirm=true. Keeps the application, data and variables. Does not stop or uninstall. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "environment_id": {
+        "type": "string",
+        "pattern": "^env_[a-f0-9]{24}$"
+      },
+      "deployment_id": {
+        "type": "string"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "environment_id",
+      "deployment_id",
+      "confirm"
+    ],
+    "additionalProperties": false
+  }
+},
+  {
+  "name": "impreza_prepare_service_binding",
+  "description": "Prepare a 15-minute review to connect a generated image application to a PostgreSQL catalog provider in the same project environment and server. Creates no database or deployment yet. Returns changes and a digest, never credentials. Review the application, provider and possible interruption before applying. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$"
+      },
+      "provider_deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$"
+      }
+    },
+    "required": [
+      "deployment_id",
+      "provider_deployment_id"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_prepare_service_binding_removal",
+  "description": "Prepare a 15-minute review to remove a managed PostgreSQL connection or retry pending cleanup. Applying replaces the consumer without its managed DATABASE_URL, then disables its dedicated login only after a healthy replacement. Database and data are retained. May interrupt traffic. Preparation queues nothing and returns no credential. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$"
+      },
+      "binding_id": {
+        "type": "string",
+        "pattern": "^bnd_[a-f0-9]{24}$"
+      }
+    },
+    "required": [
+      "deployment_id",
+      "binding_id"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_get_service_binding_plan",
+  "description": "Read a saved service binding review and its accepted command receipt without returning credentials. Accepted means queued, not connected or healthy. Requires unrestricted account credentials and read scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "binding_plan_id": {
+        "type": "string",
+        "pattern": "^bplan_[a-f0-9]{24}$"
+      }
+    },
+    "required": [
+      "binding_plan_id"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_apply_service_binding_plan",
+  "description": "Apply the exact reviewed PostgreSQL connection creation or removal after user confirmation with confirm=true and review_digest. Queues one controlled application replacement and may interrupt traffic. Creation delivers a dedicated credential only to the agent. Removal disables its login after a healthy unbound replacement and retains database data. Acceptance is not verified completion. Repeating the same plan returns its receipt without a second job. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "binding_plan_id": {
+        "type": "string",
+        "pattern": "^bplan_[a-f0-9]{24}$"
+      },
+      "review_digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "binding_plan_id",
+      "review_digest",
+      "confirm"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_prepare_image_promotion",
+  "description": "Prepare a 15-minute reviewed promotion from a successful image-mode app pinned by sha256 digest to another image-mode app. Preserves target variables, domain, limits and data. Does not queue work. Review the returned image and target before apply; traffic may be interrupted. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "description": "Target application."
+      },
+      "source_deployment_id": {
+        "type": "string",
+        "description": "Different source application on the same account."
+      }
+    },
+    "required": [
+      "deployment_id",
+      "source_deployment_id"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_get_image_promotion",
+  "description": "Read a saved image promotion review and its accepted command receipt. Reports recorded source success, not live health. Requires unrestricted account credentials and read scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "promotion_id": {
+        "type": "string",
+        "pattern": "^prom_[a-f0-9]{24}$"
+      }
+    },
+    "required": [
+      "promotion_id"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_apply_image_promotion",
+  "description": "Apply the exact reviewed immutable image promotion after user confirmation. Requires confirm=true and review_digest. May interrupt target traffic. Preserves target variables, routing and data; does not undo database writes. Repeating the same promotion returns its accepted receipt without another job. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "promotion_id": {
+        "type": "string",
+        "pattern": "^prom_[a-f0-9]{24}$"
+      },
+      "review_digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "promotion_id",
+      "review_digest",
+      "confirm"
+    ],
+    "additionalProperties": false
+  }
+},
+{
   "name": "impreza_prepare_project_deployment",
   "description": "Save an immutable reviewed deployment configuration from a retained-upload plan option. Uses real deployment validation without creating an app, queue job or DNS record. Freezes source/build/server/runtime settings and encrypts environment values; summaries return variable names only. At most 20 pending records, expiring no later than the source plan (24 hours maximum). Review the returned configuration and configuration_digest, then call impreza_apply_project_deployment. Does not reserve domains, ports or capacity. Requires deploy scope and account credentials without resource restrictions.",
   "inputSchema": {
@@ -2449,6 +2724,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_list_servers: A_READ,
   impreza_list_apps: A_READ,
   impreza_list_deployments: A_READ,
+  impreza_probe_deployment: A_READ,
   impreza_get_logs: A_READ,
   // Queues a job on the customer's own box, but that job only ever reads, and
   // asking twice returns the same file — read-only and idempotent is the
@@ -2523,6 +2799,18 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_plan_project: A_WRITE,
   impreza_list_project_plans: A_READ,
   impreza_deploy_project_plan: A_WRITE_EXT,
+  impreza_list_projects: A_READ,
+  impreza_create_project: A_WRITE_IDEM,
+  impreza_create_environment: A_WRITE_IDEM,
+  impreza_attach_environment_service: A_WRITE_IDEM,
+  impreza_detach_environment_service: A_WRITE_IDEM,
+  impreza_prepare_service_binding: A_WRITE,
+  impreza_prepare_service_binding_removal: A_WRITE,
+  impreza_get_service_binding_plan: A_READ,
+  impreza_apply_service_binding_plan: A_WRITE_EXT_IDEM,
+  impreza_prepare_image_promotion: A_WRITE,
+  impreza_get_image_promotion: A_READ,
+  impreza_apply_image_promotion: A_WRITE_EXT_IDEM,
   impreza_prepare_project_deployment: A_WRITE,
   impreza_list_prepared_deployments: A_READ,
   impreza_apply_project_deployment: A_WRITE_EXT_IDEM,
@@ -2873,6 +3161,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             body,
           ),
         );
+      }
+
+      case 'impreza_probe_deployment': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/${encodeURIComponent(dep)}/probe`, {}));
       }
 
       case 'impreza_get_logs': {
@@ -3542,6 +3836,60 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
         const { plan_id, ...body } = args;
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/deploy', body));
+      }
+      case 'impreza_list_projects': {
+        const id=args.project_id;
+        if (id!==undefined && (typeof id!=='string'||!/^prj_[a-f0-9]{24}$/.test(id))) return toError('Invalid project_id');
+        return toResult(await impreza.get('/v1/platform/projects'+(id?'/'+encodeURIComponent(id):'')));
+      }
+      case 'impreza_create_project':
+        return toResult(await impreza.post<unknown>('/v1/platform/projects',args));
+      case 'impreza_create_environment': {
+        const {project_id,...body}=args;
+        if (typeof project_id!=='string'||!/^prj_[a-f0-9]{24}$/.test(project_id)) return toError('Invalid project_id');
+        return toResult(await impreza.post<unknown>('/v1/platform/projects/'+encodeURIComponent(project_id)+'/environments',body));
+      }
+      case 'impreza_attach_environment_service':
+      case 'impreza_detach_environment_service': {
+        const {environment_id,...body}=args;
+        if (typeof environment_id!=='string'||!/^env_[a-f0-9]{24}$/.test(environment_id)) return toError('Invalid environment_id');
+        const detach=name==='impreza_detach_environment_service';
+        if (detach&&body.confirm!==true) return toError('Explicit confirm=true is required');
+        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+encodeURIComponent(environment_id)+'/services'+(detach?'/detach':''),body));
+      }
+      case 'impreza_prepare_service_binding': {
+        const {deployment_id,...body}=args;
+        if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.provider_deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(body.provider_deployment_id)) return toError('Valid application and provider IDs are required');
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding',body));
+      }
+      case 'impreza_prepare_service_binding_removal': {
+        const {deployment_id,...body}=args;
+        if (Object.keys(body).length!==1 || !Object.prototype.hasOwnProperty.call(body,'binding_id')) return toError('Supply deployment_id and binding_id only');
+        if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.binding_id!=='string'||!/^bnd_[a-f0-9]{24}$/.test(body.binding_id)) return toError('Valid application and binding IDs are required');
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding-removal',body));
+      }
+      case 'impreza_get_service_binding_plan': {
+        if (typeof args.binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(args.binding_plan_id)) return toError('Invalid binding_plan_id');
+        return toResult(await impreza.get('/v1/platform/binding-plans/'+encodeURIComponent(args.binding_plan_id)));
+      }
+      case 'impreza_apply_service_binding_plan': {
+        const {binding_plan_id,...body}=args;
+        if (typeof binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(binding_plan_id)||body.confirm!==true||typeof body.review_digest!=='string'||! /^[a-f0-9]{64}$/.test(body.review_digest)) return toError('A binding review, digest and confirm=true are required');
+        return toResult(await impreza.post('/v1/platform/binding-plans/'+encodeURIComponent(binding_plan_id)+'/apply',body));
+      }
+      case 'impreza_prepare_image_promotion': {
+        if (typeof args.deployment_id !== 'string' || !args.deployment_id || typeof args.source_deployment_id !== 'string' || !args.source_deployment_id) return toError('Target and source deployment IDs are required');
+        const { deployment_id, ...body } = args;
+        return toResult(await impreza.post('/v1/platform/deployments/custom/' + encodeURIComponent(deployment_id) + '/prepare-promotion', body));
+      }
+      case 'impreza_get_image_promotion': {
+        if (typeof args.promotion_id !== 'string' || !/^prom_[a-f0-9]{24}$/.test(args.promotion_id)) return toError('Invalid promotion_id');
+        return toResult(await impreza.get('/v1/platform/deployments/custom/promotions/' + encodeURIComponent(args.promotion_id)));
+      }
+      case 'impreza_apply_image_promotion': {
+        if (typeof args.promotion_id !== 'string' || !/^prom_[a-f0-9]{24}$/.test(args.promotion_id) || args.confirm !== true) return toError('A reviewed promotion_id and confirm=true are required');
+        const { promotion_id, ...body } = args;
+        return toResult(await impreza.post('/v1/platform/deployments/custom/promotions/' + encodeURIComponent(promotion_id) + '/apply', body));
       }
       case 'impreza_prepare_project_deployment': {
         if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');

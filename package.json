@@ -1,8 +1,8 @@
 {
   "name": "impreza-mcp",
   "mcpName": "io.github.imprezahost/impreza-mcp",
-  "version": "0.35.0",
-  "description": "Model Context Protocol server for Impreza Host — privacy-first, no-KYC hosting an AI agent can run end-to-end: self-onboard its own anonymous account (no e-mail), fund it in Bitcoin/Monero, then deploy customer-built apps to managed Impreza VPSes and manage domains/DNS & VPS lifecycle, all without leaving the chat.",
+  "version": "0.36.0",
+  "description": "Model Context Protocol server for Impreza Host \u2014 privacy-first, no-KYC hosting an AI agent can run end-to-end: self-onboard its own anonymous account (no e-mail), fund it in Bitcoin/Monero, then deploy customer-built apps to managed Impreza VPSes and manage domains/DNS & VPS lifecycle, all without leaving the chat.",
   "license": "MIT",
   "type": "module",
   "bin": {

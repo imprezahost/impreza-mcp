@@ -619,3 +619,18 @@ MIT — see `LICENSE`.
 Agent 0.6.9+: new supported Linux/systemd deploys keep the authorized container replacement, startup checks, lifecycle hooks, routes and normal startup recovery in one supervised worker. If the agent restarts, recovery=reconciling with step=reconciling_replacement waits for that original worker. Its verified durable final receipt is delivered without repeating containers or hooks, including a failed deployment whose previous release was restored. Missing or invalid receipts, worker loss or timeout, host reboot before completion, legacy unsupervised operations, data ownership changes and onion provisioning still require support; keep the private journal and do not retry to unblock the queue. This does not add automatic deployment retries, database rollback or zero-downtime traffic switching. Update the agent explicitly before the next deploy.
 
 Python deployments may select python_package_manager=uv@0.12.15 with python_pip, pyproject.toml and uv.lock. Installation is locked, production-only and non-editable on Python 3.13; public PyPI sources only. Custom uv workspaces/indexes require a Dockerfile. Use MCP 0.34.0+ and a control plane supporting this recipe.
+
+
+## PostgreSQL application connections
+
+`impreza_prepare_service_binding` reviews a dedicated PostgreSQL connection for an image application in the same project environment and server. `impreza_prepare_service_binding_removal` reviews removal or a pending-cleanup retry with the exact `deployment_id` and `binding_id`. Read the saved plan with `impreza_get_service_binding_plan`; apply only after explicit confirmation using `impreza_apply_service_binding_plan`, the exact digest and `confirm: true`. Removal retains database data and disables the dedicated login only after a healthy replacement without the connection. Acceptance means queued, not verified completion. Requires agent 0.6.13+ and a compatible control plane. Credential rotation is not available.
+
+## Public HTTPS diagnostics
+
+`impreza_probe_deployment` takes `deployment_id` and checks the saved public hostname through the control plane. It reports public DNS resolution, TLS verification and the HTTPS HEAD status, without following redirects or sending application credentials. It does not read response bodies or verify dependencies. One attempt per account every 30 seconds; no agent update is required.
+
+## Image promotion and environments
+
+`impreza_prepare_image_promotion`, `impreza_get_image_promotion` and `impreza_apply_image_promotion` review an exact registry digest for an existing destination configuration. Apply requires the returned review digest and explicit confirmation. Destination variables and data remain local to that application.
+
+Project/environment tools organize existing applications with explicit component associations. They do not copy variables, create network connections or deploy workloads. See the [project environments guide](https://docs.imprezahost.com/project-environments.html).
