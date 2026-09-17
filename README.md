@@ -265,7 +265,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.18.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.37.1.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
