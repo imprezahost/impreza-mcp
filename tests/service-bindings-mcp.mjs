@@ -10,16 +10,31 @@ try {
  for(const [name,args,method,path,body] of [
   ['impreza_prepare_service_binding',{deployment_id,provider_deployment_id},'POST','/v1/platform/deployments/custom/'+deployment_id+'/prepare-binding',{provider_deployment_id}],
   ['impreza_prepare_service_binding_removal',{deployment_id,binding_id},'POST','/v1/platform/deployments/custom/'+deployment_id+'/prepare-binding-removal',{binding_id}],
+  ['impreza_prepare_service_binding_rotation',{deployment_id,binding_id,mode:'rotate'},'POST','/v1/platform/deployments/custom/'+deployment_id+'/prepare-binding-rotation',{binding_id,mode:'rotate'}],
+  ['impreza_prepare_service_binding_rotation',{deployment_id,binding_id,mode:'abandon'},'POST','/v1/platform/deployments/custom/'+deployment_id+'/prepare-binding-rotation',{binding_id,mode:'abandon'}],
   ['impreza_get_service_binding_plan',{binding_plan_id},'GET','/v1/platform/binding-plans/'+binding_plan_id,null],
   ['impreza_apply_service_binding_plan',{binding_plan_id,review_digest,confirm:true},'POST','/v1/platform/binding-plans/'+binding_plan_id+'/apply',{review_digest,confirm:true}],
  ]) {
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
   const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const data=JSON.parse(r.content[0].text);assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);
  }
+ const rotation=tools.find(t=>t.name==='impreza_prepare_service_binding_rotation');assert(rotation);
+ assert.deepEqual(rotation.inputSchema.properties.mode.enum,['rotate','abandon']);
+ assert.deepEqual(rotation.inputSchema.required,['deployment_id','binding_id','mode']);
  for(const args of [{binding_plan_id,review_digest,confirm:false},{binding_plan_id,review_digest:'bad',confirm:true},{binding_plan_id:'../other',review_digest,confirm:true}]) {
   assert((await client.callTool({name:'impreza_apply_service_binding_plan',arguments:args})).isError);
  }
  for(const args of [{deployment_id,binding_id:'../other'},{deployment_id:'../other',binding_id},{deployment_id,binding_id,password:'must-not-be-forwarded'}]) assert((await client.callTool({name:'impreza_prepare_service_binding_removal',arguments:args})).isError);
- const final=await client.callTool({name:'impreza_get_service_binding_plan',arguments:{binding_plan_id}});assert.equal(JSON.parse(final.content[0].text).request_count,5,'invalid confirmation/identity must not call upstream');
+ for(const args of [
+  {deployment_id,binding_id},
+  {deployment_id,binding_id,mode:'rebuild'},
+  {deployment_id,binding_id,mode:'ROTATE'},
+  {deployment_id,binding_id,mode:'rotate',password:'must-not-be-forwarded'},
+  {deployment_id,binding_id,mode:'rotate',confirm:true},
+  {deployment_id,binding_id,mode:'rotate',unknown:'field'},
+  {deployment_id,binding_id:'../other',mode:'rotate'},
+  {deployment_id:'../other',binding_id,mode:'rotate'},
+ ]) assert((await client.callTool({name:'impreza_prepare_service_binding_rotation',arguments:args})).isError,JSON.stringify(args));
+ const final=await client.callTool({name:'impreza_get_service_binding_plan',arguments:{binding_plan_id}});assert.equal(JSON.parse(final.content[0].text).request_count,7,'invalid confirmation/identity/mode must not call upstream');
  console.log('PASS: binding review tools preserve exact routes/digests and refuse invalid confirmation without upstream calls.');
 } finally {await client.close();}

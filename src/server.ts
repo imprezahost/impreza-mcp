@@ -1204,6 +1204,37 @@ const TOOLS = [
   }
 },
 {
+  "name": "impreza_prepare_service_binding_rotation",
+  "description": "Prepare a 15-minute review to rotate the credentials of a managed PostgreSQL connection. mode=rotate replaces the dedicated login with a new one; mode=abandon discards a pending rotation candidate and keeps the current credentials (available only while a rotation is pending without queued cleanup — the backend validates). Applying replaces the consumer with the new credential delivered to the agent only; database data is retained; traffic may be interrupted. Requires an agent supporting postgres-service-binding-rotation-v1: older agents refuse the dispatch and the job fails until the customer explicitly updates the agent. Preparation queues nothing and returns no credential. Review the summary, then apply with impreza_apply_service_binding_plan using confirm=true and review_digest. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$"
+      },
+      "binding_id": {
+        "type": "string",
+        "pattern": "^bnd_[a-f0-9]{24}$"
+      },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "rotate",
+          "abandon"
+        ],
+        "description": "rotate: rotate the binding credentials to a new login. abandon: discard the pending rotation candidate and keep the current credentials."
+      }
+    },
+    "required": [
+      "deployment_id",
+      "binding_id",
+      "mode"
+    ],
+    "additionalProperties": false
+  }
+},
+{
   "name": "impreza_get_service_binding_plan",
   "description": "Read a saved service binding review and its accepted command receipt without returning credentials. Accepted means queued, not connected or healthy. Requires unrestricted account credentials and read scope.",
   "inputSchema": {
@@ -2806,6 +2837,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_detach_environment_service: A_WRITE_IDEM,
   impreza_prepare_service_binding: A_WRITE,
   impreza_prepare_service_binding_removal: A_WRITE,
+  impreza_prepare_service_binding_rotation: A_WRITE,
   impreza_get_service_binding_plan: A_READ,
   impreza_apply_service_binding_plan: A_WRITE_EXT_IDEM,
   impreza_prepare_image_promotion: A_WRITE,
@@ -3867,6 +3899,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (Object.keys(body).length!==1 || !Object.prototype.hasOwnProperty.call(body,'binding_id')) return toError('Supply deployment_id and binding_id only');
         if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.binding_id!=='string'||!/^bnd_[a-f0-9]{24}$/.test(body.binding_id)) return toError('Valid application and binding IDs are required');
         return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding-removal',body));
+      }
+      case 'impreza_prepare_service_binding_rotation': {
+        const {deployment_id,...body}=args;
+        if (Object.keys(body).length!==2 || !Object.prototype.hasOwnProperty.call(body,'binding_id') || !Object.prototype.hasOwnProperty.call(body,'mode')) return toError('Supply deployment_id, binding_id and mode only');
+        if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.binding_id!=='string'||!/^bnd_[a-f0-9]{24}$/.test(body.binding_id)||(body.mode!=='rotate'&&body.mode!=='abandon')) return toError('Valid application ID, binding ID and mode (rotate or abandon) are required');
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding-rotation',body));
       }
       case 'impreza_get_service_binding_plan': {
         if (typeof args.binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(args.binding_plan_id)) return toError('Invalid binding_plan_id');
