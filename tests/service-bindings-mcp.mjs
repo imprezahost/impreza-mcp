@@ -18,6 +18,9 @@ try {
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
   const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const data=JSON.parse(r.content[0].text);assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);
  }
+ const apply=tools.find(t=>t.name==='impreza_apply_service_binding_plan');
+ assert.match(apply.description,/creation, credential rotation or removal/);
+ assert.match(apply.description,/previous login only after a healthy replacement/);
  const rotation=tools.find(t=>t.name==='impreza_prepare_service_binding_rotation');assert(rotation);
  assert.deepEqual(rotation.inputSchema.properties.mode.enum,['rotate','abandon']);
  assert.deepEqual(rotation.inputSchema.required,['deployment_id','binding_id','mode']);
