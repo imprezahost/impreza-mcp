@@ -658,3 +658,15 @@ no longer advertised; retired calls return `FEATURE_NOT_AVAILABLE`. Contact
 Impreza support for other infrastructure changes. Ordering and cancellation keep
 their normal account workflows. Application management through an enrolled agent
 is separate.
+
+
+## Configuration, metrics and recovery (0.39.0)
+
+Review application configuration with export/prepare/get/apply tools; inspect
+per-app metrics and alert rules; download backup parts and review/apply a
+PostgreSQL restore into a new database. Applying a review requires its digest
+and explicit confirmation; acceptance is queued work, not verified completion.
+The custom deploy and preparation tools also support `static_files` and
+`go_build`. Metrics and MariaDB bindings require agent 0.6.17 or newer.
+See [configuration, metrics and recovery](https://docs.imprezahost.com/customer-workflows.html)
+for permissions, examples and limits. No automatic server update occurs.
