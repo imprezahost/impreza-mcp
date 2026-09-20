@@ -136,6 +136,127 @@ function isIpAddress(value: string): boolean {
 }
 
 const TOOLS = [
+{
+  "name": "impreza_create_preview",
+  "description": "Create (or refresh) the preview of one branch now, without waiting for a push. With protect=true the preview gets an HTTPS address on the shared preview domain — a random label, so the branch name still reaches no DNS record or CT log — gated by a generated password returned ONLY in this response: it is never stored in plaintext and cannot be retrieved later; the username is \"preview\". Calling again for the same branch refreshes the existing preview and never mints a new password; changing protection on a live preview means retiring it first. Requires deploy scope; the agent must support preview-basic-auth-v1 for protected previews.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "description": "The PARENT deployment (dpl_...) connected to the repo, not a preview."
+      },
+      "branch": {
+        "type": "string",
+        "description": "The branch to preview — anything except the watched branch."
+      },
+      "protect": {
+        "type": "boolean",
+        "description": "Gate the preview behind a generated password over HTTPS. Shown once in this response, never stored."
+      }
+    },
+    "required": [
+      "deployment_id",
+      "branch"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Create preview"
+},
+{
+  "name": "impreza_compare_environments",
+  "description": "Compare the configuration of two environments of the same project before promoting. Services are paired by component name: for each pair it reports which variable names match, differ or exist on one side only, whether the source image or recipe diverges, and the summarized database connection state of each side. Never returns variable values, credentials or digests. Read-only; changes nothing. Requires unrestricted account credentials.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "environment_id": {
+        "type": "string",
+        "pattern": "^env_[a-f0-9]{24}$"
+      },
+      "other_environment_id": {
+        "type": "string",
+        "pattern": "^env_[a-f0-9]{24}$",
+        "description": "The environment to compare against."
+      }
+    },
+    "required": [
+      "environment_id",
+      "other_environment_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Compare environments"
+},
+{
+  "name": "impreza_prepare_traffic_switch",
+  "description": "Prepare a 15-minute review to move the hostname of a running custom application to another running custom application on the same server. The target must not already serve a hostname. Applying moves the route after the target proves healthy and re-probes the hostname before reporting; the source keeps running and can receive the hostname back through another reviewed switch. Preparation queues nothing. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$",
+        "description": "Source application currently serving the hostname."
+      },
+      "target_deployment_id": {
+        "type": "string",
+        "pattern": "^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$"
+      }
+    },
+    "required": [
+      "deployment_id",
+      "target_deployment_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Prepare traffic switch"
+},
+{
+  "name": "impreza_get_traffic_switch",
+  "description": "Read a saved traffic switch review and its accepted command receipt. Accepted means queued, not switched or verified. Requires unrestricted account credentials and read scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "switch_id": {
+        "type": "string",
+        "pattern": "^tsw_[a-f0-9]{24}$"
+      }
+    },
+    "required": [
+      "switch_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Read traffic switch review"
+},
+{
+  "name": "impreza_apply_traffic_switch",
+  "description": "Apply the exact reviewed traffic switch after user confirmation with confirm=true and review_digest. The hostname moves only after the target proves healthy, and the route is re-probed before the move is reported. The source application keeps running. Repeating the same review returns its receipt without a second job. Requires unrestricted account credentials and deploy scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "switch_id": {
+        "type": "string",
+        "pattern": "^tsw_[a-f0-9]{24}$"
+      },
+      "review_digest": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "switch_id",
+      "review_digest",
+      "confirm"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Apply traffic switch"
+},
   {
     name: 'impreza_list_servers',
     description:
@@ -1610,8 +1731,7 @@ const TOOLS = [
     description:
       'Start, stop or reboot an Impreza Cloud VPS. These are the cloud-VPS machines (a different ' +
       'product from the Proxmox VPS that `impreza_vps_power` drives) — find the vm_id with ' +
-      '`impreza_list_services`. "shutdown" asks the guest OS to stop cleanly; "poweroff" cuts power, ' +
-      'which can lose unwritten data, so prefer shutdown unless the machine is unresponsive. ' +
+      '`impreza_list_services` (use the WHMCS service ID). Only boot, graceful shutdown and reboot are supported. ' +
       'Interrupts a running machine, so confirm with the customer first.',
     inputSchema: {
       type: 'object',
@@ -1619,8 +1739,8 @@ const TOOLS = [
         vm_id: { type: 'string', description: 'Cloud VPS id (from impreza_list_services).' },
         action: {
           type: 'string',
-          enum: ['boot', 'shutdown', 'reboot', 'poweroff'],
-          description: 'boot | shutdown (clean) | reboot | poweroff (hard, may lose unwritten data).',
+          enum: ['boot', 'shutdown', 'reboot'],
+          description: 'boot | shutdown (clean) | reboot.',
         },
       },
       required: ['vm_id', 'action'],
@@ -1665,14 +1785,14 @@ const TOOLS = [
     name: 'impreza_vps_set_hostname',
     description:
       'Rename a VPS — sets the hostname the machine reports and, on Proxmox, the label shown in the ' +
-      'panel. Works for BOTH Impreza VPS families (Proxmox and Cloud); pass the service_id from ' +
+      'panel. Available for Proxmox VPS only; pass the service_id from ' +
       '`impreza_list_services` and the right one is used. Cosmetic on its own: it does not move DNS, ' +
       'so if the customer wants a name that resolves, add a DNS record too. Some guests only pick the ' +
       'new name up after a reboot.',
     inputSchema: {
       type: 'object',
       properties: {
-        service_id: { type: 'number', description: 'VPS service id. Proxmox or Cloud — both work.' },
+        service_id: { type: 'number', description: 'VPS service id. Proxmox VPS only; basic Cloud VPS does not support this operation.' },
         hostname: { type: 'string', description: 'New hostname, e.g. web-01.example.com.' },
       },
       required: ['service_id', 'hostname'],
@@ -1682,7 +1802,7 @@ const TOOLS = [
   {
     name: 'impreza_vps_reset_password',
     description:
-      'Set a new root/administrator password on a VPS. Works for BOTH VPS families. This REPLACES the ' +
+      'Set a new root/administrator password on a VPS. Available for Proxmox VPS only. This REPLACES the ' +
       'current password, so anything logging in with the old one — a deploy script, a monitoring ' +
       'agent, a saved SSH session — stops working immediately; check with the customer first. Prefer ' +
       'an SSH key where the customer has one. The new password is only as private as the channel you ' +
@@ -1691,7 +1811,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        service_id: { type: 'number', description: 'VPS service id. Proxmox or Cloud — both work.' },
+        service_id: { type: 'number', description: 'VPS service id. Proxmox VPS only; basic Cloud VPS does not support this operation.' },
         password: { type: 'string', description: 'New root password, at least 8 characters.' },
       },
       required: ['service_id', 'password'],
@@ -1704,8 +1824,7 @@ const TOOLS = [
       'Set up automatic backups for a Proxmox VPS — the answer to "make sure this is backed up". ' +
       'Check what already exists with `impreza_vps_list_backup_schedules` first: a second overlapping ' +
       'schedule just doubles the storage. Backups land on the Impreza backup store, not on the VPS ' +
-      'disk, so they survive the machine. Cloud VPS uses images instead — see ' +
-      '`impreza_cloud_create_image`.',
+      'disk, so they survive the machine. Basic Cloud VPS does not support infrastructure backups.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2835,6 +2954,11 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_create_environment: A_WRITE_IDEM,
   impreza_attach_environment_service: A_WRITE_IDEM,
   impreza_detach_environment_service: A_WRITE_IDEM,
+  impreza_compare_environments: A_READ,
+  impreza_prepare_traffic_switch: A_WRITE,
+  impreza_get_traffic_switch: A_READ,
+  impreza_apply_traffic_switch: A_WRITE_EXT_IDEM,
+  impreza_create_preview: A_WRITE_EXT_IDEM,
   impreza_prepare_service_binding: A_WRITE,
   impreza_prepare_service_binding_removal: A_WRITE,
   impreza_prepare_service_binding_rotation: A_WRITE,
@@ -3086,7 +3210,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
   };
 });
 
-const ANNOTATED_TOOLS = TOOLS.map((tool) => {
+function basicCloudUnavailable(name: string): boolean {
+  return name.startsWith('impreza_cloud_') && name !== 'impreza_cloud_power';
+}
+const ANNOTATED_TOOLS = TOOLS.filter(tool => !basicCloudUnavailable(tool.name)).map((tool) => {
   const annotations = TOOL_ANNOTATIONS[tool.name];
   if (!annotations) throw new Error(`Tool ${tool.name} has no entry in TOOL_ANNOTATIONS`);
   return { ...tool, annotations };
@@ -3144,6 +3271,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const args = (rawArgs ?? {}) as Record<string, unknown>;
 
   try {
+    if (basicCloudUnavailable(name)) {
+      throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
+    }
     switch (name) {
       case 'impreza_list_servers':
         return toResult(await impreza.get<ServerList>('/v1/platform/servers'));
@@ -3521,8 +3651,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const vm = String(args.vm_id ?? '').trim();
         if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
         const action = String(args.action ?? '').toLowerCase();
-        if (!['boot', 'shutdown', 'reboot', 'poweroff'].includes(action)) {
-          throw new Error('action must be one of: boot, shutdown, reboot, poweroff.');
+        if (!['boot', 'shutdown', 'reboot'].includes(action)) {
+          throw new Error('action must be one of: boot, shutdown, reboot.');
         }
         return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/${action}`, {}));
       }
@@ -3561,6 +3691,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         // real machine to the wrong provider's API.
         const svc = await impreza.get<{ vps_backend?: string | null }>(`/v1/account/services/${sid}`);
         const family = svc?.vps_backend ?? null;
+        if (family === 'cloud') {
+          throw new Error('FEATURE_NOT_AVAILABLE: Basic Cloud VPS does not support hostname or password changes. Contact Impreza support.');
+        }
         if (family !== 'proxmox' && family !== 'cloud') {
           throw new Error(
             `Service ${sid} is not an Impreza VPS (vps_backend=${family ?? 'null'}). A dedicated server or a ` +
@@ -3888,6 +4021,29 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const detach=name==='impreza_detach_environment_service';
         if (detach&&body.confirm!==true) return toError('Explicit confirm=true is required');
         return toResult(await impreza.post<unknown>('/v1/platform/environments/'+encodeURIComponent(environment_id)+'/services'+(detach?'/detach':''),body));
+      }
+      case 'impreza_compare_environments': {
+        const p=z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),other_environment_id:z.string().regex(/^env_[a-f0-9]{24}$/)}).strict().parse(args);
+        return toResult(await impreza.get('/v1/platform/environments/'+encodeURIComponent(p.environment_id)+'/compare',{other:p.other_environment_id}));
+      }
+      case 'impreza_prepare_traffic_switch': {
+        const id=z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/);
+        const p=z.object({deployment_id:id,target_deployment_id:id}).strict().parse(args);
+        if(p.deployment_id===p.target_deployment_id) return toError('Choose a different target application');
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(p.deployment_id)+'/prepare-traffic-switch',{target_deployment_id:p.target_deployment_id}));
+      }
+      case 'impreza_get_traffic_switch': {
+        const p=z.object({switch_id:z.string().regex(/^tsw_[a-f0-9]{24}$/)}).strict().parse(args);
+        return toResult(await impreza.get('/v1/platform/traffic-switches/'+encodeURIComponent(p.switch_id)));
+      }
+      case 'impreza_apply_traffic_switch': {
+        const p=z.object({switch_id:z.string().regex(/^tsw_[a-f0-9]{24}$/),review_digest:z.string().regex(/^[a-f0-9]{64}$/),confirm:z.literal(true)}).strict().parse(args);
+        return toResult(await impreza.post('/v1/platform/traffic-switches/'+encodeURIComponent(p.switch_id)+'/apply',{review_digest:p.review_digest,confirm:true}));
+      }
+      case 'impreza_create_preview': {
+        const p=z.object({deployment_id:z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/),branch:z.string().min(1).max(100),protect:z.boolean().optional()}).strict().parse(args);
+        const {deployment_id,...body}=p;
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/previews',body));
       }
       case 'impreza_prepare_service_binding': {
         const {deployment_id,...body}=args;

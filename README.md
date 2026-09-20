@@ -265,7 +265,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.37.1.** The tool catalog covers app deployment plus account +
+**Package version: 0.38.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -636,3 +636,25 @@ Python deployments may select python_package_manager=uv@0.12.15 with python_pip,
 `impreza_prepare_image_promotion`, `impreza_get_image_promotion` and `impreza_apply_image_promotion` review an exact registry digest for an existing destination configuration. Apply requires the returned review digest and explicit confirmation. Destination variables and data remain local to that application.
 
 Project/environment tools organize existing applications with explicit component associations. They do not copy variables, create network connections or deploy workloads. See the [project environments guide](https://docs.imprezahost.com/project-environments.html).
+
+### Reviewed deployment workflows
+
+Version 0.38.0 adds environment configuration comparison, prepare/read/apply traffic
+switches and explicit branch previews with optional password protection. Compare
+returns variable names, never values. Traffic switches require a reviewed digest
+and confirmation, keep the source running, and require operator reconciliation if
+recovery cannot be verified. Protected preview credentials are shown once.
+Traffic switches and protected previews require agent 0.6.16 or newer. Existing
+servers update only at the customer's request. Assisted database restore is a REST
+workflow. See [project environments](https://docs.imprezahost.com/project-environments.html)
+and [deployment safety](https://docs.imprezahost.com/deployment-safety.html).
+
+### Basic Cloud VPS management
+
+Basic Cloud VPS supports status and allocated resources through `impreza_api_call`,
+and boot, graceful shutdown and reboot through `impreza_cloud_power`. Use the WHMCS
+service ID from `impreza_list_services`. Advanced Cloud infrastructure tools are
+no longer advertised; retired calls return `FEATURE_NOT_AVAILABLE`. Contact
+Impreza support for other infrastructure changes. Ordering and cancellation keep
+their normal account workflows. Application management through an enrolled agent
+is separate.
