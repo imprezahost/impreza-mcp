@@ -213,7 +213,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_prepare_database_restore",
-    "description": "Prepare a 15-minute reviewed restore of a completed backup's managed PostgreSQL dump into a NEW database on the same provider \u2014 the current database is never overwritten and nothing is cut over. Returns the review with source, target database and digest; preparing queues nothing. The binding must be healthy: a pending credential rotation or cleanup refuses the review. Requires deploy scope.",
+    "description": "Prepare a 15-minute reviewed restore of a completed backup's managed PostgreSQL or MariaDB dump into a NEW database on the original or an eligible target binding's provider of the same engine \u2014 the current database is never overwritten and nothing is cut over. Returns the review with source, target database and digest; preparing queues nothing. The binding must be healthy: a pending credential rotation or cleanup refuses the review. Requires deploy scope.",
     "inputSchema": {
       "type": "object",
       "properties": {

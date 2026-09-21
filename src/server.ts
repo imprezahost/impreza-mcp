@@ -1285,7 +1285,7 @@ const TOOLS = [
 },
   {
   "name": "impreza_prepare_service_binding",
-  "description": "Prepare a 15-minute review to connect a generated image application to a PostgreSQL catalog provider in the same project environment and server. Creates no database or deployment yet. Returns changes and a digest, never credentials. Review the application, provider and possible interruption before applying. Requires unrestricted account credentials and deploy scope.",
+  "description": "Prepare a 15-minute review to connect a generated image application to a PostgreSQL or MariaDB catalog provider in the same project environment and server. Creates no database or deployment yet. Returns changes and a digest, never credentials. Review the application, provider and possible interruption before applying. Requires unrestricted account credentials and deploy scope.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1307,7 +1307,7 @@ const TOOLS = [
 },
 {
   "name": "impreza_prepare_service_binding_removal",
-  "description": "Prepare a 15-minute review to remove a managed PostgreSQL connection or retry pending cleanup. Applying replaces the consumer without its managed DATABASE_URL, then disables its dedicated login only after a healthy replacement. Database and data are retained. May interrupt traffic. Preparation queues nothing and returns no credential. Requires unrestricted account credentials and deploy scope.",
+  "description": "Prepare a 15-minute review to remove a managed PostgreSQL or MariaDB connection or retry pending cleanup. Applying replaces the consumer without its managed DATABASE_URL, then disables its dedicated login only after a healthy replacement. Database and data are retained. May interrupt traffic. Preparation queues nothing and returns no credential. Requires unrestricted account credentials and deploy scope.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1329,7 +1329,7 @@ const TOOLS = [
 },
 {
   "name": "impreza_prepare_service_binding_rotation",
-  "description": "Prepare a 15-minute review to rotate the credentials of a managed PostgreSQL connection. mode=rotate replaces the dedicated login with a new one; mode=abandon discards a pending rotation candidate and keeps the current credentials (available only while a rotation is pending without queued cleanup — the backend validates). Applying replaces the consumer with the new credential delivered to the agent only; database data is retained; traffic may be interrupted. Requires an agent supporting postgres-service-binding-rotation-v1: older agents refuse the dispatch and the job fails until the customer explicitly updates the agent. Preparation queues nothing and returns no credential. Review the summary, then apply with impreza_apply_service_binding_plan using confirm=true and review_digest. Requires unrestricted account credentials and deploy scope.",
+  "description": "Prepare a 15-minute review to rotate the credentials of a managed PostgreSQL or MariaDB connection. mode=rotate replaces the dedicated login with a new one; mode=abandon discards a pending rotation candidate and keeps the current credentials (available only while a rotation is pending without queued cleanup — the backend validates). Applying replaces the consumer with the new credential delivered to the agent only; database data is retained; traffic may be interrupted. Requires an agent supporting the selected engine rotation capability (postgres-service-binding-rotation-v1 or mysql-service-binding-rotation-v1): older agents refuse the dispatch and the job fails until the customer explicitly updates the agent. Preparation queues nothing and returns no credential. Review the summary, then apply with impreza_apply_service_binding_plan using confirm=true and review_digest. Requires unrestricted account credentials and deploy scope.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -1377,7 +1377,7 @@ const TOOLS = [
 },
 {
   "name": "impreza_apply_service_binding_plan",
-  "description": "Apply the exact reviewed PostgreSQL connection creation, credential rotation or removal after user confirmation with confirm=true and review_digest. Queues one controlled application replacement and may interrupt traffic. Creation delivers a dedicated credential only to the agent. Rotation replaces the dedicated login and disables the previous login only after a healthy replacement, retaining database data. Removal disables its login after a healthy unbound replacement and retains database data. Acceptance is not verified completion. Repeating the same plan returns its receipt without a second job. Requires unrestricted account credentials and deploy scope.",
+  "description": "Apply the exact reviewed PostgreSQL or MariaDB connection creation, credential rotation or removal after user confirmation with confirm=true and review_digest. Queues one controlled application replacement and may interrupt traffic. Creation delivers a dedicated credential only to the agent. Rotation replaces the dedicated login and disables the previous login only after a healthy replacement, retaining database data. Removal disables its login after a healthy unbound replacement and retains database data. Acceptance is not verified completion. Repeating the same plan returns its receipt without a second job. Requires unrestricted account credentials and deploy scope.",
   "inputSchema": {
     "type": "object",
     "properties": {
