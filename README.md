@@ -230,7 +230,10 @@ you opening a browser:
   rather than per account.
 - **Tor is a deployment target, not an add-on.** `impreza_add_onion` gives a
   deployment a `.onion` address in one call, so an agent can publish a hidden
-  service the same way it publishes a normal site.
+  service the same way it publishes a normal site. `impreza_onion_auth_*`
+  manage Tor v3 restricted discovery (client authorization): private keys
+  never leave the customer's Tor client unless they ask the server to
+  generate a keypair — and then the private key is shown once, never stored.
 - **No API key in your config.** The hosted connector authenticates over OAuth.
 
 If none of that matters for your project, a mainstream provider is a perfectly
@@ -431,6 +434,13 @@ and `impreza_api_search` finds anything not named here.
 | `impreza_restart_deployment` | `POST .../restart` |
 | `impreza_redeploy_deployment` | `POST .../custom/{id}/redeploy` (in-place rebuild, same domain) |
 | `impreza_add_onion` | `POST .../onion/add` |
+| `impreza_set_onion_profile` | `POST .../onion/profile` (`standard` / `hardened` / `max` hardening tiers) |
+| `impreza_export_onion_key` | `POST .../onion/export` (sealed to your X25519 key; plaintext never transits) |
+| `impreza_fetch_onion_key_export` | `GET .../onion/export/{command_id}` (read-once — the blob is burned) |
+| `impreza_rotate_onion_key` | `POST .../onion/rotate` (new .onion; the old address dies) |
+| `impreza_onion_auth_list` | `GET .../onion/clients` |
+| `impreza_onion_auth_add` | `POST .../onion/clients` (`pubkey`, or `generate:true` → `private_key` shown once) |
+| `impreza_onion_auth_revoke` | `DELETE .../onion/clients/{name}` |
 | `impreza_change_domain` | `POST .../domain` |
 | `impreza_git_webhook_status` | `GET .../custom/{id}/git-webhook` |
 | `impreza_git_webhook_connect` | `POST .../custom/{id}/git-webhook/connect` |
@@ -582,6 +592,42 @@ as HTTP request headers.
 The IP of the machine running this MCP server (almost always your
 laptop) must be on the API key's whitelist. Manage the whitelist in
 your Impreza clientarea.
+
+## Using over Tor
+
+The MCP server can route every API call through a local Tor daemon, so
+API requests use the configured proxy. Your network provider can still observe
+your connection to Tor; this option does not hide that you are using Tor.
+
+  1. Install and start Tor (the `tor` daemon, or Tor Browser — both
+     commonly expose a SOCKS5 listener on `127.0.0.1:9050` for the daemon
+     or `127.0.0.1:9150` for Tor Browser; check your local configuration).
+  2. Add `IMPREZA_PROXY` to the MCP config env:
+
+     ```json
+     "env": {
+       "IMPREZA_API_KEY": "imp_...",
+       "IMPREZA_API_SECRET": "...",
+       "IMPREZA_PROXY": "socks5://127.0.0.1:9050"
+     }
+     ```
+
+Every API request then exits through Tor, and the API hostname is
+resolved by Tor itself (remote DNS) — nothing is resolved locally, so
+no DNS leak. The transport fails closed: if the proxy is unreachable
+or refuses the connection, the request fails — it never silently falls
+back to a direct clearnet connection.
+
+Optionally point `IMPREZA_BASE_URL` at the API's `.onion` mirror —
+`http://` is accepted only for v3 `.onion` hosts, since Tor authenticates and
+encrypts onion connections. Clearnet hosts require `https://`. An onion URL
+also requires an explicit `IMPREZA_PROXY`; the client refuses direct DNS and
+connections even when the onion URL uses HTTPS. Proxy requests refuse redirects,
+use a bounded request deadline and accept response bodies up to 16 MiB.
+
+One account-side adjustment: Tor exit IPs rotate constantly, so a
+fixed-IP whitelist on the API key cannot work. Set the key's IP factor
+to `tofu` or `keyonly` in the clientarea.
 
 ## PHP deployments
 

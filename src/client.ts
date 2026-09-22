@@ -2,16 +2,25 @@
 // OpenAPI surface in impreza-platform/specs/openapi-platform.yaml.
 //
 // Auth: standard X-API-Key + X-API-Secret headers, sourced from env.
-// Network: native fetch (Node ≥ 20 has it). No retry / circuit-breaker
-// in v1 — the AI client retries the tool call if it cares.
+// Network: native fetch (Node ≥ 20 has it), or a hand-rolled no-auth SOCKS5
+// transport over node:net/node:http when `proxy` is configured (Tor usage —
+// see socks5.ts). No retry / circuit-breaker in v1 — the AI client retries
+// the tool call if it cares.
 
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import { readFile, stat } from 'node:fs/promises';
+import http from 'node:http';
+import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createWriteStream } from 'node:fs';
+import tls from 'node:tls';
 import { unlink } from 'node:fs/promises';
 import * as tar from 'tar';
+
+import { parseSocksProxy, socks5Connect, type SocksProxy } from './socks5.js';
+import { isOnionHost } from './env.js';
 
 export interface ImprezaConfig {
   baseURL: string;
@@ -19,6 +28,12 @@ export interface ImprezaConfig {
   apiSecret: string;
   /** Wall-clock budget per HTTP call. Default 60s. */
   timeoutMs?: number;
+  /**
+   * Optional `socks5://host:port` proxy (typically a local Tor daemon) that
+   * EVERY API call is routed through. Fail-closed: when set and the proxy is
+   * unreachable, requests fail — there is no silent fallback to clearnet.
+   */
+  proxy?: string;
 }
 
 export class ImprezaClient {
@@ -26,12 +41,18 @@ export class ImprezaClient {
   private readonly apiKey: string;
   private readonly apiSecret: string;
   private readonly timeoutMs: number;
+  private readonly proxy: SocksProxy | undefined;
 
   constructor(cfg: ImprezaConfig) {
     this.baseURL = cfg.baseURL.replace(/\/+$/, '');
     this.apiKey = cfg.apiKey;
     this.apiSecret = cfg.apiSecret;
     this.timeoutMs = cfg.timeoutMs ?? 60_000;
+    this.proxy = cfg.proxy ? parseSocksProxy(cfg.proxy) : undefined;
+    const host = new URL(this.baseURL).hostname;
+    if (host.endsWith('.onion') && (!isOnionHost(host) || !this.proxy)) {
+      throw new Error('An onion API requires a valid v3 hostname and an explicit SOCKS5 proxy; no direct connection is allowed.');
+    }
   }
 
   /**
@@ -123,25 +144,26 @@ export class ImprezaClient {
   private async fetch(url: URL, init: RequestInit): Promise<Response> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'X-API-Key': this.apiKey,
+      'X-API-Secret': this.apiSecret,
+      'User-Agent': `impreza-mcp/${VERSION}`,
+      // All callers pass plain objects — cast keeps HeadersInit's array/Headers
+      // variants from poisoning the merged shape.
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+    };
     try {
-      const res = await fetch(url, {
-        ...init,
-        headers: {
-          Accept: 'application/json',
-          'X-API-Key': this.apiKey,
-          'X-API-Secret': this.apiSecret,
-          'User-Agent': `impreza-mcp/${VERSION}`,
-          ...(init.headers ?? {}),
-        },
-        // The credentials above are CUSTOM headers. Fetch strips Authorization,
-        // Cookie and Proxy-Authorization when a redirect crosses to another
-        // origin — it has no idea ours are credentials, so it would carry the
-        // customer's key and secret to whatever host a 3xx names. The API
-        // answers JSON on every endpoint and never redirects, so we take the
-        // redirect ourselves and refuse it.
-        redirect: 'manual',
-        signal: ctrl.signal,
-      });
+      // The credentials above are CUSTOM headers. Fetch strips Authorization,
+      // Cookie and Proxy-Authorization when a redirect crosses to another
+      // origin — it has no idea ours are credentials, so it would carry the
+      // customer's key and secret to whatever host a 3xx names. The API
+      // answers JSON on every endpoint and never redirects, so we take the
+      // redirect ourselves and refuse it. (node:http never follows redirects
+      // at all, so the proxied path is equally strict by construction.)
+      const res = this.proxy
+        ? await this.proxiedFetch(url, init, headers, ctrl.signal)
+        : await fetch(url, { ...init, headers, redirect: 'manual', signal: ctrl.signal });
       if (res.status >= 300 && res.status < 400) {
         throw new Error(
           `UNEXPECTED_REDIRECT: the API answered HTTP ${res.status} for ${url.pathname}. ` +
@@ -152,6 +174,93 @@ export class ImprezaClient {
       return res;
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  /**
+   * fetch() equivalent routed through the configured SOCKS5 proxy. The proxy
+   * resolves the target hostname (remote DNS — no local lookup, no leak) and
+   * TLS, when the URL is https, is layered on top of the proxied socket. Uses
+   * node:http with a per-request `createConnection` (the one form Node honors
+   * — an Agent-constructor option is silently ignored), so no dependency is
+   * needed. Any proxy/handshake failure throws: fail closed, never direct.
+   */
+  private async proxiedFetch(
+    url: URL,
+    init: RequestInit,
+    headers: Record<string, string>,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    if (!this.proxy) throw new Error('proxiedFetch without a configured proxy');
+    const isTls = url.protocol === 'https:';
+    const port = url.port ? Number(url.port) : isTls ? 443 : 80;
+    let socket: net.Socket | tls.TLSSocket | undefined;
+    const onAbort = () => socket?.destroy(new Error('Proxied request aborted'));
+    signal.addEventListener('abort', onAbort);
+    try {
+      signal.throwIfAborted();
+      socket = await socks5Connect(this.proxy, url.hostname, port, this.timeoutMs, signal);
+      signal.throwIfAborted();
+      if (isTls) {
+        const tlsSocket = tls.connect({ socket, servername: url.hostname });
+        // Abort removes once() listeners before destroy(error) emits. Keep a
+        // sink for that late event; the awaited handshake/request still rejects.
+        tlsSocket.on('error', () => {});
+        socket = tlsSocket;
+        await once(tlsSocket, 'secureConnect', { signal });
+      }
+      const established = socket;
+      const body = init.body as string | Uint8Array | undefined;
+      const reqHeaders = { ...headers };
+      if (body !== undefined) {
+        reqHeaders['Content-Length'] = String(typeof body === 'string' ? Buffer.byteLength(body) : body.byteLength);
+      }
+      return await new Promise<Response>((resolve, reject) => {
+        const req = http.request(
+          {
+            method: init.method ?? 'GET',
+            host: url.hostname,
+            port,
+            path: url.pathname + url.search,
+            headers: reqHeaders,
+            createConnection: () => established,
+          },
+          (res) => {
+            const chunks: Buffer[] = [];
+            let bytes = 0;
+            res.on('data', (c: Buffer) => {
+              bytes += c.length;
+              if (bytes > 16 * 1024 * 1024) { req.destroy(new Error('Proxied response exceeds 16 MiB')); return; }
+              chunks.push(c);
+            });
+            res.on('end', () => {
+              try {
+              const resHeaders = new Headers();
+              for (let i = 0; i + 1 < res.rawHeaders.length; i += 2) {
+                resHeaders.append(res.rawHeaders[i] as string, res.rawHeaders[i + 1] as string);
+              }
+              resolve(
+                new Response([204, 205, 304].includes(res.statusCode ?? 0) ? null : Buffer.concat(chunks), {
+                  status: res.statusCode ?? 502,
+                  statusText: res.statusMessage ?? '',
+                  headers: resHeaders,
+                }),
+              );
+              } catch (err) { reject(err); }
+            });
+            res.on('error', reject);
+            res.on('aborted', () => reject(new Error('Proxied response was truncated')));
+          },
+        );
+        req.setTimeout(this.timeoutMs, () => req.destroy(new Error(`proxied request timed out after ${this.timeoutMs}ms`)));
+        req.on('error', reject);
+        if (body !== undefined) req.write(body);
+        req.end();
+        established.resume();
+      });
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+      socket?.destroy();
     }
   }
 

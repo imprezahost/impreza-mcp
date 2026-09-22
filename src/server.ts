@@ -37,6 +37,7 @@ import {
 } from './client.js';
 import { runSetup } from './setup.js';
 import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-assets.js';
+import { envSchema } from './env.js';
 import { VERSION } from './version.js';
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
 
@@ -64,23 +65,10 @@ if (sub === '--version' || sub === '-V' || sub === 'version') {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Env validation
+// Env validation — the schema lives in env.ts so the rules (in particular
+// the https-only IMPREZA_BASE_URL with its .onion exception) are unit-testable
+// without booting the server.
 // ─────────────────────────────────────────────────────────────────────
-
-const envSchema = z.object({
-  IMPREZA_API_KEY: z.string().min(8, 'IMPREZA_API_KEY must be set (starts with imp_)'),
-  IMPREZA_API_SECRET: z.string().min(16, 'IMPREZA_API_SECRET must be set'),
-  // Must be https:// — the API key + secret travel in request headers on
-  // every call, so an http:// (or otherwise downgraded) base URL would
-  // expose them in cleartext. Refusing non-https here prevents an
-  // attacker who can influence the environment from pointing the client
-  // at a malicious or plaintext endpoint to harvest credentials.
-  IMPREZA_BASE_URL: z
-    .string()
-    .url()
-    .refine((u) => u.startsWith('https://'), 'IMPREZA_BASE_URL must be an https:// URL')
-    .default('https://api.imprezahost.com'),
-});
 
 let cfg: z.infer<typeof envSchema>;
 try {
@@ -105,7 +93,13 @@ const impreza = new ImprezaClient({
   baseURL: cfg.IMPREZA_BASE_URL,
   apiKey: cfg.IMPREZA_API_KEY,
   apiSecret: cfg.IMPREZA_API_SECRET,
+  ...(cfg.IMPREZA_PROXY ? { proxy: cfg.IMPREZA_PROXY } : {}),
 });
+
+if (cfg.IMPREZA_PROXY) {
+  // stderr — stdout is the MCP transport stream. No secrets in the line.
+  console.error(`[impreza-mcp] routing API via ${cfg.IMPREZA_PROXY}`);
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // MCP server setup
@@ -326,6 +320,17 @@ const TOOLS = [
         mode: { type: 'string', enum: ['image', 'dockerfile', 'manifest', 'compose'], description: 'Source mode.' },
         domain: { type: 'string', description: 'Public hostname. Omit when `onion: true` for an onion-only deploy.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service. Default false.' },
+        onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier of the hidden service (requires onion: true). standard = intro-point rate limiting (safe upstream default); hardened = tighter limits + max streams; max = + experimental proof-of-work — one layer among several, never a guaranteed DDoS protection, and refused if the host\'s Tor lacks the PoW module. Default standard. The .onion address never changes.' },
+        onion_import: {
+          type: 'object',
+          properties: {
+            secret_key_b64: { type: 'string', description: 'Base64 of the hs_ed25519_secret_key file (96 bytes).' },
+            public_key_b64: { type: 'string', description: 'Base64 of the hs_ed25519_public_key file (64 bytes).' },
+          },
+          required: ['secret_key_b64', 'public_key_b64'],
+          additionalProperties: false,
+          description: 'BYO hidden-service key pair: BOTH C Tor key files, base64 each — the secret file does NOT contain the public key (its body is the expanded scalar), so both are required. They live in the hidden service\'s data directory (hs_ed25519_secret_key + hs_ed25519_public_key). The address derives from the public file. Requires onion: true; keeps your existing .onion address. Deploy-time only — impreza_add_onion refuses it.',
+        },
         cpus: { type: 'number', description: 'CPU limit (cores; 1.0 = one core). Default 1.0 server-side.' },
         memory_mb: { type: 'number', description: 'Memory limit in MB. Default 512 server-side.' },
         target_port: { type: 'number', description: 'Port the container listens on (default 80).' },
@@ -677,13 +682,115 @@ const TOOLS = [
   {
     name: 'impreza_add_onion',
     description:
-      'Add a Tor v3 hidden service (.onion mirror) to a deployment that\'s currently running clearnet-only. The agent provisions Tor + publishes the hidden service alongside the existing clearnet route. Useful when the customer realized post-install that they wanted Tor exposure. The .onion address is persisted on the deployment row. Catalog deployments must declare `supports.onion: true`; for custom deployments this is always supported (Phase 89).',
+      'Add a Tor v3 hidden service (.onion mirror) to a deployment that\'s currently running clearnet-only. The agent provisions Tor + publishes the hidden service alongside the existing clearnet route. Useful when the customer realized post-install that they wanted Tor exposure. The .onion address is persisted on the deployment row. Catalog deployments must declare `supports.onion: true`; for custom deployments this is always supported (Phase 89). Optional `onion_profile` picks the hardening tier (default standard); change it later with impreza_set_onion_profile.',
     inputSchema: {
       type: 'object',
       properties: {
         deployment_id: { type: 'string', description: 'The dpl_... id to extend.' },
+        onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier: standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard.' },
       },
       required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_set_onion_profile',
+    description:
+      'Change the hardening tier of a deployment\'s EXISTING Tor v3 hidden service. Tiers: standard = intro-point rate limiting (the safe upstream default); hardened = tighter rate limits + max streams; max = + experimental proof-of-work — one layer among several, never a guaranteed DDoS protection, and the change may be refused if the host\'s Tor lacks the PoW module. The .onion address never changes. Returns 404 when the deployment has no onion service and 422 when the agent lacks onion-profile-v1 (update the agent first).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose hidden service to re-tune.' },
+        profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'The tier to apply.' },
+      },
+      required: ['deployment_id', 'profile'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_export_onion_key',
+    description:
+      'Export the hidden-service identity as a JSON version:1 bundle containing onion, secret_key_b64 and public_key_b64 (both C Tor key files). The agent seals the bundle on the server to your X25519 `recipient_pubkey` with a NaCl/libsodium anonymous sealed box — the plaintext key never transits and never rests on the platform, only the ciphertext does, and the platform cannot open it. Returns a command_id; once the agent finishes, retrieve the sealed blob with impreza_fetch_onion_key_export — readable EXACTLY ONCE, then the platform burns it. Generate the recipient keypair locally, never accept one from anyone else; decrypt the blob locally with the recipient PRIVATE key, e.g. PyNaCl `SealedBox(private_key).decrypt(bytes)` or libsodium `crypto_box_seal_open`. Requires confirm: true and an agent with onion-custody-v1 (422 on older agents).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose hidden-service key to export.' },
+        recipient_pubkey: { type: 'string', description: 'Standard base64 of a 32-byte X25519 public key you generated locally.' },
+        confirm: { type: 'boolean', const: true, description: 'True only after the customer confirmed they want the private key exported.' },
+      },
+      required: ['deployment_id', 'recipient_pubkey', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_fetch_onion_key_export',
+    description:
+      'Read the sealed export blob of a completed impreza_export_onion_key command — EXACTLY ONCE: this read removes the ciphertext from the platform and a second read is a 404 (re-export if you lose it). Returns the .onion address and the sealed blob; unseal it locally with the recipient PRIVATE key (NaCl/libsodium sealed box) to recover the versioned JSON key-pair bundle. 409 while the agent has not finished yet — poll the deployment and retry.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id the export belongs to.' },
+        command_id: { type: 'string', description: 'The cmd_... id returned by impreza_export_onion_key.' },
+      },
+      required: ['deployment_id', 'command_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_rotate_onion_key',
+    description:
+      'Rotate the hidden-service key of a deployment: the agent mints a fresh ed25519 key and the .onion address CHANGES — the old address stops working for visitors, permanently. Bookmarks, links and published references to the old address die with it; the old key is parked on the host for support-assisted recovery only, no tool restores it. If the customer may want the old address back later, export the key FIRST (impreza_export_onion_key) — it can be re-imported on a future deploy. The new address appears on the deployment row when the agent reports. Requires confirm: true, confirm_address with the CURRENT .onion verbatim (proof of which address is being killed), and an agent with onion-custody-v1 (422 on older agents).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose hidden-service key to rotate.' },
+        confirm: { type: 'boolean', const: true, description: 'True only after explicit customer confirmation.' },
+        confirm_address: { type: 'string', description: 'The CURRENT .onion address, verbatim (e.g. abc...xyz.onion).' },
+      },
+      required: ['deployment_id', 'confirm', 'confirm_address'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_onion_auth_list',
+    description:
+      'List the authorized clients of a deployment\'s Tor v3 restricted discovery (client authorization). Returns whether the hidden service is restricted and each authorized client name with its creation date. On a restricted service the .onion stays reachable ONLY by Tor clients presenting an authorized key — this list is who can get in. Requires a deployment with an onion address and an agent supporting onion-auth-v1.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose onion clients to list.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_onion_auth_add',
+    description:
+      'Authorize a new client on a deployment\'s Tor v3 restricted discovery (client authorization). Two modes: pass `pubkey` — the x25519 public key the customer generated in their OWN Tor client, so the private key never leaves their machine and is never sent to or stored by Impreza — or pass `generate: true` to have the server mint the keypair, in which case the response carries `private_key` shown ONCE: it is never stored and cannot be retrieved later, so the customer must save it immediately. Duplicate names are refused (409); revoke first to re-use a name. Requires an agent supporting onion-auth-v1 (422 on older agents).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id of the restricted onion deployment.' },
+        name: { type: 'string', description: 'Client label, unique within this deployment (e.g. "laptop", "alice-phone").' },
+        pubkey: { type: 'string', description: 'The client\'s x25519 public key, generated in their Tor client. Use this OR generate, not both.' },
+        generate: { type: 'boolean', description: 'true = the server mints the keypair and shows private_key once in this response. Default false.' },
+      },
+      required: ['deployment_id', 'name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_onion_auth_revoke',
+    description:
+      'Revoke one client\'s authorization from a deployment\'s Tor v3 restricted discovery. The client loses access to the hidden service; the deployment, the .onion address and every other client are untouched. The name can be authorized again later with a fresh keypair. Requires an agent supporting onion-auth-v1.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id of the restricted onion deployment.' },
+        name: { type: 'string', description: 'The client name from impreza_onion_auth_list.' },
+      },
+      required: ['deployment_id', 'name'],
       additionalProperties: false,
     },
   },
@@ -740,6 +847,17 @@ const TOOLS = [
         app_version: { type: 'string', description: 'Optional pinned version. Default: latest published.' },
         domain: { type: 'string', description: 'Public hostname for clearnet TLS. Omit + set onion:true for onion-only.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service mirror.' },
+        onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier of the hidden service (requires onion: true): standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard.' },
+        onion_import: {
+          type: 'object',
+          properties: {
+            secret_key_b64: { type: 'string', description: 'Base64 of the hs_ed25519_secret_key file (96 bytes).' },
+            public_key_b64: { type: 'string', description: 'Base64 of the hs_ed25519_public_key file (64 bytes).' },
+          },
+          required: ['secret_key_b64', 'public_key_b64'],
+          additionalProperties: false,
+          description: 'BYO hidden-service key pair: BOTH C Tor key files from the hidden service\'s data directory, base64 each. Requires onion: true; keeps your existing .onion address. Deploy-time only.',
+        },
         vars: { type: 'object', description: 'App-specific manifest variables (KEY → value).' },
       },
       required: ['app_name', 'agent_id'],
@@ -1140,6 +1258,21 @@ const TOOLS = [
         "type": "boolean",
         "description": "Also publish a Tor v3 hidden service. Default false."
       },
+      "onion_profile": {
+        "type": "string",
+        "enum": ["standard", "hardened", "max"],
+        "description": "Hardening tier of the hidden service (requires onion: true): standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard."
+      },
+      "onion_import": {
+        "type": "object",
+        "properties": {
+          "secret_key_b64": { "type": "string", "description": "Base64 of the hs_ed25519_secret_key file (96 bytes)." },
+          "public_key_b64": { "type": "string", "description": "Base64 of the hs_ed25519_public_key file (64 bytes)." }
+        },
+        "required": ["secret_key_b64", "public_key_b64"],
+        "additionalProperties": false,
+        "description": "BYO hidden-service key pair: BOTH C Tor key files from the hidden service's data directory, base64 each. Requires onion: true; keeps your existing .onion address. Deploy-time only."
+      },
       "healthcheck_path": {
         "type": "string",
         "minLength": 1,
@@ -1533,6 +1666,21 @@ const TOOLS = [
       "onion": {
         "type": "boolean",
         "description": "Also publish a Tor v3 hidden service. Default false."
+      },
+      "onion_profile": {
+        "type": "string",
+        "enum": ["standard", "hardened", "max"],
+        "description": "Hardening tier of the hidden service (requires onion: true): standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard."
+      },
+      "onion_import": {
+        "type": "object",
+        "properties": {
+          "secret_key_b64": { "type": "string", "description": "Base64 of the hs_ed25519_secret_key file (96 bytes)." },
+          "public_key_b64": { "type": "string", "description": "Base64 of the hs_ed25519_public_key file (64 bytes)." }
+        },
+        "required": ["secret_key_b64", "public_key_b64"],
+        "additionalProperties": false,
+        "description": "BYO hidden-service key pair: BOTH C Tor key files from the hidden service's data directory, base64 each. Requires onion: true; keeps your existing .onion address. Deploy-time only."
       },
       "healthcheck_path": {
         "type": "string",
@@ -2918,6 +3066,22 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_delete_task: A_DESTRUCTIVE,
   impreza_change_domain: A_WRITE_EXT_IDEM,
   impreza_add_onion: A_WRITE_EXT_IDEM,
+  // Setting the same tier twice converges to the same torrc — idempotent.
+  impreza_set_onion_profile: A_WRITE_EXT_IDEM,
+  // Key custody. Export enqueues a fresh agent command per call. Fetch is
+  // a GET that BURNS the blob on success — not read-only, not idempotent,
+  // so it honestly gets A_WRITE. Rotate kills the old address for good and
+  // touches the agent: destructive, external, and every call rotates again.
+  impreza_export_onion_key: A_WRITE_EXT,
+  impreza_fetch_onion_key_export: A_WRITE,
+  impreza_rotate_onion_key: A_DESTRUCTIVE_EXT,
+  // Onion client authorization (Tor v3 restricted discovery). Add is NOT
+  // idempotent: a duplicate name is refused with 409. Revoke follows the
+  // impreza_revoke_credential precedent — it kills an authorization, nothing
+  // else, and re-adding the name restores access.
+  impreza_onion_auth_list: A_READ,
+  impreza_onion_auth_add: A_WRITE_EXT,
+  impreza_onion_auth_revoke: A_WRITE_IDEM,
   // Both touch the hook on GitHub; disconnect documents itself as idempotent
   // and connect re-wires to the same end state.
   impreza_git_webhook_connect: A_WRITE_EXT_IDEM,
@@ -3562,10 +3726,115 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_add_onion': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
+        const body: Record<string, unknown> = {};
+        if (typeof args.onion_profile === 'string') body.onion_profile = args.onion_profile;
         return toResult(
           await impreza.post<{ command_id: string; deployment: Deployment }>(
             `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/add`,
-            {},
+            body,
+          ),
+        );
+      }
+
+      case 'impreza_set_onion_profile': {
+        const dep = String(args.deployment_id ?? '');
+        const profile = String(args.profile ?? '');
+        if (!dep) return toError('deployment_id is required');
+        if (!['standard', 'hardened', 'max'].includes(profile)) return toError('profile must be one of: standard, hardened, max');
+        return toResult(
+          await impreza.post<{ command_id: string; profile: string; note: string }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/profile`,
+            { profile },
+          ),
+        );
+      }
+
+      case 'impreza_export_onion_key': {
+        const dep = String(args.deployment_id ?? '');
+        const recipient = String(args.recipient_pubkey ?? '').trim();
+        if (!dep) return toError('deployment_id is required');
+        const decoded = Buffer.from(recipient, 'base64');
+        if (decoded.length !== 32 || decoded.toString('base64') !== recipient) {
+          return toError('recipient_pubkey must be the standard base64 of a 32-byte X25519 public key');
+        }
+        if (args.confirm !== true) return toError('Explicit customer confirmation is required (confirm: true)');
+        return toResult(
+          await impreza.post<{ command_id: string; note: string }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/export`,
+            { recipient_pubkey: recipient, confirm: true },
+          ),
+        );
+      }
+
+      case 'impreza_fetch_onion_key_export': {
+        const dep = String(args.deployment_id ?? '');
+        const command = String(args.command_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        if (!/^cmd_[A-Za-z0-9_-]{1,28}$/.test(command)) return toError('command_id is required (the cmd_... id from impreza_export_onion_key)');
+        return toResult(
+          await impreza.get<{ command_id: string; onion: string; sealed: string; note: string }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/export/${encodeURIComponent(command)}`,
+          ),
+        );
+      }
+
+      case 'impreza_rotate_onion_key': {
+        const dep = String(args.deployment_id ?? '');
+        const address = String(args.confirm_address ?? '').trim();
+        if (!dep) return toError('deployment_id is required');
+        if (args.confirm !== true) return toError('Explicit customer confirmation is required (confirm: true)');
+        if (!/^[a-z2-7]{56}\.onion$/.test(address)) return toError('confirm_address must be the current .onion address, verbatim (56 base32 chars + .onion)');
+        return toResult(
+          await impreza.post<{ command_id: string; note: string }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/rotate`,
+            { confirm: true, confirm_address: address },
+          ),
+        );
+      }
+
+      case 'impreza_onion_auth_list': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        return toResult(
+          await impreza.get<{ restricted: boolean; clients: Array<{ name: string; created_at: string }> }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients`,
+          ),
+        );
+      }
+
+      case 'impreza_onion_auth_add': {
+        const dep = String(args.deployment_id ?? '');
+        const name = String(args.name ?? '').trim();
+        if (!dep) return toError('deployment_id is required');
+        if (!name) return toError('name is required');
+        const pubkey = typeof args.pubkey === 'string' ? args.pubkey.trim() : '';
+        const generate = args.generate === true;
+        if (generate && pubkey) return toError('Pass either pubkey or generate:true, not both');
+        if (!generate && !pubkey) return toError('pubkey is required unless generate:true');
+        const body: Record<string, unknown> = generate ? { name, generate: true } : { name, pubkey };
+        const data = await impreza.post<{ name: string; pubkey: string; private_key?: string }>(
+          `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients`,
+          body,
+        );
+        if (data.private_key) {
+          return {
+            content: [{
+              type: 'text',
+              text: 'SAVE THIS PRIVATE KEY NOW — it is shown exactly once, is never stored by Impreza, and cannot be retrieved later. If it is lost, revoke this client and add it again.\n\n' + JSON.stringify(data, null, 2),
+            }],
+          };
+        }
+        return toResult(data);
+      }
+
+      case 'impreza_onion_auth_revoke': {
+        const dep = String(args.deployment_id ?? '');
+        const name = String(args.name ?? '').trim();
+        if (!dep) return toError('deployment_id is required');
+        if (!name) return toError('name is required');
+        return toResult(
+          await impreza.del<unknown>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients/${encodeURIComponent(name)}`,
           ),
         );
       }
@@ -3630,6 +3899,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (typeof args.app_version === 'string') body.app_version = args.app_version;
         if (typeof args.domain === 'string') body.domain = args.domain;
         if (typeof args.onion === 'boolean') body.onion = args.onion;
+        if (typeof args.onion_profile === 'string') body.onion_profile = args.onion_profile;
+        if (typeof args.onion_import === 'object' && args.onion_import !== null) body.onion_import = args.onion_import;
         if (args.vars && typeof args.vars === 'object') body.vars = args.vars;
         return toResult(
           await impreza.post<Deployment>('/v1/platform/deployments', body),
@@ -4694,6 +4965,8 @@ interface DeployCustomBody {
   mode: string;
   domain?: string;
   onion?: boolean;
+  onion_profile?: string;
+  onion_import?: { secret_key_b64: string; public_key_b64: string };
   cpus?: number;
   memory_mb?: number;
   target_port?: number;
@@ -4821,6 +5094,22 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if (args.static_spa !== undefined) { if (typeof args.static_spa !== 'boolean') throw new Error('static_spa must be boolean'); body.static_spa = args.static_spa; }
   if (typeof args.domain === 'string') body.domain = args.domain;
   if (typeof args.onion === 'boolean') body.onion = args.onion;
+  if (args.onion_profile !== undefined) {
+    if (typeof args.onion_profile !== 'string' || !['standard', 'hardened', 'max'].includes(args.onion_profile)) throw new Error('onion_profile must be one of: standard, hardened, max');
+    if (args.onion !== true) throw new Error('onion_profile requires onion: true');
+    body.onion_profile = args.onion_profile;
+  }
+  if (args.onion_import !== undefined) {
+    const imp = args.onion_import;
+    if (!imp || typeof imp !== 'object' || Array.isArray(imp)) throw new Error('onion_import must be an object {secret_key_b64, public_key_b64} with the base64 of both C Tor key files');
+    const rec = imp as Record<string, unknown>;
+    const secret = typeof rec.secret_key_b64 === 'string' ? rec.secret_key_b64 : '';
+    const pub = typeof rec.public_key_b64 === 'string' ? rec.public_key_b64 : '';
+    if (Buffer.from(secret, 'base64').length !== 96 || Buffer.from(secret, 'base64').toString('base64') !== secret) throw new Error('onion_import.secret_key_b64 must be the standard base64 of the 96-byte hs_ed25519_secret_key file');
+    if (Buffer.from(pub, 'base64').length !== 64 || Buffer.from(pub, 'base64').toString('base64') !== pub) throw new Error('onion_import.public_key_b64 must be the standard base64 of the 64-byte hs_ed25519_public_key file');
+    if (args.onion !== true) throw new Error('onion_import requires onion: true');
+    body.onion_import = { secret_key_b64: secret, public_key_b64: pub };
+  }
   if (typeof args.cpus === 'number') body.cpus = args.cpus;
   if (typeof args.memory_mb === 'number') body.memory_mb = args.memory_mb;
   if (typeof args.target_port === 'number') body.target_port = args.target_port;

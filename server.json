@@ -34,7 +34,13 @@
         },
         {
           "name": "IMPREZA_BASE_URL",
-          "description": "API base URL. Defaults to https://api.imprezahost.com.",
+          "description": "API base URL. Defaults to https://api.imprezahost.com. http:// is accepted only for .onion hosts.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "IMPREZA_PROXY",
+          "description": "Optional SOCKS5 proxy for all API calls, e.g. socks5://127.0.0.1:9050 for a local Tor daemon. Remote DNS; fails closed.",
           "isRequired": false,
           "isSecret": false
         }
