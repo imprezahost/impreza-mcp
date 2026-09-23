@@ -98,5 +98,25 @@ try {
   assert(!cat.isError);
   assert.deepEqual(parse(cat).body.onion_import, IMPORT);
  }
+
+ // Purge and private preview requests preserve explicit gates and exact bodies.
+ const purge=tools.tools.find(t=>t.name==='impreza_purge_onion_key');
+ assert.equal(purge.annotations.destructiveHint,true);
+ for(const args of [{deployment_id:'dpl_test',confirm_address:ONION},{deployment_id:'dpl_test',confirm:true,confirm_address:'bad'}]) {
+  assert.equal((await client.callTool({name:purge.name,arguments:args})).isError,true);
+ }
+ const pg=parse(await client.callTool({name:purge.name,arguments:{deployment_id:'dpl_test',confirm:true,confirm_address:ONION}}));
+ assert.equal(pg.path,'/v1/platform/deployments/dpl_test/onion/purge');
+ assert.deepEqual(pg.body,{confirm:true,confirm_address:ONION});
+ const dep='dpl_'+'a'.repeat(16);
+ const clients=[{name:'reviewer',pubkey:'A'.repeat(52)}];
+ for(const privacy of [{private:true},{onion_clients:clients}]) {
+  const result=await client.callTool({name:'impreza_create_preview',arguments:{deployment_id:dep,branch:'review',...privacy}});
+  assert(!result.isError,result.content?.[0]?.text);
+  assert.deepEqual(parse(result).body,{branch:'review',...privacy});
+ }
+ for(const invalid of [{onion_clients:[]},{private:true,protect:true},{onion_clients:clients,protect:true},{onion_clients:[{name:'../escape',pubkey:'A'.repeat(52)}]}]) {
+  assert.equal((await client.callTool({name:'impreza_create_preview',arguments:{deployment_id:dep,branch:'review',...invalid}})).isError,true);
+ }
  console.log('PASS: onion custody tools — schema, annotations, sealed export dispatch, read-once burn, rotate gates, onion_import forwarding.');
 } finally { await client.close(); }

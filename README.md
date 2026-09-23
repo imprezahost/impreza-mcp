@@ -716,3 +716,32 @@ The custom deploy and preparation tools also support `static_files` and
 `go_build`. Metrics and MariaDB bindings require agent 0.6.17 or newer.
 See [configuration, metrics and recovery](https://docs.imprezahost.com/customer-workflows.html)
 for permissions, examples and limits. No automatic server update occurs.
+
+### Isolated runtime through Tor (0.42.0)
+
+Custom image and source deployments can opt in with `tor_egress: true` through
+`impreza_deploy_custom` and saved deployment preparation. This option needs an
+agent advertising `tor-egress-v1`, Docker Engine 28+, and a SOCKS5h-capable
+application. The runtime has no direct outbound fallback. Source downloads,
+image pulls and builds retain the server's normal network connection. Catalog
+installs, imported manifests and external service bindings are unsupported.
+See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
+for availability and verification. This option is separate from using Tor to
+connect the MCP client itself and from publishing an inbound onion address.
+
+## Private onion previews and retained identities (0.42.0)
+
+Preview creation supports `private: true`; optionally supply one or more `onion_clients`.
+Supplied reviewers use a name and X25519 public key. Without supplied clients, a reviewer keypair is generated and the private key is shown once. This mode requires agent
+0.6.20 with `onion-private-preview-v1`; reviewer authorization is installed
+before the first onion publication. Repeated deploys preserve later revocations.
+Do not combine this option with password-protected HTTPS previews.
+
+`impreza_purge_onion_key` requires the exact old onion address and explicit
+confirmation. Queued work is not proof of deletion: inspect its completed
+result. Active addresses are refused. Purge removes retained copies on that
+server; exports and backups elsewhere remain. Releasing a reservation for an
+uninstalled application does not delete key material.
+
+See the [onion guide](https://docs.imprezahost.com/onion-services.html)
+for permissions, customer update steps and supported limitations.

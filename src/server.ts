@@ -149,6 +149,23 @@ const TOOLS = [
       "protect": {
         "type": "boolean",
         "description": "Gate the preview behind a generated password over HTTPS. Shown once in this response, never stored."
+      },
+      "private": {
+        "type": "boolean",
+        "description": "Restrict the preview's .onion with Tor client authorization. With no onion_clients, one reviewer keypair is minted and its private key is shown ONCE in this response."
+      },
+      "onion_clients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "pubkey": {"type": "string"}
+          },
+          "required": ["name", "pubkey"],
+          "additionalProperties": false
+        },
+        "description": "Reviewer x25519 public keys (base32, 52 chars) authorized to reach a private preview. Implies private=true."
       }
     },
     "required": [
@@ -345,6 +362,7 @@ const TOOLS = [
         go_package: {"type": "string", "maxLength": 120, "description": "go_build only: main package folder relative to project_dir (default .), such as cmd/server. Up to 120 ASCII characters and five segments; no hidden or parent segments. Saved at creation and inherited by previews/redeploys."},
         php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
         start_command: { type: 'string', minLength: 1, maxLength: 1000, description: 'python_pip only, required: production shell command, one line up to 1000 UTF-8 bytes. Example: exec uvicorn app:app --host 0.0.0.0 --port 8000. PORT and HOST are runtime variables. Do not include credentials. Saved at creation and inherited by previews/redeploys.' },
+        tor_egress: { type: 'boolean', description: 'Opt in to isolated runtime egress through Tor (SOCKS5-aware applications only). Requires an agent advertising tor-egress-v1. Custom image/source modes only; build and source retrieval are not anonymized. No direct fallback.' },
         require_healthy_start: {"type": "boolean", "description": "Generated recipes only (node_npm, python_pip, php_composer, static_files, go_build; static_files and go_build use their built-in probe when no path is set). Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."},
         startup_timeout_seconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Required healthy start only: 30-600 second startup observation budget, default 60; build/recovery time is separate.' },
         healthcheck_path: {"type": "string", "minLength": 1, "maxLength": 200, "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$", "description": "node_npm, python_pip, php_composer or go_build only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."},
@@ -746,6 +764,21 @@ const TOOLS = [
         deployment_id: { type: 'string', description: 'The dpl_... id whose hidden-service key to rotate.' },
         confirm: { type: 'boolean', const: true, description: 'True only after explicit customer confirmation.' },
         confirm_address: { type: 'string', description: 'The CURRENT .onion address, verbatim (e.g. abc...xyz.onion).' },
+      },
+      required: ['deployment_id', 'confirm', 'confirm_address'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_purge_onion_key',
+    description:
+      'Irreversibly destroy a RETAINED onion identity of a deployment: the parked recovery copies on its host and the platform-side reservation. Wait for agent success to confirm deletion of retained copies on the current host. Prior exports and external backups are unaffected. For uninstalled deployments, released mode clears records only and does not verify key deletion. The address must be a prior identity left by impreza_rotate_onion_key, or the stale address of an uninstalled deployment; purging the CURRENT address of a live deployment is refused. Requires confirm: true and confirm_address with the retained .onion verbatim. Agent mode needs onion-purge-v1 (422 on older agents).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The dpl_... id whose retained identity to purge.' },
+        confirm: { type: 'boolean', const: true, description: 'True only after explicit customer confirmation of an irreversible action.' },
+        confirm_address: { type: 'string', description: 'The RETAINED .onion address being destroyed, verbatim (not the current one).' },
       },
       required: ['deployment_id', 'confirm', 'confirm_address'],
       additionalProperties: false,
@@ -1280,6 +1313,7 @@ const TOOLS = [
         "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$",
         "description": "node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."
       },
+      "tor_egress": { "type": "boolean", "description": "Opt in to isolated runtime egress through Tor (SOCKS5-aware applications only). Requires an agent advertising tor-egress-v1. Custom image/source modes only; build and source retrieval are not anonymized. No direct fallback." },
       "require_healthy_start": {
         "type": "boolean",
         "description": "node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."
@@ -1689,6 +1723,7 @@ const TOOLS = [
         "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$",
         "description": "node_npm, python_pip or php_composer only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."
       },
+      "tor_egress": { "type": "boolean", "description": "Opt in to isolated runtime egress through Tor (SOCKS5-aware applications only). Requires an agent advertising tor-egress-v1. Custom image/source modes only; build and source retrieval are not anonymized. No direct fallback." },
       "require_healthy_start": {
         "type": "boolean",
         "description": "node_npm, python_pip or php_composer only. Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."
@@ -3075,6 +3110,9 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_export_onion_key: A_WRITE_EXT,
   impreza_fetch_onion_key_export: A_WRITE,
   impreza_rotate_onion_key: A_DESTRUCTIVE_EXT,
+  // Purge destroys retained recovery material forever: same ceiling as
+  // rotate, minus the recovery window.
+  impreza_purge_onion_key: A_DESTRUCTIVE_EXT,
   // Onion client authorization (Tor v3 restricted discovery). Add is NOT
   // idempotent: a duplicate name is refused with 409. Revoke follows the
   // impreza_revoke_credential precedent — it kills an authorization, nothing
@@ -3792,6 +3830,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         );
       }
 
+      case 'impreza_purge_onion_key': {
+        const dep = String(args.deployment_id ?? '');
+        const address = String(args.confirm_address ?? '').trim();
+        if (!dep) return toError('deployment_id is required');
+        if (args.confirm !== true) return toError('Explicit customer confirmation is required (confirm: true)');
+        if (!/^[a-z2-7]{56}\.onion$/.test(address)) return toError('confirm_address must be the retained .onion address being destroyed, verbatim (56 base32 chars + .onion)');
+        return toResult(
+          await impreza.post<{ command_id?: string; mode: string; note: string }>(
+            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/purge`,
+            { confirm: true, confirm_address: address },
+          ),
+        );
+      }
+
       case 'impreza_onion_auth_list': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
@@ -3891,6 +3943,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
 
       case 'impreza_deploy_catalog_app': {
+        if (args.tor_egress !== undefined && args.tor_egress !== false) return toError('Tor runtime egress requires custom image or source deployment');
         const appName = String(args.app_name ?? '');
         const agentId = String(args.agent_id ?? '');
         if (!appName) return toError('app_name is required');
@@ -4327,7 +4380,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.post('/v1/platform/traffic-switches/'+encodeURIComponent(p.switch_id)+'/apply',{review_digest:p.review_digest,confirm:true}));
       }
       case 'impreza_create_preview': {
-        const p=z.object({deployment_id:z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/),branch:z.string().min(1).max(100),protect:z.boolean().optional()}).strict().parse(args);
+        const p=z.object({deployment_id:z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/),branch:z.string().min(1).max(100),protect:z.boolean().optional(),private:z.boolean().optional(),onion_clients:z.array(z.object({name:z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/),pubkey:z.string().regex(/^[A-Za-z2-7]{52}$/)}).strict()).min(1).max(16).optional()}).strict().parse(args);
+        if (p.protect && (p.private || p.onion_clients)) return toError('Private onion previews and password-protected previews are mutually exclusive');
         const {deployment_id,...body}=p;
         return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/previews',body));
       }
@@ -4982,6 +5036,7 @@ interface DeployCustomBody {
   go_package?: string;
   php_document_root?: string;
   start_command?: string;
+  tor_egress?: boolean;
   require_healthy_start?: boolean;
   startup_timeout_seconds?: number;
   healthcheck_path?: string;
@@ -5019,7 +5074,10 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if (args.build_secrets !== undefined) { if (args.mode!=='dockerfile' || !['dockerfile','node_npm','node_npm_static'].includes(String(args.build_strategy??'dockerfile'))) throw new Error('build_secrets requires a Dockerfile or npm source build'); }
   if (args.npm_workspace !== undefined && !['node_npm','node_npm_static'].includes(String(args.build_strategy))) throw new Error('npm_workspace requires an npm recipe');
   if (args.project_dir !== undefined && !['node_npm','node_npm_static','python_pip','php_composer','static_files','go_build'].includes(String(args.build_strategy))) throw new Error('project_dir requires a generated recipe');
+  if (args.tor_egress !== undefined && typeof args.tor_egress !== 'boolean') throw new Error('tor_egress must be boolean');
+  if (args.tor_egress === true && !['image','dockerfile'].includes(mode)) throw new Error('Tor runtime egress requires image or dockerfile mode');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.tor_egress !== undefined) body.tor_egress = args.tor_egress as boolean;
   if(args.go_package!==undefined) {
     if(args.build_strategy!=='go_build' || typeof args.go_package!=='string' || args.go_package.length>120 || !(args.go_package==='.' || /^[A-Za-z0-9_][A-Za-z0-9._-]*(?:\/[A-Za-z0-9_][A-Za-z0-9._-]*){0,4}$(?![\s\S])/.test(args.go_package))) throw new Error('Invalid go_package');
     body.go_package=args.go_package;
