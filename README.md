@@ -470,6 +470,7 @@ and `impreza_api_search` finds anything not named here.
 | `impreza_vps_create_backup` | `POST /v1/vps/proxmox/{id}/backups` |
 | `impreza_vps_list_templates` | `GET /v1/vps/proxmox/{id}/templates` |
 | `impreza_vps_reinstall` | `POST /v1/vps/proxmox/{id}/reinstall` — destructive (wipes) |
+| `impreza_vps_resize` | `POST /v1/services/{id}/resize` — more vCPU, memory or disk at the pro-rated price (quote first with `GET /v1/services/{id}/resize/quote`); `max_amount` pins it |
 
 ## Install + setup
 
@@ -729,6 +730,19 @@ installs, imported manifests and external service bindings are unsupported.
 See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
+
+## VPS resize (0.44.0)
+
+`impreza_vps_resize` gives a configurable VPS more vCPUs, memory or disk. Price it
+first with `impreza_api_call` on `/services/{id}/resize/quote`, passing the new
+sizes as `query`: it returns the pro-rated amount due today (the billing
+system's own figure), what the VPS renews at and whether the balance covers it.
+Then call `impreza_vps_resize` with the same sizes and `max_amount` set to that
+`due_today`, so a price that moved in between is refused rather than charged.
+Sizes only go up. The disk is enlarged at once; the new vCPU count and memory
+take effect when the VPS is restarted with `impreza_vps_power` action=reboot (a
+reboot from inside the server keeps the old ones). See
+[Resize a VPS](https://docs.imprezahost.com/order-vps.html#resize).
 
 ## Configurable VPS (0.43.0)
 

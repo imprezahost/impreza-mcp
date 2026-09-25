@@ -2539,6 +2539,32 @@ const TOOLS = [
     },
   },
   {
+    name: 'impreza_vps_resize',
+    description:
+      'Give a VPS more CPU, memory or disk — the answer to "my server is too small". Pass the `service_id` and the NEW ' +
+      'sizes: `cpu_cores`, `memory_gb`, `disk_gb` (leave out any that stay as they are). Sizes only go up; a VPS cannot ' +
+      'be made smaller. Price it first with `impreza_api_call` on `/services/{id}/resize/quote` with the same sizes as ' +
+      '`query`, show the customer `due_today` and what it `renews` at, then call this with `max_amount` set to that ' +
+      '`due_today`: the resize is refused, not charged, if it would cost more. It is paid from the account credit ' +
+      'balance, which must already cover it (top up first with `impreza_topup`). The new CPU count and memory reach the ' +
+      'VPS when it is restarted with `impreza_vps_power` action=reboot — a reboot from inside the server keeps the old ' +
+      'ones; the disk is enlarged at once. For the ' +
+      'configurable VPS only — a fixed plan such as Tor Hosting changes plan with `impreza_upgrade_service`. Returns ' +
+      'order_id, invoice_id, amount, the sizes before and after, and when they take effect.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+        cpu_cores: { type: 'number', description: 'New vCPU count: at least the current one, inside the range impreza_vps_offer lists.' },
+        memory_gb: { type: 'number', description: 'New memory in GB: at least the current amount, inside the range impreza_vps_offer lists.' },
+        disk_gb: { type: 'number', description: 'New SSD disk in GB: at least the current size, inside the range impreza_vps_offer lists.' },
+        max_amount: { type: 'string', description: 'The most this resize may cost, in the account currency — the quoted due_today, e.g. "3.50".' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_list_products',
     description:
       'List the products the customer can order (VPS, Tor hosting, dedicated servers, ...) with pricing in the account currency. ' +
@@ -3293,6 +3319,8 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // a whole is destructive and non-idempotent.
   impreza_vps_power: A_DESTRUCTIVE,
   impreza_vps_reinstall: A_DESTRUCTIVE, // erases the disk
+  // Spends account credit and changes what the VPS is billed at; sizes only go up.
+  impreza_vps_resize: A_DESTRUCTIVE,
   impreza_vps_rollback_snapshot: A_DESTRUCTIVE, // loses newer data
   impreza_vps_restore_backup: A_DESTRUCTIVE, // loses newer data
   // Deleting a restore point is irreversible but repeat-safe.
@@ -4793,6 +4821,30 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const sid = svcId(args);
         if (!sid) return toError('service_id is required (numeric)');
         return toResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/templates`));
+      }
+
+      case 'impreza_vps_resize': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        // The API checks every size against the VPS; this only refuses what
+        // cannot be a size, so a bad call makes no request.
+        const body: Record<string, unknown> = {};
+        for (const k of ['cpu_cores', 'memory_gb', 'disk_gb']) {
+          const v = args[k];
+          if (v === undefined || v === null || v === '') continue;
+          const n = typeof v === 'number' ? v : Number(v);
+          if (!Number.isInteger(n) || n < 1) return toError(`${k} must be a whole number of at least 1`);
+          body[k] = n;
+        }
+        if (Object.keys(body).length === 0) {
+          return toError('pass at least one new size: cpu_cores, memory_gb or disk_gb');
+        }
+        if (args.max_amount !== undefined && args.max_amount !== null && args.max_amount !== '') {
+          const max = String(args.max_amount).trim();
+          if (!/^\d+(\.\d{1,2})?$/.test(max)) return toError('max_amount must be an amount such as "3.50"');
+          body.max_amount = max;
+        }
+        return toResult(await impreza.post<unknown>(`/v1/services/${sid}/resize`, body));
       }
 
       case 'impreza_vps_reinstall': {
