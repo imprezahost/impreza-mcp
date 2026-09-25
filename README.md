@@ -452,8 +452,9 @@ and `impreza_api_search` finds anything not named here.
 | `impreza_topup_status` | `GET /v1/account/topup/{invoice_id}` |
 | `impreza_topup_payment` | `GET /v1/account/topup/{invoice_id}/payment` — crypto address + amount to pay |
 | **Catalog & ordering** | |
-| `impreza_list_products` | `GET /v1/products` — plans + pricing (filter `type=server` for VPS/dedicated) |
-| `impreza_order_vps` | `POST /v1/orders` — buy from balance; born deployable (`@agent`); 202 + poll `impreza_list_servers` |
+| `impreza_list_products` | `GET /v1/products` — products + pricing; the VPS is listed at its smallest size (`configurable: true`) |
+| `impreza_vps_offer` | `GET /v1/products/vps` — VPS locations, operating systems, CPU / memory / disk ranges and prices; with a whole configuration, `GET /v1/products/vps/quote` — its exact price |
+| `impreza_order_vps` | `POST /v1/orders` — a VPS by location, OS and size (or a fixed plan by `product_id`); paid from balance; born deployable (`@agent`); 202 + poll `impreza_list_servers` |
 | **Domains & DNS** | |
 | `impreza_domain_check` | `GET /v1/domains/check` |
 | `impreza_domain_details` | `GET /v1/domains/{domain}` |
@@ -728,6 +729,18 @@ installs, imported manifests and external service bindings are unsupported.
 See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
+
+## Configurable VPS (0.43.0)
+
+The VPS is one configurable product: choose the location, operating system,
+vCPUs, memory and SSD disk. `impreza_vps_offer` lists every choice with its
+price per unit for each billing cycle, in the account currency; given a whole
+configuration (`billing_cycle`, `location`, `os`, `cpu_cores`, `memory_gb`,
+`disk_gb`) it returns the exact price, whether the balance covers it and
+whether that location has room right now. `impreza_order_vps` orders that
+configuration with `product_id` left out; fixed plans such as Tor Hosting are
+still ordered by `product_id`. The price charged is the price quoted. See
+[Order a VPS](https://docs.imprezahost.com/order-vps.html).
 
 ## Private onion previews and retained identities (0.42.0)
 

@@ -2541,9 +2541,10 @@ const TOOLS = [
   {
     name: 'impreza_list_products',
     description:
-      'List the products the customer can order (VPS plans, dedicated servers, ...) with pricing in the account currency. ' +
-      'Filter to VPS / dedicated plans with `type: "server"`. Returns id, name, group and per-cycle price + setup fee — ' +
-      'feed the `id` and a `billing_cycle` into `impreza_order_vps`.',
+      'List the products the customer can order (VPS, Tor hosting, dedicated servers, ...) with pricing in the account currency. ' +
+      'Filter to server products with `type: "server"`. The VPS is one configurable product (`configurable: true`, priced ' +
+      'from its smallest size) — get its locations, operating systems and sizes with `impreza_vps_offer`. Fixed plans return ' +
+      'id, name, group and per-cycle price + setup fee — feed the `id` and a `billing_cycle` into `impreza_order_vps`.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2554,24 +2555,54 @@ const TOOLS = [
     },
   },
   {
-    name: 'impreza_order_vps',
+    name: 'impreza_vps_offer',
     description:
-      'Order a VPS (or other catalog product) and pay from the account credit balance — the balance must already cover ' +
-      'the plan price (top up first with `impreza_topup`). Pick `product_id` via `impreza_list_products`. The VPS is born ' +
-      'DEPLOYABLE: unless you pass `app`, the Impreza agent is auto-installed so it appears under `impreza_list_servers` ' +
-      'within a few minutes. Set the OS via `config_options` ({optionId: value}); omit for the plan default. Returns ' +
-      'immediately (202) — the order provisions in the background, so poll `impreza_list_servers` until the new agent is online.',
+      'What a new VPS can be, and what it costs. Lists the locations (with each jurisdiction\'s note), the operating ' +
+      'systems, the CPU/memory/disk ranges with the price per unit for every billing cycle, and the apps it can be born ' +
+      'with, in the account currency. Pass a whole configuration (`billing_cycle`, `location`, `os`, `cpu_cores`, ' +
+      '`memory_gb`, `disk_gb`) to get its exact price instead — what is due today, what it renews at, whether the balance ' +
+      'covers it and whether that location has room right now. Then order it with `impreza_order_vps` using the same ' +
+      'values. Read-only.',
     inputSchema: {
       type: 'object',
       properties: {
-        product_id: { type: 'number', description: 'Product id from impreza_list_products.' },
-        billing_cycle: { type: 'string', description: 'One of: monthly, quarterly, semiannually, annually, biennially, triennially.' },
-        app: { type: 'string', description: "Optional. '@agent' (default — deployable), '@agent-mcp', 'none' (bare OS), or a catalog app name from impreza_list_apps." },
-        config_options: { type: 'object', description: 'Optional configurable options as {optionId: value} (e.g. the OS template). A rejected option is dropped and the plan default is used.' },
-        hostname: { type: 'string', description: 'Optional server hostname.' },
-        domain: { type: 'string', description: 'Optional domain for the order line.' },
+        billing_cycle: { type: 'string', description: 'Optional, to price a configuration: monthly, quarterly, semiannually, annually, biennially or triennially.' },
+        location: { type: ['string', 'number'], description: 'Optional: a location id, slug or name from this tool, e.g. "romania".' },
+        os: { type: ['string', 'number'], description: 'Optional: an operating system id, slug or name from this tool, e.g. "ubuntu-24.04".' },
+        cpu_cores: { type: 'number', description: 'Optional: vCPU count, inside the range this tool lists.' },
+        memory_gb: { type: 'number', description: 'Optional: memory in GB, inside the range this tool lists.' },
+        disk_gb: { type: 'number', description: 'Optional: SSD disk in GB, inside the range this tool lists.' },
+        app: { type: 'string', description: "Optional: what it is born with — '@agent' (default), '@agent-mcp', 'none', a '@panel-*' choice or a catalog app name." },
       },
-      required: ['product_id', 'billing_cycle'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_order_vps',
+    description:
+      'Order a VPS and pay from the account credit balance — the balance must already cover the price (top up first with ' +
+      '`impreza_topup`). For the VPS, choose `location`, `os`, `cpu_cores`, `memory_gb` and `disk_gb` from `impreza_vps_offer` ' +
+      '(price that configuration there first) and leave `product_id` out. For a fixed plan such as Tor Hosting, pass its ' +
+      '`product_id` from `impreza_list_products` instead (and `config_options` only if that plan has some). The VPS is born ' +
+      'DEPLOYABLE: unless you pass `app`, the Impreza agent is auto-installed so it appears under `impreza_list_servers` ' +
+      'within a few minutes. Returns immediately (202) — the order provisions in the background, so poll ' +
+      '`impreza_list_servers` until the new agent is online.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        billing_cycle: { type: 'string', description: 'One of: monthly, quarterly, semiannually, annually, biennially, triennially.' },
+        location: { type: ['string', 'number'], description: 'VPS location: an id, slug or name from impreza_vps_offer, e.g. "romania".' },
+        os: { type: ['string', 'number'], description: 'VPS operating system: an id, slug or name from impreza_vps_offer, e.g. "ubuntu-24.04".' },
+        cpu_cores: { type: 'number', description: 'VPS vCPU count, inside the range impreza_vps_offer lists.' },
+        memory_gb: { type: 'number', description: 'VPS memory in GB, inside the range impreza_vps_offer lists.' },
+        disk_gb: { type: 'number', description: 'VPS SSD disk in GB, inside the range impreza_vps_offer lists.' },
+        app: { type: 'string', description: "Optional. '@agent' (default — deployable), '@agent-mcp', 'none' (bare OS), a '@panel-*' control panel, or a catalog app name from impreza_list_apps." },
+        hostname: { type: 'string', description: 'Optional server hostname (a DNS name such as "web-1"). Two identical VPS orders within a day are refused as a repeat unless their hostnames differ.' },
+        product_id: { type: 'number', description: 'Only for a fixed plan (e.g. Tor Hosting) from impreza_list_products. Leave it out for the VPS.' },
+        config_options: { type: 'object', description: 'Fixed plans only: configurable options as {optionId: value}, from GET /v1/products/{id}. Each must belong to that plan.' },
+        domain: { type: 'string', description: 'Fixed plans only: domain for the order line.' },
+      },
+      required: ['billing_cycle'],
       additionalProperties: false,
     },
   },
@@ -3270,6 +3301,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
   // ── catalog + ordering ────────────────────────────────────────────────────
   impreza_list_products: A_READ,
+  impreza_vps_offer: A_READ,
   // Both spend account credit and change what the customer is billed.
   impreza_order_vps: A_DESTRUCTIVE,
   impreza_upgrade_service: A_DESTRUCTIVE,
@@ -4624,17 +4656,34 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.get<unknown>('/v1/products', query));
       }
 
-      case 'impreza_order_vps': {
-        const productId = typeof args.product_id === 'number' ? args.product_id : Number(args.product_id);
-        const billingCycle = String(args.billing_cycle ?? '');
-        if (!Number.isFinite(productId) || productId <= 0) {
-          return toError('product_id is required (a positive number from impreza_list_products)');
+      case 'impreza_vps_offer': {
+        // The server checks every value against the product; this only picks
+        // which of the two reads the arguments ask for.
+        const pick: Record<string, string> = {};
+        for (const k of ['billing_cycle', 'location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb', 'app']) {
+          const v = args[k];
+          if ((typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v))) pick[k] = String(v);
         }
+        const whole = ['billing_cycle', 'location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb'].every((k) => k in pick);
+        if (whole) return toResult(await impreza.get<unknown>('/v1/products/vps/quote', pick));
+        return toResult(await impreza.get<unknown>('/v1/products/vps'));
+      }
+
+      case 'impreza_order_vps': {
+        const billingCycle = String(args.billing_cycle ?? '');
         if (!billingCycle) return toError('billing_cycle is required (e.g. "monthly")');
-        const body: Record<string, unknown> = { product_id: productId, billing_cycle: billingCycle };
-        if (typeof args.app === 'string' && args.app) body.app = args.app;
-        if (typeof args.hostname === 'string' && args.hostname) body.hostname = args.hostname;
-        if (typeof args.domain === 'string' && args.domain) body.domain = args.domain;
+        const body: Record<string, unknown> = { billing_cycle: billingCycle };
+        if (args.product_id !== undefined && args.product_id !== null && args.product_id !== '') {
+          const productId = typeof args.product_id === 'number' ? args.product_id : Number(args.product_id);
+          if (!Number.isInteger(productId) || productId <= 0) {
+            return toError('product_id must be a positive whole number from impreza_list_products (leave it out for the VPS)');
+          }
+          body.product_id = productId;
+        }
+        for (const k of ['location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb', 'app', 'hostname', 'domain']) {
+          const v = args[k];
+          if ((typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v))) body[k] = v;
+        }
         if (args.config_options && typeof args.config_options === 'object') body.config_options = args.config_options;
         return toResult(await impreza.post<unknown>('/v1/orders', body));
       }
