@@ -731,6 +731,32 @@ See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#run
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
 
+## Point-in-time PostgreSQL recovery (0.45.0)
+
+Six tools cover status, configuration, a recovery drill, and prepare/get/apply
+of a reviewed UTC recovery point: `impreza_get_pitr`, `impreza_configure_pitr`,
+`impreza_drill_pitr`, `impreza_prepare_pitr_restore`,
+`impreza_get_pitr_restore`, and `impreza_apply_pitr_restore`. Status uses read
+scope; changes use deploy scope. The hosted connector requires a credential
+without resource confinement because physical PostgreSQL recovery can cover
+several bindings on a provider.
+
+WAL and base backups consume the account's storage. After six consecutive
+failures, automatic work pauses until the cause is repaired and configuration
+is saved again. Disabling stops protection but retains stored objects. A
+restore requires the review digest and `confirm: true`, creates a new database,
+and never redirects the live application. Poll the review until its receipt
+says `verified` or `failed`; acceptance alone is not a successful recovery.
+
+## Scheduled tasks (0.45.0)
+
+`impreza_create_task` creates a scheduled task on an app and `impreza_update_task`
+changes one that exists (any field you leave out keeps its current value, so
+`enabled=false` pauses a task without losing its schedule or history), as on the
+hosted connector. They replace `impreza_schedule_task`, which is gone: update
+any client or prompt that still calls it. `impreza_list_tasks`,
+`impreza_run_task` and `impreza_delete_task` are unchanged.
+
 ## VPS resize (0.44.0)
 
 `impreza_vps_resize` gives a configurable VPS more vCPUs, memory or disk. Price it
@@ -772,3 +798,4 @@ uninstalled application does not delete key material.
 
 See the [onion guide](https://docs.imprezahost.com/onion-services.html)
 for permissions, customer update steps and supported limitations.
+

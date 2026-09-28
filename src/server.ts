@@ -40,6 +40,7 @@ import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-asse
 import { envSchema } from './env.js';
 import { VERSION } from './version.js';
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
+import {PITR_TOOLS,isPitrTool,callPitrTool} from './pitr-workflows.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Subcommand dispatch — `setup` short-circuits before env validation.
@@ -132,6 +133,7 @@ function isIpAddress(value: string): boolean {
 
 const TOOLS = [
 ...CUSTOMER_TOOLS,
+...PITR_TOOLS,
 {
   "name": "impreza_create_preview",
   "description": "Create (or refresh) the preview of one branch now, without waiting for a push. With protect=true the preview gets an HTTPS address on the shared preview domain — a random label, so the branch name still reaches no DNS record or CT log — gated by a generated password returned ONLY in this response: it is never stored in plaintext and cannot be retrieved later; the username is \"preview\". Calling again for the same branch refreshes the existing preview and never mints a new password; changing protection on a live preview means retiring it first. Requires deploy scope; the agent must support preview-basic-auth-v1 for protected previews.",
@@ -570,20 +572,22 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  // Creating and changing a task are two tools, as on the hosted connector: one catch-all
+  // that chose by omitting task_id is the shape both plugin directories reject ("split write
+  // operations by action type"), and the same agent saw a different surface per connector.
   {
-    name: 'impreza_schedule_task',
+    name: 'impreza_create_task',
     description:
-      "Create or change a scheduled task on an app. Omit task_id to create; pass it to edit, and any field left out keeps its current value. Two kinds: `http` requests a PATH ON THE APP ITSELF (the common case — `/cron.php` for Nextcloud, `/wp-cron.php` for WordPress) and counts 2xx/3xx as success; `command` runs a shell command in an image you name, on the app's network. The request reaches the app at its own address inside the server, so it works even for an app with no public hostname. Cadence is a fixed set, not a cron expression. Nothing runs inside the app's own container — that needs root on the host, which is deliberately not offered.",
+      "Create a scheduled task on an app. Two kinds: `http` requests a PATH ON THE APP ITSELF (the common case — `/cron.php` for Nextcloud, `/wp-cron.php` for WordPress) and treats a 2xx/3xx as success; `command` runs a shell command in an image you name, on the app's network. The request goes to the app's own address inside the server, so it works even when the app has no public hostname. Cadence is one of a fixed set, not a cron expression. Nothing runs inside the app's own container — that would need root on the host, which is deliberately not offered here. To change a task that already exists, use impreza_update_task.",
     inputSchema: {
       type: 'object',
       properties: {
-        task_id: { type: 'string', description: 'Omit to create; pass to edit.' },
         deployment_id: { type: 'string', description: 'The dpl_... id the task belongs to.' },
-        name: { type: 'string', description: 'What this task is for, in a few words.' },
+        name: { type: 'string', description: 'What this task is for, in a few words. Shown to the customer.' },
         kind: { type: 'string', enum: ['http', 'command'], description: 'Default http.' },
-        http_path: { type: 'string', description: 'Path on the app, starting with / — e.g. /cron.php.' },
+        http_path: { type: 'string', description: 'Path on the app, starting with / — e.g. /cron.php. http kind only.' },
         http_method: { type: 'string', enum: ['GET', 'POST'], description: 'Default GET.' },
-        image: { type: 'string', description: 'Container image. command kind only.' },
+        image: { type: 'string', description: 'Container image to run. command kind only.' },
         command: { type: 'string', description: 'Single-line shell command, no double quotes. command kind only.' },
         schedule: {
           type: 'string',
@@ -592,9 +596,39 @@ const TOOLS = [
         },
         at_hour: { type: 'integer', description: 'Hour in UTC, 0-23, for daily/weekly.' },
         at_weekday: { type: 'integer', description: 'Day of week, 0=Sunday, for weekly.' },
-        enabled: { type: 'boolean', description: 'Set false to pause without deleting.' },
+        enabled: { type: 'boolean', description: 'Set false to create it paused.' },
         keep_runs: { type: 'integer', description: 'How many past runs to keep, 1-200. Default 10.' },
       },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_update_task',
+    description:
+      "Change a scheduled task that already exists. Pass the task_id from impreza_list_tasks; any field you leave out keeps its current value, so enabled=false pauses a task without touching its schedule or losing its run history. The kinds and cadences are the same set impreza_create_task accepts. To make a new task instead, use impreza_create_task.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'The task to change (from impreza_list_tasks).' },
+        deployment_id: { type: 'string', description: 'The dpl_... id the task belongs to.' },
+        name: { type: 'string', description: 'What this task is for, in a few words. Shown to the customer.' },
+        kind: { type: 'string', enum: ['http', 'command'], description: 'Default http.' },
+        http_path: { type: 'string', description: 'Path on the app, starting with / — e.g. /cron.php. http kind only.' },
+        http_method: { type: 'string', enum: ['GET', 'POST'], description: 'Default GET.' },
+        image: { type: 'string', description: 'Container image to run. command kind only.' },
+        command: { type: 'string', description: 'Single-line shell command, no double quotes. command kind only.' },
+        schedule: {
+          type: 'string',
+          enum: ['every_5m', 'every_15m', 'every_30m', 'hourly', 'daily', 'weekly'],
+          description: 'Default hourly.',
+        },
+        at_hour: { type: 'integer', description: 'Hour in UTC, 0-23, for daily/weekly.' },
+        at_weekday: { type: 'integer', description: 'Day of week, 0=Sunday, for weekly.' },
+        enabled: { type: 'boolean', description: 'Set false to pause it without deleting.' },
+        keep_runs: { type: 'integer', description: 'How many past runs to keep, 1-200. Default 10.' },
+      },
+      required: ['task_id'],
       additionalProperties: false,
     },
   },
@@ -612,7 +646,7 @@ const TOOLS = [
   {
     name: 'impreza_delete_task',
     description:
-      'Delete a scheduled task and its run history. Irreversible. To stop a task without losing what it did, call impreza_schedule_task with enabled=false — that is almost always what someone means by "turn it off".',
+      'Delete a scheduled task and its run history. Irreversible. To stop a task without losing what it did, call impreza_update_task with enabled=false instead — that is almost always what someone means by "turn it off".',
     inputSchema: {
       type: 'object',
       properties: { task_id: { type: 'string', description: 'The task to delete.' } },
@@ -3118,6 +3152,7 @@ const A_DESTRUCTIVE_EXT_IDEM: ToolAnnotations = { readOnlyHint: false, destructi
 
 const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   ...Object.fromEntries(CUSTOMER_TOOLS.map(t=>[t.name,t.annotations])),
+  ...Object.fromEntries(PITR_TOOLS.map(t=>[t.name,t.annotations])),
   // ── platform: apps / deployments ──────────────────────────────────────────
   impreza_list_servers: A_READ,
   impreza_list_apps: A_READ,
@@ -3153,7 +3188,8 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_discard_replaced: A_DESTRUCTIVE,
   impreza_backup_schedule: A_WRITE_IDEM,
   impreza_list_tasks: A_READ,
-  impreza_schedule_task: A_WRITE_IDEM,
+  impreza_create_task: A_WRITE,
+  impreza_update_task: A_WRITE_IDEM,
   impreza_run_task: A_WRITE_EXT,
   impreza_delete_task: A_DESTRUCTIVE,
   impreza_change_domain: A_WRITE_EXT_IDEM,
@@ -3550,6 +3586,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (basicCloudUnavailable(name)) {
       throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
     }
+    if(isPitrTool(name)) return toResult(await callPitrTool(impreza,name,args));
     if(isCustomerTool(name)) return toResult(await callCustomerTool(impreza,name,args));
     switch (name) {
       case 'impreza_list_servers':
@@ -3689,8 +3726,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         );
       }
 
-      case 'impreza_schedule_task': {
-        const tid = String(args.task_id ?? '');
+      case 'impreza_create_task':
+      case 'impreza_update_task': {
         const body: Record<string, unknown> = {};
         for (const k of [
           'deployment_id', 'name', 'kind', 'http_path', 'http_method',
@@ -3699,11 +3736,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         ] as const) {
           if (k in args) body[k] = args[k];
         }
-        return toResult(
-          tid
-            ? await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}`, body)
-            : await impreza.post('/v1/tasks', body),
-        );
+        if (name === 'impreza_update_task') {
+          const tid = String(args.task_id ?? '').trim();
+          if (!tid) return toError('task_id is required — get it from impreza_list_tasks. To create a new task, use impreza_create_task.');
+          return toResult(await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}`, body));
+        }
+        if (!String(args.deployment_id ?? '').trim()) {
+          return toError('deployment_id is required — a task belongs to an app. Find it with impreza_list_deployments.');
+        }
+        return toResult(await impreza.post('/v1/tasks', body));
       }
 
       case 'impreza_run_task': {

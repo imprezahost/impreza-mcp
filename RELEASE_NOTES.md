@@ -1,9 +1,10 @@
-# MCP 0.34.0
+# MCP 0.45.0
 
-- Review Git sources at an exact commit and retain the reviewed bytes for saved plans.
-- Select npm workspaces, pinned pnpm/Yarn recipes and the pinned uv Python recipe.
-- Pass retained source contexts when reviewing and deploying Compose applications.
-- Supply named build credentials for supported source builds; update agents to 0.6.11+ before using build secrets or retained Compose runtime files.
-- Refresh runtime dependencies with security fixes.
-
-The corresponding control-plane capabilities must be deployed before using these inputs. Unsupported agents are refused before commands are dispatched. Existing servers update only when the customer requests it. This release does not add immediate build interruption, automatic retries or zero-downtime traffic switching.
+- Point-in-time PostgreSQL recovery: six tools for status, configuration, a
+  recovery drill and a reviewed restore into a new database
+  (`impreza_get_pitr`, `impreza_configure_pitr`, `impreza_drill_pitr`,
+  `impreza_prepare_pitr_restore`, `impreza_get_pitr_restore`,
+  `impreza_apply_pitr_restore`).
+- Scheduled tasks match the hosted connector: `impreza_create_task` and
+  `impreza_update_task` replace `impreza_schedule_task`. **Breaking:** the old
+  name is gone; update clients and prompts that call it.
