@@ -1,10 +1,12 @@
-# MCP 0.45.0
+# MCP 0.46.0
 
-- Point-in-time PostgreSQL recovery: six tools for status, configuration, a
-  recovery drill and a reviewed restore into a new database
-  (`impreza_get_pitr`, `impreza_configure_pitr`, `impreza_drill_pitr`,
-  `impreza_prepare_pitr_restore`, `impreza_get_pitr_restore`,
-  `impreza_apply_pitr_restore`).
-- Scheduled tasks match the hosted connector: `impreza_create_task` and
-  `impreza_update_task` replace `impreza_schedule_task`. **Breaking:** the old
-  name is gone; update clients and prompts that call it.
+- The local package reaches parity with the hosted connector: 184 tools on both
+  sides. It gains the 16 tools that were hosted-only:
+  - projects and environments: rename and delete;
+  - variable groups: read and replace;
+  - configuration promotion: prepare, review and apply;
+  - ordered environment deploys: start, follow and list;
+  - agent update policy and update requests;
+  - the Shield profile.
+- Tool annotations match the hosted connector. A destructive tool called with
+  `confirm` missing or false is refused before any request is sent.

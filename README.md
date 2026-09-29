@@ -268,7 +268,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.38.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.46.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -276,16 +276,15 @@ generates ready-to-paste config snippets for 5 AI tools.
 
 On top of that, everything an app needs after it is running: backup and
 restore into the customer's **own** S3 bucket, a timer on an app with its
-output kept, outbound webhooks so you stop polling, and reading the app's own
-files to find out why it behaves as if it were not configured.
-
-On top of that, everything an app needs after it is running: backup and
-restore into the customer's **own** S3 bucket, a timer on an app with its
 output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
-The local (`npx`) server and the hosted OAuth connector expose the **same 116
-tools**, so nothing is lost by picking either path.
+The local (`npx`) server and the hosted OAuth connector expose the **same tool
+catalog — 184 tools on both sides**. Two declared, one-direction gaps remain:
+`impreza_get_log_request` stays hosted-only (only the control plane resolves a
+bare `request_id`; locally, call `impreza_tail_logs` again on the application —
+requests dedupe), and `impreza_upload_context` stays local-only (binary tarball
+streaming does not fit the hosted transport).
 
 ### New in 0.11.0
 
@@ -730,6 +729,25 @@ installs, imported manifests and external service bindings are unsupported.
 See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
+
+## Local and hosted parity (0.46.0)
+
+The local package now carries the 16 tools that only the hosted connector had:
+
+- projects and environments: `impreza_rename_project`, `impreza_delete_project`,
+  `impreza_rename_environment` and `impreza_delete_environment`;
+- variable groups: `impreza_get_variable_group` and `impreza_set_variable_group`;
+- configuration promotion: `impreza_prepare_config_promotion`,
+  `impreza_get_config_promotion` and `impreza_apply_config_promotion`;
+- ordered environment deploys: `impreza_deploy_environment`,
+  `impreza_get_environment_deploy` and `impreza_list_environment_deploys`;
+- agent updates: `impreza_get_update_policy`, `impreza_set_update_policy` and
+  `impreza_request_agent_update`;
+- Shield: `impreza_set_shield`.
+
+Tool annotations (read-only, destructive, idempotent) now match the hosted
+connector. A destructive tool called with `confirm` missing or false is refused
+before any request is sent.
 
 ## Point-in-time PostgreSQL recovery (0.45.0)
 
