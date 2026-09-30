@@ -2,9 +2,11 @@
   "name": "impreza-host",
   "displayName": "Impreza Host",
   "description": "Privacy-first offshore hosting an agent can run end to end: deploy apps, manage VPSes, domains and DNS, without leaving the conversation.",
+  "privacyPolicyUrl": "https://impreza.host/privacy/",
   "version": "0.1.0",
   "license": "MIT",
   "homepage": "https://github.com/imprezahost/impreza-mcp",
+  "icon": ".claude-plugin/icon.png",
   "author": {
     "name": "ImpCom International Ltd",
     "url": "https://impreza.host/"
