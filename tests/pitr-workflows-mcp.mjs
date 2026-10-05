@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-pitr',IMPREZA_BASE_URL:'https://rollback.invalid'}});
-const client=new Client({name:'pitr-surface-fixture',version:'1'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('pitr-surface-fixture',{env:{IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-pitr'}});const client=mcp.client;
 const deployment_id='dpl_'+'a'.repeat(16),pitr_plan_id='ppl_'+'b'.repeat(24),review_digest='c'.repeat(64);
 const cases=[
  ['impreza_get_pitr',{deployment_id},'GET',`/v1/platform/deployments/${deployment_id}/pitr`,null,true],
@@ -15,11 +12,14 @@ const cases=[
 ];
 let requests=0;
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;
+ await mcp.connect();const tools=(await client.listTools()).tools;
  for(const [name,args,method,path,body,readOnly] of cases){
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);assert.equal(tool.annotations.readOnlyHint,readOnly);
-  const out=await client.callTool({name,arguments:args});assert(!out.isError,JSON.stringify(out));const data=JSON.parse(out.content[0].text);
-  assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,{});requests=data.request_count;
+  const out=await client.callTool({name,arguments:args});assert(!out.isError,JSON.stringify(out));const data=mcp.last();
+  if(name==='impreza_get_pitr_restore')assert.deepEqual(out.structuredContent,sample('impreza_get_pitr_restore:pending'));
+  if(name==='impreza_prepare_pitr_restore')assert.deepEqual(out.structuredContent,sample('impreza_prepare_pitr_restore:fresh_review'));
+  if(name==='impreza_apply_pitr_restore')assert.deepEqual(out.structuredContent,sample('impreza_apply_pitr_restore:replay_accepted_review'));
+  assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,{});requests=mcp.count();
   const key=Object.keys(args)[0];
   for(const bad of [{...args,extra:'never-send'},{...args,[key]:'../foreign'},{...args,[key]:args[key]+'\n'}]) assert((await client.callTool({name,arguments:bad})).isError,name);
  }
@@ -29,8 +29,8 @@ try {
   assert((await client.callTool({name:'impreza_configure_pitr',arguments:{deployment_id,enabled:true,...extra}})).isError);
  for(const target_time of ['2026-02-30T12:00:00Z','2026-09-24 12:00:00','2026-09-24T12:00:00+00:00','2026-09-24T12:00:00Z\n'])
   assert((await client.callTool({name:'impreza_prepare_pitr_restore',arguments:{deployment_id,target_time}})).isError);
- const probe=await client.callTool({name:'impreza_get_pitr',arguments:{deployment_id}});
- assert.equal(JSON.parse(probe.content[0].text).request_count,requests+1,'rejected arguments must make no HTTP request');
+ const probe=await client.callTool({name:'impreza_get_pitr',arguments:{deployment_id}});assert(!probe.isError,JSON.stringify(probe));
+ assert.equal(mcp.count(),requests+1,'rejected arguments must make no HTTP request');
  console.log('PASS: six PITR tools through stdio; strict schemas, annotations, routes, UTC validation and confirmation; invalid calls send no HTTP');
-}finally{await client.close();}
+}finally{await mcp.close();}
 

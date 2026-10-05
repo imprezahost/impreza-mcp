@@ -1303,15 +1303,10 @@ function el(id) { return document.getElementById(id); }
     return 'normal';
   }
 
-  // \`neutral\` keeps the bar in the default colour whatever the number says.
-  // Used for the memory reading, which comes from the hypervisor and counts
-  // page cache as used: 80% is what a healthy machine looks like there, so the
-  // 70%/90% thresholds do not describe anything real and an amber bar would be
-  // an alarm with nothing behind it.
-  function setMeter(fillEl, valEl, pct, text, neutral) {
+  function setMeter(fillEl, valEl, pct, text) {
     var p = Math.max(0, Math.min(100, Number(pct) || 0));
     fillEl.style.width = p.toFixed(1) + '%';
-    fillEl.dataset.load = neutral ? 'normal' : load(p);
+    fillEl.dataset.load = load(p);
     valEl.textContent = text;
   }
 
@@ -1347,15 +1342,7 @@ function el(id) { return document.getElementById(id); }
 
     var usedGiB = gib(d.memory_used);
     var totalGiB = gib(d.memory_total);
-    // The server now sends a \`memory\` block that says what its own number
-    // means. Prefer it; fall back to dividing the raw bytes for a payload that
-    // predates it, which is what this card did before and what still arrives
-    // from an older deployment of the API.
-    var memInfo = (d.memory && typeof d.memory === 'object') ? d.memory : null;
-    var memPct = (memInfo && isFinite(Number(memInfo.percent)))
-      ? Number(memInfo.percent)
-      : ((usedGiB !== null && totalGiB) ? (usedGiB / totalGiB) * 100 : 0);
-    var memCached = !!(memInfo && memInfo.includes_cache_and_buffers);
+    var memPct = (usedGiB !== null && totalGiB) ? (usedGiB / totalGiB) * 100 : 0;
     var cpuPct = Number(d.cpu_usage);
     if (!isFinite(cpuPct)) { cpuPct = 0; }
     // The upstream reports CPU as a percentage already; a 0–1 fraction would be
@@ -1364,17 +1351,11 @@ function el(id) { return document.getElementById(id); }
 
     el('meters').hidden = false;
     setMeter(el('cpuFill'), el('cpuVal'), cpuPct, cpuPct.toFixed(1) + '% of 100%');
-    // "incl. cache" is four words that stop the reader concluding the machine
-    // is about to run out. Without it this card showed 80% on a box the
-    // in-guest agent reports at 20%, and a model reading the same number told
-    // a customer to go check swap.
     setMeter(
       el('memFill'), el('memVal'), memPct,
       (usedGiB !== null && totalGiB)
         ? usedGiB.toFixed(2) + ' of ' + totalGiB.toFixed(2) + ' GiB · ' + memPct.toFixed(0) + '%'
-          + (memCached ? ' incl. cache' : '')
-        : 'not reported',
-      memCached
+        : 'not reported'
     );
 
     var up = uptime(d.uptime);
@@ -1601,7 +1582,7 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/server-card.html, LF-normalised. */
-export const SERVER_CARD_HTML_MD5 = '1f6440d17ca989a79ccc5d71964232f1';
+export const SERVER_CARD_HTML_MD5 = '86ae56f14b80cb4af14e7bc54bf6c92a';
 
 export const DEPLOY_WIZARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -2503,4 +2484,4 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/deploy-wizard.html, LF-normalised. */
-export const DEPLOY_WIZARD_HTML_MD5 = '7ee199850fbd65aad02f7af96f5380d9';
+export const DEPLOY_WIZARD_HTML_MD5 = '59ce1c546d8aa4b99aead60b0e5795b3';

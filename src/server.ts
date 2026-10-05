@@ -16,15 +16,21 @@
 //   (no args)                 — boot the MCP server over stdio (default)
 //   setup --tool <name>       — print ready-to-paste AI-tool config snippet
 
+import { listPrompts, getPrompt } from './playbooks.js';
+import { hostInventoryOutputSchema } from './host-inventory-schema.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
+  type CallToolRequest,
   CallToolRequestSchema,
   ListResourcesRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { shieldControlsInput } from './shield-controls.js';
 
 import {
   ImprezaClient,
@@ -39,6 +45,7 @@ import { runSetup } from './setup.js';
 import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-assets.js';
 import { envSchema } from './env.js';
 import { VERSION } from './version.js';
+import { OUTPUT_SCHEMAS, STRUCTURED_OMIT } from './output-schemas.js';
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
 import {PITR_TOOLS,isPitrTool,callPitrTool} from './pitr-workflows.js';
 
@@ -110,7 +117,7 @@ const server = new Server(
   { name: 'impreza-mcp', version: VERSION },
   // `resources` is here for the MCP Apps panels below — they are ordinary
   // MCP resources under the ui:// scheme, and this server has no others.
-  { capabilities: { tools: {}, resources: {} } },
+  { capabilities: { tools: {}, resources: {}, prompts: {} } },
 );
 
 // Tool definitions — each one wraps an Impreza REST call. JSON Schema
@@ -550,6 +557,52 @@ const TOOLS = [
   "title": "Set update policy"
 },
 {
+  "name": "impreza_pause_agent",
+  "title": "Pause agent",
+  "description": "Pause new server command dispatch and suspend credentials confined to this server. Apps and commands already dispatched may continue. Heartbeats remain active. Requires unrestricted account credentials with manage scope and explicit human confirmation (confirm=true).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agent_id": {
+        "type": "string",
+        "pattern": "^agt_[a-f0-9]{16,24}$"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "agent_id",
+      "confirm"
+    ],
+    "additionalProperties": false
+  }
+},
+{
+  "name": "impreza_resume_agent",
+  "title": "Resume agent",
+  "description": "Resume server command dispatch and unexpired, unrevoked credentials confined to this server. Existing queued commands may run; resuming does not claim the agent is healthy. Requires unrestricted account credentials with manage scope and explicit human confirmation (confirm=true).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "agent_id": {
+        "type": "string",
+        "pattern": "^agt_[a-f0-9]{16,24}$"
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true
+      }
+    },
+    "required": [
+      "agent_id",
+      "confirm"
+    ],
+    "additionalProperties": false
+  }
+},
+{
   "name": "impreza_request_agent_update",
   "description": "Queue the agent update job for one server after user confirmation with confirm=true. The agent verifies the signed release manifest of the channel before swapping its own binary and restores the previous one if startup fails; the job only finishes as verified when the next heartbeat reports the new version. Refused while any operation is pending on the server, outside the maintenance window, or when the agent is pinned or already current. Requires unrestricted account credentials and deploy scope.",
   "inputSchema": {
@@ -572,6 +625,12 @@ const TOOLS = [
   },
   "title": "Queue agent update"
 },
+  {
+    "name": "impreza_get_shield",
+    "description": "Read the Shield policy revision, CRS exclusions and the last 24 hours of WAF audit findings for one app: requests that would have been blocked, blocked requests and the top five static CRS rules. No visitor identity. Requires read scope.",
+    "inputSchema": {"type":"object","properties":{"deployment_id":{"type":"string","description":"The dpl_… deployment id (from impreza_list_deployments)."}},"required":["deployment_id"],"additionalProperties":false},
+    "title":"Review Impreza Shield audit findings"
+  },
 {
   "name": "impreza_set_shield",
   "description": "Change the Impreza Shield L7 protection profile (off|standard|hardened|max) of a running custom deployment without touching the container. The standard profile audits only and never blocks; enabling blocking (shield_mode=enforce) additionally requires confirm_enforce=true after reviewing audit findings for false positives, and is limited to hardened|max. Requires manage scope.",
@@ -582,6 +641,9 @@ const TOOLS = [
         "type": "string",
         "description": "The dpl_… deployment id (from impreza_list_deployments)."
       },
+        "controls":{"type":"object","additionalProperties":false,"description":"Patch Shield controls. Requires shield-v2-controls and base_revision. Omitted fields keep their settings; null limits restore profile defaults. Empty pow_paths protects every path on hardened/max. Trusted clearnet peers bypass PoW and rate limits, never the WAF. Attack mode restores the base settings locally at its absolute deadline, even without the control plane. Requires agent 0.6.27 or later.","properties":{"pow_paths":{"type":"array","maxItems":10,"uniqueItems":true,"items":{"type":"string","maxLength":256,"pattern":"^/[A-Za-z0-9/_.-]*$"},"description":"Text prefixes of decoded or normalized request paths; /api also matches /apiary. Prefer a trailing slash for a path subtree."},"rate_limit_rpm":{"type":["integer","null"],"minimum":30,"maximum":6000},"pow_difficulty":{"type":["integer","null"],"minimum":2,"maximum":4},"trusted_sources":{"type":"array","maxItems":10,"uniqueItems":true,"items":{"type":"string","maxLength":64},"description":"Canonical network CIDRs, IPv4 /16-/32 or IPv6 /48-/128. No host bits or mapped IPv6. Real transport peer only; never Forwarded headers or onion routes. Private customer configuration, excluded from audit logs."},"under_attack":{"oneOf":[{"type":"object","properties":{"enabled":{"type":"boolean","const":true},"duration_hours":{"type":"integer","minimum":1,"maximum":24}},"required":["enabled","duration_hours"],"additionalProperties":false},{"type":"object","properties":{"enabled":{"type":"boolean","const":false}},"required":["enabled"],"additionalProperties":false}],"description":"Enable PoW everywhere at difficulty at least 4 for 1-24 hours, or disable early. WAF mode stays as requested; attack mode never enables enforce automatically. Trusted peers remain exempt from PoW."}}},
+        "base_revision":{"type":"integer","minimum":0,"description":"Current Shield revision, required for Shield v2 writes; obtain it from impreza_get_shield."},
+        "exclusions":{"type":"array","maxItems":20,"items":{"type":"object","properties":{"rule_id":{"type":"integer","minimum":900000,"maximum":999999},"path_prefix":{"type":"string","maxLength":256,"pattern":"^/[A-Za-z0-9/_.-]*$"}},"required":["rule_id"],"additionalProperties":false},"description":"Reviewed CRS rule exclusions. Apply changed exclusions in audit mode and review again before enforcing."},
       "shield_profile": {
         "type": "string",
         "enum": [
@@ -715,6 +777,13 @@ const TOOLS = [
   "title": "Apply traffic switch"
 },
   {
+    name: 'impreza_get_host_inventory',
+    title: 'Read host inventory',
+    description: 'Read the latest allowlisted host facts for one server: OS, kernel, cached package candidates, supported services, SSH policy and public fingerprints, real filesystems and component versions. Requests a fresh read at most once per 15 minutes; background collection is every six hours. No host changes, package refresh, private files or model submission. Requires host-inventory-v1 and agent 0.6.28 (not yet released); unknown, stale, partial and offline states are explicit.',
+    inputSchema: {type:'object',properties:{agent_id:{type:'string',pattern:'^agt_[a-f0-9]{16,24}$'}},required:['agent_id'],additionalProperties:false},
+    outputSchema: hostInventoryOutputSchema,
+  },
+  {
     name: 'impreza_list_servers',
     description:
       'List every Impreza-managed VPS the customer owns (and any external bring-your-own server they registered), ' +
@@ -780,6 +849,7 @@ const TOOLS = [
         agent_id: { type: 'string', description: 'Target VPS agent_id (from impreza_list_servers).' },
         mode: { type: 'string', enum: ['image', 'dockerfile', 'manifest', 'compose'], description: 'Source mode.' },
         domain: { type: 'string', description: 'Public hostname. Omit when `onion: true` for an onion-only deploy.' },
+        shield_profile: { type: 'string', enum: ['off', 'standard', 'hardened', 'max'], description: 'Impreza Shield profile for this app. Explicit off disables it. Omit for standard when the agent supports Shield, otherwise off.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service. Default false.' },
         onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier of the hidden service (requires onion: true). standard = intro-point rate limiting (safe upstream default); hardened = tighter limits + max streams; max = + experimental proof-of-work — one layer among several, never a guaranteed DDoS protection, and refused if the host\'s Tor lacks the PoW module. Default standard. The .onion address never changes.' },
         onion_import: {
@@ -808,6 +878,7 @@ const TOOLS = [
         start_command: { type: 'string', minLength: 1, maxLength: 1000, description: 'python_pip only, required: production shell command, one line up to 1000 UTF-8 bytes. Example: exec uvicorn app:app --host 0.0.0.0 --port 8000. PORT and HOST are runtime variables. Do not include credentials. Saved at creation and inherited by previews/redeploys.' },
         tor_egress: { type: 'boolean', description: 'Opt in to isolated runtime egress through Tor (SOCKS5-aware applications only). Requires an agent advertising tor-egress-v1. Custom image/source modes only; build and source retrieval are not anonymized. No direct fallback.' },
         require_healthy_start: {"type": "boolean", "description": "Generated recipes only (node_npm, python_pip, php_composer, static_files, go_build; static_files and go_build use their built-in probe when no path is set). Require an explicit healthcheck_path to become healthy before deployment succeeds, including the first install. Requires agent 0.6.3+. Failed first installs remove containers and preserve volumes; eligible previous releases recover. Omit or false keeps legacy behavior. Saved at creation and inherited by previews/redeploys."},
+        zero_downtime: { type: 'boolean', description: 'Opt in to zero-downtime redeploys (from the first redeploy on): the new version starts next to the running one and takes traffic only after GET / answers HTTP 200-399; if it never does, the running version keeps serving. Only for a single-service app with a domain or onion, no host port and no writable volume (volumes refuse it). Makes the app proxy-only (no direct IP:port). Tune the readiness check later with impreza_set_zero_downtime. Needs agent 0.6.27+; older agents redeploy normally.' },
         startup_timeout_seconds: { type: 'integer', minimum: 30, maximum: 600, description: 'Required healthy start only: 30-600 second startup observation budget, default 60; build/recovery time is separate.' },
         healthcheck_path: {"type": "string", "minLength": 1, "maxLength": 200, "pattern": "^/(?:[A-Za-z0-9_-][A-Za-z0-9._~-]*(?:/[A-Za-z0-9_-][A-Za-z0-9._~-]*)*/?)?$", "description": "node_npm, python_pip, php_composer or go_build only. Optional HTTP path such as /health (200 ASCII characters max). Checks 127.0.0.1 on target_port and requires 2xx without redirects. Omit for /: Python/PHP require 2xx; legacy Node accepts status below 500. Saved at creation; previews and redeploys retain it. A failed replacement recovers a verified healthy previous release; first installs keep the agent startup warning policy."},
         build_secrets: {type:'object',maxProperties:16,additionalProperties:{type:'string',maxLength:65536},description:'Private build-only credentials; encrypted, delivered just-in-time to an agent supporting build-secrets-v1. npmrc installs private npm packages; other names mount during build scripts. Build output withheld. Trusted source only. No automatic preview inheritance.'},
@@ -1135,6 +1206,7 @@ const TOOLS = [
         deployment_id: { type: 'string', description: 'The dpl_... id of the custom deployment to rebuild.' },
         context_id: { type: 'string', description: 'Optional retained archive version for an app created from an upload.' },
         vars: { type: 'object', description: 'Optional env vars merged into the deployment before the rebuild. System vars are preserved.' },
+        zero_downtime: { type: 'boolean', description: "Optional, this redeploy only: true runs a zero-downtime redeploy (the saved readiness settings, or GET / answering 200-399), false runs a normal in-place redeploy. Omit to use the app's saved setting. Refused, with the reason, for an app that does not qualify." },
       },
       required: ['deployment_id'],
       additionalProperties: false,
@@ -1382,6 +1454,15 @@ const TOOLS = [
       'Read the balance + currency here before calling `impreza_topup`.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
+  {"name": "impreza_host_permissions", "description": "Read explicit operation/server permissions. Descriptions grant no authority. Legacy manage alone does not enable new host operations.", "inputSchema": {"type": "object", "properties": {}, "required": [], "additionalProperties": false}},
+  {"name": "impreza_get_host_plan", "description": "Read and reconcile the originating credential host plan under current permissions. Acceptance is not host completion; partial effects must not be retried.", "inputSchema": {"type": "object", "properties": {"plan_id": {"type": "string", "pattern": "^hpl_[a-f0-9]{32}$"}}, "required": ["plan_id"], "additionalProperties": false}},
+  {"name": "impreza_prepare_host_plan", "description": "Prepare an existing VPS reinstall for dashboard human approval of its exact server, template, digest and deadline. Explicit operation/server permission and manage scope required. No provider effect.", "inputSchema": {"type": "object", "properties": {"service_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "operation": {"type": "string", "enum": ["vps.reinstall"]}, "template_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "ttl_minutes": {"type": "integer", "minimum": 15, "maximum": 60}}, "required": ["service_id", "operation", "template_id"], "additionalProperties": false}},
+  {"name": "impreza_apply_host_plan", "description": "Consume dashboard human approval and submit existing VPS reinstall. Exact digest and approval required. Drift, expiry, revocation and replay refuse. No AI self-approval. Reconcile partial effects; never retry blindly.", "inputSchema": {"type": "object", "properties": {"plan_id": {"type": "string", "pattern": "^hpl_[a-f0-9]{32}$"}, "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "approval_id": {"type": "string", "pattern": "^apr_[a-f0-9]{32}$"}}, "required": ["plan_id", "plan_digest", "approval_id"], "additionalProperties": false}},
+  {
+    name: 'impreza_privileged_audit',
+    description: 'Read and export paginated admission audit for privileged operations on this account. Resource-confined credentials only see events on their permitted services/deployments. No arguments, command output, secrets or caller IPs. Fixed retention per class; acceptance does not certify host completion. Requires read scope.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, before: { type: 'string', pattern: '^aud_[a-f0-9]{32}$' } }, additionalProperties: false },
+  },
   {
     name: 'impreza_privacy_report',
     description:
@@ -1426,6 +1507,37 @@ const TOOLS = [
         max: { type: 'number', description: 'How many previews may run at once (1-20, default 5). Over the cap the oldest is retired.' },
       },
       required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_get_zero_downtime',
+    title: 'Check zero-downtime eligibility',
+    description: "Check whether an app can use zero-downtime redeploys and, if not, every reason why: each reason has a stable code (catalog_app, preview, tor_egress, sandbox, no_proxy_route, compose_unreadable, multiple_services, container_name, network_mode, not_on_proxy_network, fixed_host_port, writable_volume, agent_unknown, agent_unsupported), an English sentence and what to change. Scope app reasons refuse the opt-in; agent reasons do not (redeploys run normally until the agent is updated to 0.6.27+). eligible is true only when nothing prevents it. Also returns the saved setting and the last redeploy's outcome. Works for custom and catalog apps. Requires read scope.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The deployment (dpl_...), custom or catalog.' },
+      },
+      required: ['deployment_id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'impreza_set_zero_downtime',
+    description: 'Turn zero-downtime redeploys on or off for a CUSTOM app and set the readiness check. With it on, a redeploy starts the new version next to the running one, proves it ready over the proxy network (the container running and healthy, and GET path answering an accepted status three times in a row within the timeout), and only then moves the route; the replaced container keeps serving in-flight requests for drain_seconds. A new version that never becomes ready never takes traffic and the running version keeps serving. Only a single-service app with a domain or onion, no fixed host port and no writable volume qualifies; turning it on is refused with every condition that prevents it (impreza_get_zero_downtime lists them before you try). It makes the app proxy-only (no direct IP:port) and needs agent 0.6.27+ (older agents redeploy normally). Not for catalog apps, databases or apps that run migrations on start.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: 'The custom deployment (dpl_...).' },
+        enabled: { type: 'boolean', description: 'On or off.' },
+        path: { type: 'string', description: 'Readiness path requested on the new version, e.g. /healthz (default /).' },
+        status_min: { type: 'integer', description: 'Lowest accepted HTTP status (default 200).' },
+        status_max: { type: 'integer', description: 'Highest accepted HTTP status (default 399).' },
+        timeout_seconds: { type: 'integer', description: 'How long the new version has to become ready, 30-600 (default 60).' },
+        drain_seconds: { type: 'integer', description: 'How long the replaced container keeps serving requests in flight, 0-60 (default 5).' },
+      },
+      required: ['deployment_id', 'enabled'],
       additionalProperties: false,
     },
   },
@@ -3596,6 +3708,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   ...Object.fromEntries(CUSTOMER_TOOLS.map(t=>[t.name,t.annotations])),
   ...Object.fromEntries(PITR_TOOLS.map(t=>[t.name,t.annotations])),
   // ── platform: apps / deployments ──────────────────────────────────────────
+  impreza_get_host_inventory: A_READ,
   impreza_list_servers: A_READ,
   impreza_list_apps: A_READ,
   impreza_list_deployments: A_READ,
@@ -3605,11 +3718,11 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // asking twice returns the same file — read-only and idempotent is the
   // honest description.
   impreza_inspect_app: A_READ,
-  impreza_get_app_read: A_READ,
+  impreza_get_app_read: A_WRITE_IDEM,
   // The CLI can delete what it can read, and running it twice is not the
   // same as running it once — an install, a migration, a drop.
   impreza_app_cli: A_DESTRUCTIVE,
-  impreza_get_cli_run: A_READ,
+  impreza_get_cli_run: A_WRITE_IDEM,
   impreza_git_webhook_status: A_READ,
   // Deploys pull public images / clone public git and make Let's Encrypt issue
   // a cert → EXT. Additive (a new deployment), and NOT idempotent: a second
@@ -3629,7 +3742,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_restore_app: A_DESTRUCTIVE,
   impreza_discard_replaced: A_DESTRUCTIVE,
   impreza_backup_schedule: A_WRITE_IDEM,
-  impreza_list_tasks: A_READ,
+  impreza_list_tasks: A_WRITE_IDEM,
   impreza_create_task: A_WRITE,
   impreza_update_task: A_WRITE_IDEM,
   impreza_run_task: A_WRITE_EXT,
@@ -3674,9 +3787,16 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // narrow their effect.
   // §8.1 dark previews. Retiring one is destructive: the hidden-service keys
   // are deleted, not parked, so the address never comes back.
+  impreza_host_permissions: A_READ,
+  impreza_get_host_plan: A_READ,
+  impreza_prepare_host_plan: A_WRITE,
+  impreza_apply_host_plan: A_DESTRUCTIVE_EXT,
+  impreza_privileged_audit: A_READ,
   impreza_privacy_report: A_READ,
   impreza_list_previews: A_READ,
   impreza_configure_previews: A_WRITE_IDEM,
+  impreza_get_zero_downtime: A_READ,
+  impreza_set_zero_downtime: A_WRITE_IDEM,
   impreza_retire_preview: A_DESTRUCTIVE,
   impreza_mint_subcredential: A_WRITE,
   impreza_list_credentials: A_READ,
@@ -3715,9 +3835,12 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_prepare_config_promotion: A_WRITE,
   impreza_get_config_promotion: A_READ,
   impreza_apply_config_promotion: A_WRITE_EXT_IDEM,
-  impreza_get_update_policy: A_READ,
+  impreza_get_update_policy: A_WRITE_IDEM,
   impreza_set_update_policy: A_WRITE_IDEM,
+  impreza_pause_agent: A_WRITE,
+  impreza_resume_agent: A_WRITE,
   impreza_request_agent_update: A_WRITE,
+  impreza_get_shield: A_READ,
   impreza_set_shield: A_WRITE_EXT_IDEM,
   impreza_tail_logs: A_READ,
   impreza_prepare_traffic_switch: A_WRITE,
@@ -3964,6 +4087,9 @@ function panelFor(tool: string): string | undefined {
   return UI_PANELS.find((p) => p.tool === tool)?.uri;
 }
 
+server.setRequestHandler(ListPromptsRequestSchema, async (req) => listPrompts(req.params));
+server.setRequestHandler(GetPromptRequestSchema, async (req) => getPrompt(req.params));
+
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: UI_PANELS.map((p) => ({
     uri: p.uri,
@@ -3988,9 +4114,13 @@ function basicCloudUnavailable(name: string): boolean {
   return name.startsWith('impreza_cloud_') && name !== 'impreza_cloud_power';
 }
 const ANNOTATED_TOOLS = TOOLS.filter(tool => !basicCloudUnavailable(tool.name)).map((tool) => {
+  const description = tool.description + (['impreza_get_update_policy','impreza_get_app_read','impreza_get_cli_run','impreza_list_tasks'].includes(tool.name)
+    ? ' This read may reconcile expired operational state and clean up expired internal jobs.' : '');
   const annotations = TOOL_ANNOTATIONS[tool.name];
   if (!annotations) throw new Error(`Tool ${tool.name} has no entry in TOOL_ANNOTATIONS`);
-  return { ...tool, annotations };
+  // The output schema, the same object the hosted server declares.
+  const outputSchema = OUTPUT_SCHEMAS[tool.name];
+  return outputSchema ? { ...tool, description, annotations, outputSchema } : { ...tool, description, annotations };
 });
 
 /**
@@ -4040,7 +4170,74 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: tools as unknown as typeof TOOLS[number][] };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
+server.setRequestHandler(CallToolRequestSchema, async (req) => withStructuredContent(req.params.name, await callTool(req)));
+
+/**
+ * A tool that declares an outputSchema answers with structuredContent on
+ * every path. The object is the text block's own JSON, minus the one-time
+ * secrets STRUCTURED_OMIT names and projected onto the schema (see
+ * projectOntoSchema); errors carry none, and a text that is not one JSON object
+ * is left as it was. The text block always keeps the whole JSON.
+ */
+
+/**
+ * Keep, at every level the schema closes (additionalProperties: false), only
+ * the properties it declares; open levels pass whole.
+ *
+ * This package is installed and updated on the customer's schedule, while the
+ * API it forwards gains fields on ours. A closed schema with the new field in
+ * structuredContent would make a strict client (the MCP SDK validates) refuse
+ * every answer of that tool until the package is updated. The new field still
+ * reaches the model in the text block; only the structured copy stays inside
+ * the contract. Values are never rewritten, so a field that is declared but
+ * has the wrong type still fails validation, as it should.
+ */
+function projectOntoSchema(value: unknown, schema: unknown): unknown {
+  if (!schema || typeof schema !== 'object') return value;
+  const s = schema as { anyOf?: unknown; oneOf?: unknown; additionalProperties?: unknown; properties?: unknown; items?: unknown; required?: unknown };
+  const branches = Array.isArray(s.anyOf) ? s.anyOf : Array.isArray(s.oneOf) ? s.oneOf : null;
+  if (branches && value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    // The branch whose required properties this object has (first match).
+    const v = value as Record<string, unknown>;
+    const branch = branches.find((b) => {
+      const req = (b as { required?: unknown }).required;
+      return Array.isArray(req) && req.every((k) => typeof k === 'string' && k in v);
+    });
+    return branch ? projectOntoSchema(value, branch) : value;
+  }
+  if (Array.isArray(value)) {
+    return s.items ? value.map((item) => projectOntoSchema(item, s.items)) : value;
+  }
+  if (value !== null && typeof value === 'object' && s.additionalProperties === false && s.properties && typeof s.properties === 'object') {
+    const props = s.properties as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (Object.prototype.hasOwnProperty.call(props, k)) out[k] = projectOntoSchema(v, props[k]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function withStructuredContent<R extends { content?: unknown; isError?: unknown; structuredContent?: unknown }>(name: string, result: R): R {
+  if (!OUTPUT_SCHEMAS[name] || result.isError || result.structuredContent !== undefined) return result;
+  const first = Array.isArray(result.content) ? (result.content[0] as { type?: unknown; text?: unknown } | undefined) : undefined;
+  if (!first || first.type !== 'text' || typeof first.text !== 'string') return result;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(first.text);
+  } catch {
+    return result;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return result;
+  // One-time secrets (a credential shown ONCE, a read-once sealed blob) stay
+  // in the text only, as before; the structured copy never carries them.
+  const structured = parsed as Record<string, unknown>;
+  for (const key of STRUCTURED_OMIT[name] ?? []) delete structured[key];
+  return { ...result, structuredContent: projectOntoSchema(structured, OUTPUT_SCHEMAS[name]) as Record<string, unknown> };
+}
+
+async function callTool(req: CallToolRequest) {
   const { name, arguments: rawArgs } = req.params;
   const args = (rawArgs ?? {}) as Record<string, unknown>;
 
@@ -4051,6 +4248,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if(isPitrTool(name)) return toResult(await callPitrTool(impreza,name,args));
     if(isCustomerTool(name)) return toResult(await callCustomerTool(impreza,name,args));
     switch (name) {
+      case 'impreza_get_host_inventory': {
+        const id=String(args.agent_id??'');
+        if(!/^agt_[a-f0-9]{16,24}$/.test(id)) return toError('agent_id is required');
+        return toStructuredResult(await impreza.get<unknown>(`/v1/platform/servers/${encodeURIComponent(id)}/inventory`));
+      }
+
       case 'impreza_list_servers':
         return toResult(await impreza.get<ServerList>('/v1/platform/servers'));
 
@@ -4274,7 +4477,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'impreza_redeploy_deployment': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
-        const body: { vars?: Record<string, unknown>; context_id?: string } = {};
+        const body: { vars?: Record<string, unknown>; context_id?: string; zero_downtime?: boolean } = {};
+        if (args.zero_downtime !== undefined) {
+          if (typeof args.zero_downtime !== 'boolean') return toError('zero_downtime must be true or false');
+          body.zero_downtime = args.zero_downtime;
+        }
         if (args.context_id !== undefined) {
           if (typeof args.context_id !== "string" || !/^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) return toError("Invalid context_id");
           body.context_id = args.context_id;
@@ -4432,11 +4639,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           body,
         );
         if (data.private_key) {
+          // The JSON is the first block, so the tool keeps its structuredContent
+          // (without the private key: STRUCTURED_OMIT). The warning follows as
+          // a second block; a strict client rejects a tool that declares an
+          // outputSchema and answers without structuredContent.
           return {
-            content: [{
-              type: 'text',
-              text: 'SAVE THIS PRIVATE KEY NOW — it is shown exactly once, is never stored by Impreza, and cannot be retrieved later. If it is lost, revoke this client and add it again.\n\n' + JSON.stringify(data, null, 2),
-            }],
+            content: [
+              { type: 'text', text: JSON.stringify(data, null, 2) },
+              { type: 'text', text: 'SAVE THIS PRIVATE KEY NOW — it is shown exactly once, is never stored by Impreza, and cannot be retrieved later. If it is lost, revoke this client and add it again.' },
+            ],
           };
         }
         return toResult(data);
@@ -4777,6 +4988,31 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return toResult(await impreza.post<unknown>('/v1/credentials', body));
       }
 
+      case 'impreza_host_permissions':
+      case 'impreza_get_host_plan':
+      case 'impreza_prepare_host_plan':
+      case 'impreza_apply_host_plan': {
+        const allowed = name === 'impreza_host_permissions' ? [] : name === 'impreza_get_host_plan' ? ['plan_id'] : name === 'impreza_prepare_host_plan' ? ['service_id','operation','template_id','ttl_minutes'] : ['plan_id','plan_digest','approval_id'];
+        if (Object.keys(args).some(k => !allowed.includes(k))) return toError('INVALID_HOST_INPUT: Unexpected parameter.');
+        if (name === 'impreza_host_permissions') return toResult(await impreza.get<unknown>('/v1/host/permissions'));
+        if (name !== 'impreza_prepare_host_plan' && (typeof args.plan_id !== 'string' || !/^hpl_[a-f0-9]{32}$/.test(args.plan_id))) return toError('INVALID_HOST_PLAN: Use a returned plan ID.');
+        if (name === 'impreza_get_host_plan') return toResult(await impreza.get<unknown>('/v1/host/plans/' + args.plan_id));
+        if (name === 'impreza_prepare_host_plan') {
+          if (!Number.isInteger(args.service_id) || Number(args.service_id)<1 || Number(args.service_id)>2147483647 || !Number.isInteger(args.template_id) || Number(args.template_id)<1 || Number(args.template_id)>2147483647 || args.operation !== 'vps.reinstall' || (args.ttl_minutes !== undefined && (!Number.isInteger(args.ttl_minutes) || Number(args.ttl_minutes)<15 || Number(args.ttl_minutes)>60))) return toError('INVALID_HOST_INPUT: Use positive server/template IDs, vps.reinstall and TTL 15-60.');
+          return toResult(await impreza.post<unknown>('/v1/host/plans', args));
+        }
+        if (typeof args.plan_digest !== 'string' || !/^[a-f0-9]{64}$/.test(args.plan_digest) || typeof args.approval_id !== 'string' || !/^apr_[a-f0-9]{32}$/.test(args.approval_id)) return toError('INVALID_HOST_INPUT: Use the returned digest and approval ID.');
+        return toResult(await impreza.post<unknown>('/v1/host/plans/' + args.plan_id + '/apply', args));
+      }
+      case 'impreza_privileged_audit': {
+        const limit = args.limit ?? 50;
+        const before = args.before;
+        if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 200 || (before !== undefined && (typeof before !== 'string' || !/^aud_[a-f0-9]{32}$/.test(before)))) return toError('INVALID_ARGUMENT: Use limit between 1 and 200 and a returned cursor.');
+        const query = new URLSearchParams({ limit: String(limit) });
+        if (typeof before === 'string') query.set('before', before);
+        return toResult(await impreza.get<unknown>(`/v1/audit/privileged?${query.toString()}`));
+      }
+
       case 'impreza_privacy_report':
         return toResult(await impreza.get<unknown>('/v1/privacy/report'));
 
@@ -4795,6 +5031,27 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (args.max !== undefined) body.previews_max = Number(args.max);
         return toResult(await impreza.post<unknown>(
           `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/previews/settings`, body));
+      }
+
+      case 'impreza_get_zero_downtime': {
+        const p = z.object({ deployment_id: z.string().regex(/^dpl_[A-Za-z0-9_-]{1,40}$/) }).strict().parse(args);
+        return toResult(await impreza.get<unknown>(
+          `/v1/platform/deployments/${encodeURIComponent(p.deployment_id)}/zero-downtime`));
+      }
+
+      case 'impreza_set_zero_downtime': {
+        const p = z.object({
+          deployment_id: z.string().regex(/^dpl_[A-Za-z0-9_-]{1,40}$/),
+          enabled: z.boolean(),
+          path: z.string().regex(/^\/[A-Za-z0-9._~!$&'()*+,;=:@\/%-]{0,255}$/).refine((v) => !v.includes('..'), 'path must not contain ..').optional(),
+          status_min: z.number().int().min(100).max(599).optional(),
+          status_max: z.number().int().min(100).max(599).optional(),
+          timeout_seconds: z.number().int().min(30).max(600).optional(),
+          drain_seconds: z.number().int().min(0).max(60).optional(),
+        }).strict().parse(args);
+        const { deployment_id: dep, ...body } = p;
+        return toResult(await impreza.post<unknown>(
+          `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/zero-downtime`, body));
       }
 
       case 'impreza_retire_preview': {
@@ -4997,12 +5254,22 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const {agent_id,...body}=p;
         return toResult(await impreza.put<unknown>('/v1/platform/servers/'+encodeURIComponent(agent_id)+'/update-policy',body));
       }
+      case 'impreza_pause_agent':
+      case 'impreza_resume_agent': {
+        const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/).refine(v=>v===v.trim()),confirm:z.literal(true)}).strict().parse(args);
+        return toResult(await impreza.post<unknown>('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/'+(name==='impreza_pause_agent'?'pause':'resume'),{confirm:p.confirm}));
+      }
       case 'impreza_request_agent_update': {
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/),confirm:z.literal(true)}).strict().parse(args);
         return toResult(await impreza.post<unknown>('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/agent-update',{confirm:p.confirm}));
       }
+      case 'impreza_get_shield': {
+        const p=z.object({deployment_id:z.string().min(1)}).strict().parse(args);
+        return toResult(await impreza.get<unknown>('/v1/platform/deployments/'+encodeURIComponent(p.deployment_id)+'/shield'));
+      }
       case 'impreza_set_shield': {
-        const p=z.object({deployment_id:z.string().min(1),shield_profile:z.enum(['off','standard','hardened','max']),shield_mode:z.enum(['audit','enforce']).optional(),confirm_enforce:z.literal(true).optional()}).strict().parse(args);
+        const p=z.object({deployment_id:z.string().min(1),shield_profile:z.enum(['off','standard','hardened','max']),shield_mode:z.enum(['audit','enforce']).optional(),confirm_enforce:z.literal(true).optional(),base_revision:z.number().int().nonnegative().optional(),exclusions:z.array(z.object({rule_id:z.number().int().min(900000).max(999999),path_prefix:z.string().max(256).regex(/^\/[A-Za-z0-9/_.-]*$/).optional()}).strict()).max(20).optional(),controls:shieldControlsInput.optional()}).strict().parse(args);
+        if((p.exclusions!==undefined||p.controls!==undefined)&&p.base_revision===undefined) return toError('exclusions and controls require base_revision from impreza_get_shield');
         if(p.shield_mode==='enforce'&&p.confirm_enforce!==true) return toError('shield_mode=enforce requires confirm_enforce=true');
         const {deployment_id,...body}=p;
         return toResult(await impreza.post<unknown>('/v1/platform/deployments/'+encodeURIComponent(deployment_id)+'/shield',body));
@@ -5120,9 +5387,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
 
       case 'impreza_doctor': {
-        const body: Record<string, unknown> = {};
-        if (typeof args.client_time === 'string' && args.client_time) body.client_time = args.client_time;
-        return toResult(await impreza.post<unknown>('/v1/doctor', body));
+        const query: Record<string, string> = {};
+        if (typeof args.client_time === 'string' && args.client_time) query.client_time = args.client_time;
+        return toResult(await impreza.get<unknown>('/v1/doctor', query));
       }
 
       case 'impreza_api_search': {
@@ -5709,13 +5976,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const msg = err instanceof Error ? err.message : String(err);
     return toError(msg);
   }
-});
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // deploy_custom — multi-mode dispatcher
 // ─────────────────────────────────────────────────────────────────────
 
 interface DeployCustomBody {
+  shield_profile?: 'off' | 'standard' | 'hardened' | 'max';
   name: string;
   agent_id: string;
   mode: string;
@@ -5741,6 +6009,7 @@ interface DeployCustomBody {
   tor_egress?: boolean;
   require_healthy_start?: boolean;
   startup_timeout_seconds?: number;
+  zero_downtime?: boolean;
   healthcheck_path?: string;
   public_build_vars?: Record<string, string>;
   build_secrets?: Record<string,string>;
@@ -5779,6 +6048,12 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if (args.tor_egress !== undefined && typeof args.tor_egress !== 'boolean') throw new Error('tor_egress must be boolean');
   if (args.tor_egress === true && !['image','dockerfile'].includes(mode)) throw new Error('Tor runtime egress requires image or dockerfile mode');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.shield_profile !== undefined) {
+    if (typeof args.shield_profile !== 'string' || !['off', 'standard', 'hardened', 'max'].includes(args.shield_profile)) {
+      throw new Error('shield_profile must be off, standard, hardened or max');
+    }
+    body.shield_profile = args.shield_profile as NonNullable<DeployCustomBody['shield_profile']>;
+  }
   if (args.tor_egress !== undefined) body.tor_egress = args.tor_egress as boolean;
   if(args.go_package!==undefined) {
     if(args.build_strategy!=='go_build' || typeof args.go_package!=='string' || args.go_package.length>120 || !(args.go_package==='.' || /^[A-Za-z0-9_][A-Za-z0-9._-]*(?:\/[A-Za-z0-9_][A-Za-z0-9._-]*){0,4}$(?![\s\S])/.test(args.go_package))) throw new Error('Invalid go_package');
@@ -5820,6 +6095,10 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
       body.startup_timeout_seconds = seconds;
     }
     if (args.require_healthy_start !== undefined) body.require_healthy_start = args.require_healthy_start;
+  }
+  if (args.zero_downtime !== undefined) {
+    if (typeof args.zero_downtime !== 'boolean') throw new Error('zero_downtime must be boolean');
+    body.zero_downtime = args.zero_downtime;
   }
   if (args.healthcheck_path !== undefined) {
     if (!['node_npm','python_pip','php_composer','go_build'].includes(String(args.build_strategy))) throw new Error('healthcheck_path requires node_npm, python_pip or php_composer');

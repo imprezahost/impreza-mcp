@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { fileURLToPath } from 'node:url';
-const transport = new StdioClientTransport({command: process.execPath, args: ['--import', new URL('./fixtures/onion-profile-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))], env: { ...process.env, IMPREZA_BASE_URL: 'https://onion-profile.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential' }});
-const client = new Client({name: 'onion-profile-test', version: '1.0.0'});
-const parse = (result) => JSON.parse(result.content[0].text);
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('onion-profile-test',{host:'onion-profile.invalid'});const client=mcp.client;
+let secrets=0; // the fixture numbers its synthetic one-time secrets per server process
 try {
- await client.connect(transport);
+ await mcp.connect();
  const tools = await client.listTools();
  const setProfile = tools.tools.find(t => t.name === 'impreza_set_onion_profile');
  const addOnion = tools.tools.find(t => t.name === 'impreza_add_onion');
@@ -30,12 +27,14 @@ try {
   const result = await client.callTool({name: 'impreza_set_onion_profile', arguments: args});
   assert.equal(result.isError, true, JSON.stringify(args));
  }
+ assert.equal(mcp.count(), 0, 'refused input must make no HTTP request');
 
  // set_onion_profile → POST {profile} on the profile route.
  {
   const result = await client.callTool({name: 'impreza_set_onion_profile', arguments: {deployment_id: 'dpl_test', profile: 'hardened'}});
   assert(!result.isError);
-  const data = parse(result);
+  assert.deepEqual(result.structuredContent, sample('impreza_set_onion_profile:queue_profile'));
+  const data = mcp.last();
   assert.equal(data.method, 'POST');
   assert.equal(data.path, '/v1/platform/deployments/dpl_test/onion/profile');
   assert.deepEqual(data.body, {profile: 'hardened'});
@@ -43,18 +42,26 @@ try {
 
  // add_onion forwards the tier when given, and posts an empty body without it.
  {
-  const withTier = parse(await client.callTool({name: 'impreza_add_onion', arguments: {deployment_id: 'dpl_test', onion_profile: 'max'}}));
+  const r = await client.callTool({name: 'impreza_add_onion', arguments: {deployment_id: 'dpl_test', onion_profile: 'max'}});
+  assert(!r.isError, JSON.stringify(r));
+  assert.deepEqual(r.structuredContent, sample('impreza_add_onion:queue_onion_mirror'));
+  const withTier = mcp.last();
+  assert.equal(withTier.method, 'POST');
   assert.equal(withTier.path, '/v1/platform/deployments/dpl_test/onion/add');
   assert.deepEqual(withTier.body, {onion_profile: 'max'});
-  const plain = parse(await client.callTool({name: 'impreza_add_onion', arguments: {deployment_id: 'dpl_test'}}));
-  assert.deepEqual(plain.body, {});
+  assert(!(await client.callTool({name: 'impreza_add_onion', arguments: {deployment_id: 'dpl_test'}})).isError);
+  assert.deepEqual(mcp.last().body, {});
  }
 
  // catalog deploy forwards onion + onion_profile.
  {
   const result = await client.callTool({name: 'impreza_deploy_catalog_app', arguments: {app_name: 'vaultwarden', agent_id: 'agt_test', onion: true, onion_profile: 'hardened'}});
   assert(!result.isError);
-  const data = parse(result);
+  // Credentials generated at creation are shown once: in the text, never in structuredContent or the log.
+  assert.deepEqual(result.structuredContent, sample('impreza_deploy_catalog_app:generated_credentials'));
+  mcp.secretKept(result, 'credentials', {ADMIN_PASSWORD: 'synthetic-secret-' + (++secrets)});
+  const data = mcp.last();
+  assert.equal(data.method, 'POST');
   assert.equal(data.path, '/v1/platform/deployments');
   assert.equal(data.body.onion, true);
   assert.equal(data.body.onion_profile, 'hardened');
@@ -64,11 +71,15 @@ try {
  {
   const ok = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't1', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion: true, onion_profile: 'max'}});
   assert(!ok.isError, ok.content?.[0]?.text);
-  const data = parse(ok);
+  assert.deepEqual(ok.structuredContent, sample('impreza_deploy_custom:image_onion_only'));
+  const data = mcp.last();
+  assert.equal(data.path, '/v1/platform/deployments/custom');
   assert.equal(data.body.onion, true);
   assert.equal(data.body.onion_profile, 'max');
+  const before = mcp.count();
   const refused = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't2', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion_profile: 'max'}});
   assert.equal(refused.isError, true, 'onion_profile without onion must be refused');
+  assert.equal(mcp.count(), before, 'the refused deploy made no HTTP request');
  }
  console.log('PASS: onion profile tools — tier enum, exact dispatch, deploy/add_onion forwarding, tier-without-onion refused.');
-} finally { await client.close(); }
+} finally { await mcp.close(); }

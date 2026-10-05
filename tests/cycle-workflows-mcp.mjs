@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_API_KEY:'test-key',IMPREZA_API_SECRET:'test-secret-not-a-real-credential'}});
-const client=new Client({name:'cycle-workflows-test',version:'1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('cycle-workflows-test');const client=mcp.client;
+const SAMPLE={impreza_compare_environments:'impreza_compare_environments:staging_vs_production',impreza_get_traffic_switch:'impreza_get_traffic_switch:pending',impreza_prepare_traffic_switch:'impreza_prepare_traffic_switch:move_hostname',impreza_apply_traffic_switch:'impreza_apply_traffic_switch:first_apply',impreza_create_preview:'impreza_create_preview:private_given_keys'};
+let secrets=0; // the fixture numbers its synthetic one-time secrets per server process
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;
+ await mcp.connect();const tools=(await client.listTools()).tools;
  const deployment_id='dpl_'+'a'.repeat(16),target_deployment_id='dpl_'+'b'.repeat(16),switch_id='tsw_'+'c'.repeat(24),review_digest='d'.repeat(64),environment_id='env_'+'a'.repeat(24),other_environment_id='env_'+'b'.repeat(24);
  let last=0;
  for(const [name,args,method,path,body,query] of [
@@ -17,7 +16,12 @@ try {
   ['impreza_create_preview',{deployment_id,branch:'feature/example'},'POST','/v1/platform/deployments/custom/'+deployment_id+'/previews',{branch:'feature/example'},{}],
  ]) {
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
-  const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const data=JSON.parse(r.content[0].text);assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,query);last=data.request_count;
+  const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));
+  if(SAMPLE[name])assert.deepEqual(r.structuredContent,sample(SAMPLE[name]));
+  // A password-protected preview answers its password once: in the text, never in structuredContent or the log.
+  if(name==='impreza_create_preview'&&args.protect)mcp.secretKept(r,'password','synthetic-secret-'+(++secrets));
+  else if(name==='impreza_create_preview')assert(!/password"|reviewer_private_key/.test(r.content[0].text),'no one-time secret without protect/private');
+  const data=mcp.last();assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,query);last=mcp.count();
  }
  const bad=[
   ['impreza_compare_environments',{environment_id:'../other',other_environment_id}],
@@ -36,11 +40,11 @@ try {
   ['impreza_create_preview',{deployment_id,branch:'x',password:'never-send'}],
  ];
  for(const [name,args] of bad) assert((await client.callTool({name,arguments:args})).isError,name);
- const probe=await client.callTool({name:'impreza_get_traffic_switch',arguments:{switch_id}});
- assert.equal(JSON.parse(probe.content[0].text).request_count,last+1,'invalid arguments must cause zero HTTP requests');
+ const probe=await client.callTool({name:'impreza_get_traffic_switch',arguments:{switch_id}});assert(!probe.isError,JSON.stringify(probe));
+ assert.equal(mcp.count(),last+1,'invalid arguments must cause zero HTTP requests');
  assert.equal(tools.find(t=>t.name==='impreza_create_preview').annotations.openWorldHint,true);
  assert.equal(tools.find(t=>t.name==='impreza_create_preview').annotations.idempotentHint,true);
  assert.equal(tools.find(t=>t.name==='impreza_compare_environments').annotations.readOnlyHint,true);
  assert.equal(tools.find(t=>t.name==='impreza_apply_traffic_switch').annotations.readOnlyHint,false);
  console.log('PASS: 5 candidate MCP tools, exact requests, query forwarding, confirmation and 14 refusals without network effects.');
-} finally {await client.close();}
+} finally {await mcp.close();}

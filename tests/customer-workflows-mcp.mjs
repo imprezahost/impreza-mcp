@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_API_KEY:'test-key',IMPREZA_API_SECRET:'test-secret-not-a-real-credential'}});
-const client=new Client({name:'customer-workflows-test',version:'1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('customer-workflows-test');const client=mcp.client;
+// the read tools with an outputSchema answer the real controller shape (validated by the SDK client)
+const SAMPLE={impreza_export_app_config:'impreza_export_app_config:git_app',impreza_get_config_plan:'impreza_get_config_plan:pending',impreza_app_metrics:'impreza_app_metrics:default_window',impreza_list_alerts:'impreza_list_alerts:with_alerts',impreza_get_database_restore:'impreza_get_database_restore:pending',impreza_prepare_database_restore:'impreza_prepare_database_restore:fresh_review',impreza_apply_database_restore:'impreza_apply_database_restore:replay_accepted_review'};
 const deployment_id='dpl_'+'a'.repeat(16), backup_id='bkp_'+'b'.repeat(16),config_plan_id='cplan_'+'c'.repeat(24),restore_plan_id='rspl_'+'d'.repeat(24),review_digest='e'.repeat(64);
 const cases=[
  ['impreza_export_app_config',{deployment_id},'GET',`/v1/platform/deployments/custom/${deployment_id}/config`,null,{}],
@@ -19,11 +18,12 @@ const cases=[
  ['impreza_download_backup',{backup_id},'POST',`/v1/backups/${backup_id}/download-link`,{},{}]
 ];
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;let count=0;
+ await mcp.connect();const tools=(await client.listTools()).tools;let count=0;
  for(const [name,args,method,path,body,query] of cases){
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
   const result=await client.callTool({name,arguments:args});assert(!result.isError,JSON.stringify(result));
-  const data=JSON.parse(result.content[0].text);assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,query);count=data.request_count;
+  if(SAMPLE[name])assert.deepEqual(result.structuredContent,sample(SAMPLE[name]),name);
+  const data=mcp.last();assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);assert.deepEqual(data.query,query);count=mcp.count();
   for(const bad of [{...args,unexpected:'never-send'},{...args,[Object.keys(args)[0]]:'../foreign'},{...args,[Object.keys(args)[0]]:args[Object.keys(args)[0]]+'\n'}]) assert((await client.callTool({name,arguments:bad})).isError,name);
  }
  for(const name of ['impreza_apply_config_plan','impreza_apply_database_restore']) {
@@ -32,6 +32,6 @@ try {
  }
  for(const args of [{deployment_id,minutes:0},{deployment_id,minutes:1441},{deployment_id,minutes:2.5}]) assert((await client.callTool({name:'impreza_app_metrics',arguments:args})).isError);
  for(const args of [{deployment_id,metric:'down',threshold:2},{deployment_id,metric:'memory_pct',threshold:101},{deployment_id,metric:'unknown',threshold:1},{deployment_id,metric:'down',threshold:1,rule_id:'../x'}]) assert((await client.callTool({name:'impreza_set_alert_rule',arguments:args})).isError);
- const probe=await client.callTool({name:'impreza_export_app_config',arguments:{deployment_id}});assert.equal(JSON.parse(probe.content[0].text).request_count,count+1,'invalid inputs must not send HTTP');
+ const probe=await client.callTool({name:'impreza_export_app_config',arguments:{deployment_id}});assert(!probe.isError,JSON.stringify(probe));assert.equal(mcp.count(),count+1,'invalid inputs must not send HTTP');
  console.log('PASS: 11 workflows with exact request paths, bodies, query, strict inputs and explicit confirmation.');
-}finally{await client.close();}
+}finally{await mcp.close();}

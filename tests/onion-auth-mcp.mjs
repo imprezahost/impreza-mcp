@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { fileURLToPath } from 'node:url';
-const transport = new StdioClientTransport({command: process.execPath, args: ['--import', new URL('./fixtures/onion-auth-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))], env: { ...process.env, IMPREZA_BASE_URL: 'https://onion-auth.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential' }});
-const client = new Client({name: 'onion-auth-test', version: '1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+// A well-formed X25519 public key in the base32 form the API stores.
+const PUB = 'B'.repeat(51) + 'A';
+const mcp = loggedClient('onion-auth-test', {host: 'onion-auth.invalid'}); const client = mcp.client;
 try {
- await client.connect(transport);
+ await mcp.connect();
  const tools = await client.listTools();
  const list = tools.tools.find(t => t.name === 'impreza_onion_auth_list');
  const add = tools.tools.find(t => t.name === 'impreza_onion_auth_add');
@@ -29,50 +28,55 @@ try {
   const result = await client.callTool(args);
   assert.equal(result.isError, true, JSON.stringify(args));
  }
+ assert.equal(mcp.count(), 0, 'refused input must make no HTTP request');
 
  // list → GET on the clients collection.
  {
   const result = await client.callTool({name: 'impreza_onion_auth_list', arguments: {deployment_id: 'dpl_test'}});
-  assert(!result.isError);
-  const data = JSON.parse(result.content[0].text);
+  assert(!result.isError, JSON.stringify(result));
+  const data = mcp.last();
   assert.equal(data.method, 'GET');
   assert.equal(data.path, '/v1/platform/deployments/dpl_test/onion/clients');
-  assert.equal(data.restricted, true);
-  assert.deepEqual(data.clients, [{name: 'alice', created_at: '2026-09-21T00:00:00Z'}]);
+  const expected = sample('impreza_onion_auth_list:restricted');
+  assert.deepEqual(result.structuredContent, expected);
+  assert.equal(result.structuredContent.restricted, expected.restricted);
+  assert.deepEqual(result.structuredContent.clients, expected.clients);
  }
 
  // add with a customer-supplied pubkey → POST {name, pubkey}, no private_key back.
  {
-  const result = await client.callTool({name: 'impreza_onion_auth_add', arguments: {deployment_id: 'dpl_test', name: 'alice', pubkey: 'x25519-pub-alice'}});
+  const result = await client.callTool({name: 'impreza_onion_auth_add', arguments: {deployment_id: 'dpl_test', name: 'alice', pubkey: PUB}});
   assert(!result.isError);
-  const data = JSON.parse(result.content[0].text);
+  const data = mcp.last();
   assert.equal(data.method, 'POST');
   assert.equal(data.path, '/v1/platform/deployments/dpl_test/onion/clients');
-  assert.deepEqual(data.body, {name: 'alice', pubkey: 'x25519-pub-alice'});
-  assert.equal(data.private_key, undefined);
+  assert.deepEqual(data.body, {name: 'alice', pubkey: PUB});
+  assert.equal(JSON.parse(result.content[0].text).private_key, undefined);
  }
 
  // add with generate → POST {name, generate:true}, private_key shown once with a warning.
  {
   const result = await client.callTool({name: 'impreza_onion_auth_add', arguments: {deployment_id: 'dpl_test', name: 'bob', generate: true}});
   assert(!result.isError);
-  const text = result.content[0].text;
-  assert.match(text, /SAVE THIS PRIVATE KEY NOW/);
-  assert.match(text, /shown exactly once/);
-  assert.match(text, /never stored/);
-  assert(text.includes('generated-x25519-private-key'), 'private_key is present in the one-time output');
-  const json = JSON.parse(text.slice(text.indexOf('{')));
-  assert.deepEqual(json.body, {name: 'bob', generate: true});
-  assert.equal(json.private_key, 'generated-x25519-private-key');
+  // The JSON is the first block (so the tool keeps its structuredContent), the
+  // one-time warning the second.
+  const json = JSON.parse(result.content[0].text);
+  const warning = result.content[1].text;
+  assert.match(warning, /SAVE THIS PRIVATE KEY NOW/);
+  assert.match(warning, /shown exactly once/);
+  assert.match(warning, /never stored/);
+  assert.deepEqual(mcp.last().body, {name: 'bob', generate: true});
+  // The private key is in the text once and never in structuredContent or the request log.
+  mcp.secretKept(result, 'private_key', json.private_key);
  }
 
  // revoke → DELETE on the named client, path-escaped.
  {
   const result = await client.callTool({name: 'impreza_onion_auth_revoke', arguments: {deployment_id: 'dpl_test', name: 'alice'}});
   assert(!result.isError);
-  const data = JSON.parse(result.content[0].text);
+  const data = mcp.last();
   assert.equal(data.method, 'DELETE');
   assert.equal(data.path, '/v1/platform/deployments/dpl_test/onion/clients/alice');
  }
  console.log('PASS: onion-auth tools — schema, annotations, exact REST dispatch, one-time private_key warning.');
-} finally { await client.close(); }
+} finally { await mcp.close(); }

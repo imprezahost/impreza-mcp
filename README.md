@@ -268,7 +268,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.46.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.47.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -280,11 +280,13 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 184 tools on both sides**. Two declared, one-direction gaps remain:
+catalog — 196 tools on both sides**. Declared, one-direction gaps remain:
 `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
-requests dedupe), and `impreza_upload_context` stays local-only (binary tarball
-streaming does not fit the hosted transport).
+requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and
+`impreza_get_credential_policy` are hosted-first (locally, the same reads are
+REST calls through `impreza_api_call`); and `impreza_upload_context` stays
+local-only (binary tarball streaming does not fit the hosted transport).
 
 ### New in 0.11.0
 
@@ -729,6 +731,40 @@ installs, imported manifests and external service bindings are unsupported.
 See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
+
+## Account overview, playbooks and safer operations (0.47.0)
+
+Twelve new tools and five prompts:
+
+- **Account overview:** `impreza_get_account_overview` situates an assistant on
+  the account in one read-only call: servers, apps and environments, domains,
+  open alerts, recent deployment failures and the suggested next actions. A
+  credential confined to some resources sees every section filtered to them.
+- **Playbooks as prompts:** `prompts/list` offers five guided procedures:
+  `impreza_publish_git`, `impreza_change_domain`,
+  `impreza_diagnose_deployment`, `impreza_restore_backup` and
+  `impreza_update_agent`. They grant no authority; every step still goes
+  through the tools and their confirmations.
+- **Pause and resume a server's agent:** `impreza_pause_agent` stops new
+  command dispatch and suspends credentials confined to that server;
+  `impreza_resume_agent` brings them back. Work already dispatched may finish.
+  Both need an unrestricted credential with manage scope and `confirm: true`.
+- **Host plans with human approval:** `impreza_host_permissions`,
+  `impreza_prepare_host_plan`, `impreza_get_host_plan` and
+  `impreza_apply_host_plan` prepare a VPS reinstall that a person approves in
+  the dashboard (exact server, template, digest and deadline) before it runs. An
+  AI cannot approve its own plan.
+- **Zero-downtime redeploys:** `impreza_get_zero_downtime` explains whether an
+  app qualifies and every reason why not; `impreza_set_zero_downtime` turns it
+  on for a custom app and sets the readiness check. Needs agent 0.6.27 or later.
+- **Reads:** `impreza_get_shield` (Shield policy and the last 24 hours of WAF
+  findings, no visitor identity), `impreza_privileged_audit` (the admission
+  audit of privileged operations on the account) and
+  `impreza_get_host_inventory` (allowlisted host facts; it needs agent 0.6.28,
+  not yet released, and says so).
+- **Structured output:** read tools declare an `outputSchema` and return
+  `structuredContent`; one-time secrets stay in the text and never in the
+  structured result.
 
 ## Local and hosted parity (0.46.0)
 

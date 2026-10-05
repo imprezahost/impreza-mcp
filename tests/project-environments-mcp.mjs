@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/image-promotions-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_API_KEY:'test-key',IMPREZA_API_SECRET:'test-secret-not-a-real-credential'}});
-const client=new Client({name:'project-environments-test',version:'1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('project-environments-test');const client=mcp.client;
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;
+ await mcp.connect();const tools=(await client.listTools()).tools;
  const project_id='prj_'+'a'.repeat(24),environment_id='env_'+'b'.repeat(24);
  for(const [name,args,method,path,body] of [
   ['impreza_list_projects',{},'GET','/v1/platform/projects',null],
@@ -16,10 +13,14 @@ try {
   ['impreza_detach_environment_service',{environment_id,deployment_id:'dpl_app',confirm:true},'POST','/v1/platform/environments/'+environment_id+'/services/detach',{deployment_id:'dpl_app',confirm:true}],
   ['impreza_list_environment_deploys',{environment_id},'GET','/v1/platform/environments/'+environment_id+'/deploys',null],
  ]) {
-  assert(tools.find(t=>t.name===name));const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const d=JSON.parse(r.content[0].text);assert.equal(d.path,path);assert.equal(d.method,method);assert.deepEqual(d.body,body);
+  assert(tools.find(t=>t.name===name));const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const d=mcp.last();assert.equal(d.path,path);assert.equal(d.method,method);assert.deepEqual(d.body,body);
+  const key=name==='impreza_list_projects'?(args.project_id?'impreza_list_projects:one_project_with_environments':'impreza_list_projects:list'):name==='impreza_list_environment_deploys'?'impreza_list_environment_deploys:staging_batches':null;
+  if(key)assert.deepEqual(r.structuredContent,sample(key));
  }
+ const before=mcp.count();
  for(const args of [{environment_id,deployment_id:'dpl_app',confirm:false},{environment_id:'../other',deployment_id:'dpl_app',confirm:true}])assert((await client.callTool({name:'impreza_detach_environment_service',arguments:args})).isError);
  assert((await client.callTool({name:'impreza_list_environment_deploys',arguments:{environment_id:'../other'}})).isError);
  assert((await client.callTool({name:'impreza_list_environment_deploys',arguments:{environment_id,extra:true}})).isError);
+ assert.equal(mcp.count(),before,'refused calls must make no HTTP request');
  console.log('PASS: project/environment MCP transport and explicit detach confirmation.');
-} finally {await client.close();}
+} finally {await mcp.close();}

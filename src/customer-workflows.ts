@@ -163,7 +163,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_set_alert_rule",
-    "description": "Create or update an alert rule on an application. metric \"down\" fires when the app is not running (threshold is 1); \"restart_loop\" fires when restarts grow past threshold within the window; \"memory_pct\" fires when memory stays above threshold percent of its cgroup limit for the window. duration_minutes (1-60) is the consecutive-minutes window. An open rule fires once and closes with a note when the condition clears. Pass rule_id to update an existing rule. Requires deploy scope.",
+    "description": "Create or update an alert rule on an application. metric \"down\" fires when the app is not running (threshold is 1); \"restart_loop\" fires when restarts grow past threshold within the window; \"memory_pct\" fires when memory stays above threshold percent of its cgroup limit for the window. Shield metrics shield_blocked and shield_rate_limited fire when distinct request counts exceed an integer threshold (1-1000000) across five UTC minute buckets. duration_minutes must be 5 (default 5 for Shield metrics). Evidence contains only counts and window. duration_minutes (1-60) is the consecutive-minutes window for other metrics. An open rule fires once and closes with a note when the condition clears. Pass rule_id to update an existing rule. Requires deploy scope.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -180,7 +180,9 @@ export const CUSTOMER_TOOLS = [
           "enum": [
             "down",
             "restart_loop",
-            "memory_pct"
+            "memory_pct",
+            "shield_blocked",
+            "shield_rate_limited"
           ]
         },
         "threshold": {
@@ -210,6 +212,21 @@ export const CUSTOMER_TOOLS = [
       "openWorldHint": false
     },
     "title": "Set alert rule"
+  },
+  {
+    "name": "impreza_get_account_overview",
+    "description": "One read-only call that situates you on the account: servers (agent, version, state), apps and environments, domains, open alerts, recent deployment failures and the suggested next actions with the exact tool to call. When your credential is confined to specific resources, every section is filtered to them and each affected section carries filtered: showing/of. No metrics, no logs, no write actions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "title": "Get account overview"
   },
   {
     "name": "impreza_prepare_database_restore",
@@ -329,19 +346,23 @@ const validators: Record<string,z.ZodTypeAny> = {"impreza_export_app_config":z.o
 "impreza_apply_config_plan":z.object({"config_plan_id":z.string().regex(new RegExp("^cplan_[a-f0-9]{24}$(?![\\s\\S])")),"review_digest":z.string().regex(new RegExp("^[a-f0-9]{64}$(?![\\s\\S])")),"confirm":z.literal(true)}).strict(),
 "impreza_app_metrics":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])")),"minutes":z.number().finite().int().min(5).max(1440).optional()}).strict(),
 "impreza_list_alerts":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])"))}).strict(),
-"impreza_set_alert_rule":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])")),"rule_id":z.string().regex(new RegExp("^arl_[a-f0-9]{24}$(?![\\s\\S])")).optional(),"metric":z.enum(["down", "restart_loop", "memory_pct"]),"threshold":z.number().finite().int().min(1).max(1000000),"duration_minutes":z.number().finite().int().min(1).max(60).optional(),"enabled":z.boolean().optional()}).strict(),
+"impreza_set_alert_rule":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])")),"rule_id":z.string().regex(new RegExp("^arl_[a-f0-9]{24}$(?![\\s\\S])")).optional(),"metric":z.enum(["down", "restart_loop", "memory_pct", "shield_blocked", "shield_rate_limited"]),"threshold":z.number().finite().int().min(1).max(1000000),"duration_minutes":z.number().finite().int().min(1).max(60).optional(),"enabled":z.boolean().optional()}).strict(),
+"impreza_get_account_overview":z.object({}).strict(),
 "impreza_prepare_database_restore":z.object({"backup_id":z.string().regex(new RegExp("^bkp_[a-f0-9]{16}$(?![\\s\\S])")),"target_binding_id":z.string().regex(new RegExp("^bnd_[a-f0-9]{24}$(?![\\s\\S])")).optional()}).strict(),
 "impreza_get_database_restore":z.object({"restore_plan_id":z.string().regex(new RegExp("^rspl_[a-f0-9]{24}$(?![\\s\\S])"))}).strict(),
 "impreza_apply_database_restore":z.object({"restore_plan_id":z.string().regex(new RegExp("^rspl_[a-f0-9]{24}$(?![\\s\\S])")),"review_digest":z.string().regex(new RegExp("^[a-f0-9]{64}$(?![\\s\\S])")),"confirm":z.literal(true)}).strict(),
 "impreza_download_backup":z.object({"backup_id":z.string().regex(new RegExp("^bkp_[a-f0-9]{16}$(?![\\s\\S])"))}).strict()};
-const routes: Record<string,[string,string]> = {"impreza_export_app_config": ["GET", "/v1/platform/deployments/custom/{deployment_id}/config"], "impreza_prepare_config_apply": ["POST", "/v1/platform/deployments/custom/{deployment_id}/prepare-config-apply"], "impreza_get_config_plan": ["GET", "/v1/platform/config-plans/{config_plan_id}"], "impreza_apply_config_plan": ["POST", "/v1/platform/config-plans/{config_plan_id}/apply"], "impreza_app_metrics": ["GET", "/v1/platform/deployments/custom/{deployment_id}/metrics"], "impreza_list_alerts": ["GET", "/v1/platform/deployments/custom/{deployment_id}/alerts"], "impreza_set_alert_rule": ["POST", "/v1/platform/deployments/custom/{deployment_id}/alert-rules"], "impreza_prepare_database_restore": ["POST", "/v1/backups/{backup_id}/prepare-database-restore"], "impreza_get_database_restore": ["GET", "/v1/database-restores/{restore_plan_id}"], "impreza_apply_database_restore": ["POST", "/v1/database-restores/{restore_plan_id}/apply"], "impreza_download_backup": ["POST", "/v1/backups/{backup_id}/download-link"]};
+const routes: Record<string,[string,string]> = {"impreza_export_app_config": ["GET", "/v1/platform/deployments/custom/{deployment_id}/config"], "impreza_prepare_config_apply": ["POST", "/v1/platform/deployments/custom/{deployment_id}/prepare-config-apply"], "impreza_get_config_plan": ["GET", "/v1/platform/config-plans/{config_plan_id}"], "impreza_apply_config_plan": ["POST", "/v1/platform/config-plans/{config_plan_id}/apply"], "impreza_app_metrics": ["GET", "/v1/platform/deployments/custom/{deployment_id}/metrics"], "impreza_list_alerts": ["GET", "/v1/platform/deployments/custom/{deployment_id}/alerts"], "impreza_set_alert_rule": ["POST", "/v1/platform/deployments/custom/{deployment_id}/alert-rules"], "impreza_get_account_overview": ["GET", "/v1/platform/overview"], "impreza_prepare_database_restore": ["POST", "/v1/backups/{backup_id}/prepare-database-restore"], "impreza_get_database_restore": ["GET", "/v1/database-restores/{restore_plan_id}"], "impreza_apply_database_restore": ["POST", "/v1/database-restores/{restore_plan_id}/apply"], "impreza_download_backup": ["POST", "/v1/backups/{backup_id}/download-link"]};
 export function isCustomerTool(name:string):boolean { return Object.hasOwn(routes,name); }
 export async function callCustomerTool(client:ImprezaClient,name:string,args:Record<string,unknown>):Promise<unknown> {
  const validator=validators[name], route=routes[name];
  if(!validator || !route) throw new Error('Unknown customer workflow');
  const p=validator.parse(args) as Record<string,unknown>;
+ if(name==='impreza_set_alert_rule' && (p.metric==='shield_blocked' || p.metric==='shield_rate_limited') && p.duration_minutes!==undefined && p.duration_minutes!==5) throw new Error('Shield spike duration_minutes must be 5');
  if(name==='impreza_set_alert_rule' && ((p.metric==='down' && p.threshold!==1) || (p.metric==='memory_pct' && Number(p.threshold)>100))) throw new Error('Invalid threshold for metric');
  const [method,template]=route;
  const path=template.replace(/\{([a-z_]+)\}/g,(_:string,key:string)=>{const value=p[key];delete p[key];return encodeURIComponent(String(value));});
- return method==='GET' ? client.get(path,Object.fromEntries(Object.entries(p).map(([k,v])=>[k,String(v)]))) : client.post(path,p);
+ if(method==='GET') return client.get(path,Object.fromEntries(Object.entries(p).map(([k,v])=>[k,String(v)])));
+ if(method==='PUT') return client.put(path,p);
+ return client.post(path,p);
 }

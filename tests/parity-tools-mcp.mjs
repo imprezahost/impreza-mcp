@@ -1,11 +1,8 @@
 // The tools that brought the local package to parity with the hosted MCP:
 // transport contract per tool, the request-free refusals, and the log-tail flow.
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/parity-tools-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_API_KEY:'test-key',IMPREZA_API_SECRET:'test-secret-not-a-real-credential'}});
-const client=new Client({name:'parity-tools-test',version:'1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('parity-tools-test');const client=mcp.client;
 const prj='prj_'+'a'.repeat(24),env='env_'+'b'.repeat(24),edb='edb_'+'c'.repeat(24),cpro='cpro_'+'d'.repeat(24),agt='agt_'+'e'.repeat(16),digest='a'.repeat(64);
 const BROUGHT=[
  ['impreza_get_variable_group',{project_id:prj},'GET','/v1/platform/projects/'+prj+'/vars',null],
@@ -29,12 +26,21 @@ const BROUGHT=[
  ['impreza_set_shield',{deployment_id:'dpl_app',shield_profile:'standard'},'POST','/v1/platform/deployments/dpl_app/shield',{shield_profile:'standard'}],
  ['impreza_set_shield',{deployment_id:'dpl_app',shield_profile:'max',shield_mode:'enforce',confirm_enforce:true},'POST','/v1/platform/deployments/dpl_app/shield',{shield_profile:'max',shield_mode:'enforce',confirm_enforce:true}],
 ];
+// the read tools with an outputSchema answer the real controller shape (validated by the SDK client)
+const SAMPLE={
+ ['/v1/platform/projects/'+prj+'/vars']:'impreza_get_variable_group:project_group',
+ ['/v1/platform/environments/'+env+'/vars']:'impreza_get_variable_group:environment_group',
+ ['/v1/platform/environment-deploys/'+edb]:'impreza_get_environment_deploy:running',
+ ['/v1/platform/config-promotions/'+cpro]:'impreza_get_config_promotion:pending',
+ ['/v1/platform/servers/'+agt+'/update-policy']:'impreza_get_update_policy:stable_never_reported',
+};
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;
+ await mcp.connect();const tools=(await client.listTools()).tools;
  for(const [name,args,method,path,body] of BROUGHT) {
   assert(tools.find(t=>t.name===name),'missing tool '+name);
   const r=await client.callTool({name,arguments:args});assert(!r.isError,name+': '+JSON.stringify(r));
-  const d=JSON.parse(r.content[0].text);assert.equal(d.path,path,name+' path');assert.equal(d.method,method,name+' method');assert.deepEqual(d.body,body,name+' body');
+  const d=mcp.last();assert.equal(d.path,path,name+' path');assert.equal(d.method,method,name+' method');assert.deepEqual(d.body,body,name+' body');
+  if(method==='GET'&&SAMPLE[path])assert.deepEqual(r.structuredContent,sample(SAMPLE[path]),name+' structured answer');
  }
  // the local-only upload stays (set parity with the hosted connector is the private checker's)
  assert(tools.find(t=>t.name==='impreza_upload_context'),'local-only upload tool missing');
@@ -60,10 +66,10 @@ try {
   ['impreza_set_shield',{deployment_id:'dpl_app',shield_profile:'standard',surprise:1}],
  ]) assert((await client.callTool({name,arguments:args})).isError,name+' accepted '+JSON.stringify(args));
  // a refused confirm never leaves the process
- let g=await client.callTool({name:'impreza_get_update_policy',arguments:{agent_id:agt}});const c0=JSON.parse(g.content[0].text).request_count;
+ let g=await client.callTool({name:'impreza_get_update_policy',arguments:{agent_id:agt}});assert(!g.isError,JSON.stringify(g));const c0=mcp.count();
  await client.callTool({name:'impreza_request_agent_update',arguments:{agent_id:agt,confirm:false}});
  await client.callTool({name:'impreza_apply_config_promotion',arguments:{promotion_id:cpro,review_digest:digest,confirm:false}});
- g=await client.callTool({name:'impreza_get_update_policy',arguments:{agent_id:agt}});const c1=JSON.parse(g.content[0].text).request_count;
+ g=await client.callTool({name:'impreza_get_update_policy',arguments:{agent_id:agt}});assert(!g.isError,JSON.stringify(g));const c1=mcp.count();
  assert.equal(c1,c0+1,'a refused confirm still made a request');
  console.log('PASS: parity tools transport, log-tail flow, and negative validations.');
-} finally {await client.close();}
+} finally {await mcp.close();}

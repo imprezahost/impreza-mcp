@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/image-promotions-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_API_KEY:'test-key',IMPREZA_API_SECRET:'test-secret-not-a-real-credential'}});
-const client=new Client({name:'binding-review-test',version:'1.0.0'});
+import {loggedClient,sample} from './fixtures/request-log.mjs';
+const mcp=loggedClient('binding-review-test');const client=mcp.client;
 try {
- await client.connect(transport);const tools=(await client.listTools()).tools;
+ await mcp.connect();const tools=(await client.listTools()).tools;
  const deployment_id='dpl_'+'a'.repeat(16),provider_deployment_id='dpl_'+'b'.repeat(16),binding_plan_id='bplan_'+'c'.repeat(24),review_digest='d'.repeat(64),binding_id='bnd_'+'e'.repeat(24);
  for(const [name,args,method,path,body] of [
   ['impreza_prepare_service_binding',{deployment_id,provider_deployment_id},'POST','/v1/platform/deployments/custom/'+deployment_id+'/prepare-binding',{provider_deployment_id}],
@@ -16,7 +13,8 @@ try {
   ['impreza_apply_service_binding_plan',{binding_plan_id,review_digest,confirm:true},'POST','/v1/platform/binding-plans/'+binding_plan_id+'/apply',{review_digest,confirm:true}],
  ]) {
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
-  const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const data=JSON.parse(r.content[0].text);assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);
+  const r=await client.callTool({name,arguments:args});assert(!r.isError,JSON.stringify(r));const data=mcp.last();assert.equal(data.method,method);assert.equal(data.path,path);assert.deepEqual(data.body,body);
+  if(name==='impreza_get_service_binding_plan')assert.deepEqual(r.structuredContent,sample('impreza_get_service_binding_plan:rotate'));
  }
  const apply=tools.find(t=>t.name==='impreza_apply_service_binding_plan');
  assert.match(apply.description,/creation, credential rotation or removal/);
@@ -38,6 +36,6 @@ try {
   {deployment_id,binding_id:'../other',mode:'rotate'},
   {deployment_id:'../other',binding_id,mode:'rotate'},
  ]) assert((await client.callTool({name:'impreza_prepare_service_binding_rotation',arguments:args})).isError,JSON.stringify(args));
- const final=await client.callTool({name:'impreza_get_service_binding_plan',arguments:{binding_plan_id}});assert.equal(JSON.parse(final.content[0].text).request_count,7,'invalid confirmation/identity/mode must not call upstream');
+ const final=await client.callTool({name:'impreza_get_service_binding_plan',arguments:{binding_plan_id}});assert(!final.isError,JSON.stringify(final));assert.equal(mcp.count(),7,'invalid confirmation/identity/mode must not call upstream');
  console.log('PASS: binding review tools preserve exact routes/digests and refuse invalid confirmation without upstream calls.');
-} finally {await client.close();}
+} finally {await mcp.close();}

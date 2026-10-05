@@ -1,0 +1,3026 @@
+{
+  "impreza_add_onion:queue_onion_mirror": {
+    "command_id": "cmd_ca0b0fb69a9b86a5",
+    "deployment": {
+      "agent_id": "agt_f18b2o0000000000000001",
+      "app_name": "f18b2-onion",
+      "app_version": "1.0.0",
+      "connection_info": null,
+      "created_at": "2026-09-10T10:00:00Z",
+      "domain": "addh.fixture.invalid",
+      "id": "dpl_6f00000000000001",
+      "last_error": null,
+      "last_health_at": null,
+      "last_operation": null,
+      "network_mode": "http",
+      "onion": null,
+      "onion_exported_at": null,
+      "onion_profile": "hardened",
+      "runtime": {
+        "age_seconds": null,
+        "counts": null,
+        "fresh_for_seconds": 120,
+        "last_reported_state": null,
+        "observed_at": null,
+        "reason": "agent_offline",
+        "scope": "containers",
+        "state": "unknown"
+      },
+      "signup_window": null,
+      "status": "running",
+      "vars": []
+    },
+    "note": "Onion provisioning enqueued. The .onion address appears on the deployment within ~30-60s."
+  },
+  "impreza_app_metrics:default_window": {
+    "deployment_id": "dpl_1a00000000000011",
+    "last_point_at": "2026-10-02T09:23:00Z",
+    "points": [
+      {
+        "cpu_pct": 12.5,
+        "memory_bytes": 104857600,
+        "memory_limit_bytes": 805306368,
+        "minute": "2026-10-02T09:22:00Z",
+        "resolution": "minute",
+        "restart_count": 0,
+        "state": "running",
+        "volume_bytes": 2097152
+      },
+      {
+        "cpu_pct": 3,
+        "memory_bytes": 104857600,
+        "memory_limit_bytes": 805306368,
+        "minute": "2026-10-02T09:23:00Z",
+        "resolution": "minute",
+        "restart_count": 1,
+        "state": "running",
+        "volume_bytes": 2097152
+      }
+    ],
+    "resolution": "minute",
+    "retention_days_hourly": 90,
+    "retention_hours": 24,
+    "state": "running"
+  },
+  "impreza_apply_config_promotion:accepted_replay": {
+    "receipt": {
+      "accepted_at": "2026-10-01T10:05:00+00:00",
+      "components_updated": [
+        "web"
+      ],
+      "promotion_id": "cpro_8b0000000000000000000001",
+      "source_environment_id": "env_8b0000000000000000000011",
+      "status": "accepted",
+      "takes_effect": "on the next deploy of each component",
+      "target_environment_id": "env_8b0000000000000000000012",
+      "target_group_id": "evg_8b0000000000000000000101"
+    },
+    "replayed": true
+  },
+  "impreza_apply_database_restore:replay_accepted_review": {
+    "receipt": {
+      "accepted_at": "2026-09-30T10:05:00+00:00",
+      "backup_id": "bkp_7a00000000000001",
+      "command_id": "cmd_7a0000000000000000000001",
+      "job_deployment_id": "rstjob_7a00000000000001",
+      "plan_id": "rspl_7a0000000000000000000001",
+      "restore": "not_yet_verified",
+      "restore_database": "imp_restore_7a00000000000001",
+      "status": "accepted",
+      "transport_id": "bkp_7a000000000000a1"
+    },
+    "replayed": true
+  },
+  "impreza_apply_image_promotion:accepted_replay": {
+    "receipt": {
+      "accepted_at": "2026-10-01T10:05:00+00:00",
+      "command_id": "cmd_8b0000000000000000000101",
+      "deployment_id": "dpl_8b00000000000016",
+      "image": "registry.fixture.invalid/b4/web@sha256:b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8",
+      "promotion_id": "prom_8b0000000000000000000001",
+      "status": "accepted"
+    },
+    "replayed": true
+  },
+  "impreza_apply_pitr_restore:replay_accepted_review": {
+    "receipt": {
+      "accepted_at": "2026-09-30T12:05:00+00:00",
+      "agent_id": "agt_f18b37a000000000000001",
+      "binding_id": "bnd_7a0000000000000000000001",
+      "binding_revision": "f03f8332cbabb847edd753be5597ff8757b0a8c26d424622f165b100c0ab35e1",
+      "command_id": "cmd_7a0000000000000000000011",
+      "config_id": "pcfg_7a0000000000000000000002",
+      "consumer_deployment_id": "dpl_7a00000000000001",
+      "phase": "recovering",
+      "plan_id": "ppl_7a0000000000000000000001",
+      "provider_deployment_id": "dpl_7a00000000000002",
+      "provider_version": "16",
+      "recovery": "not_yet_verified",
+      "restore_database": "imp_restore_7a00000000000011",
+      "status": "accepted",
+      "storage_bucket": "b3-fixture-bucket",
+      "storage_prefix": "impreza/dpl_7a00000000000002/pitr/pcfg_7a0000000000000000000002/g_7a00000000000002",
+      "storage_service_id": 501,
+      "target_time": "2026-09-30T11:30:00Z"
+    },
+    "replayed": true
+  },
+  "impreza_apply_project_deployment:accepted_replay": {
+    "receipt": {
+      "accepted_at": "2026-10-01T10:05:00+00:00",
+      "command_id": "cmd_8b0000000000000000000401",
+      "configuration_digest": "7668d880b1bcacbf5dea605072bce99d94e7215f507b311cc98ae10ca54482c6",
+      "deployment_id": "dpl_8b00000000000071",
+      "execution_id": "pdep_8b0000000000000000000001",
+      "status": "accepted"
+    },
+    "replayed": true
+  },
+  "impreza_apply_service_binding_plan:accepted_replay": {
+    "receipt": {
+      "accepted_at": "2026-10-01T10:05:00+00:00",
+      "binding_id": "bnd_8b0000000000000000000011",
+      "command_id": "cmd_8b0000000000000000000201",
+      "connectivity": "not_yet_verified",
+      "deployment_id": "dpl_8b00000000000061",
+      "plan_id": "bplan_8b0000000000000000000001",
+      "status": "accepted"
+    },
+    "replayed": true
+  },
+  "impreza_attach_environment_service:attached": {
+    "component": "web-h",
+    "deployment_id": "dpl_8b00000000000001",
+    "environment_id": "env_8b0000000000000000000005",
+    "project_id": "prj_8b0000000000000000000001",
+    "replayed": false,
+    "role": "web"
+  },
+  "impreza_compare_environments:staging_vs_production": {
+    "environment_a": {
+      "environment_id": "env_2b0000000000000000000001",
+      "name": "staging"
+    },
+    "environment_b": {
+      "environment_id": "env_2b0000000000000000000002",
+      "name": "production"
+    },
+    "only_in_a": [
+      {
+        "component": "db",
+        "deployment_id": "dpl_2b00000000000002",
+        "kind": "catalog",
+        "role": "database",
+        "status": "running"
+      },
+      {
+        "component": "worker",
+        "deployment_id": "dpl_2b00000000000005",
+        "kind": "custom",
+        "role": "worker",
+        "status": "running"
+      }
+    ],
+    "only_in_b": [
+      {
+        "component": "cache",
+        "deployment_id": "dpl_2b00000000000004",
+        "kind": "catalog",
+        "role": "cache",
+        "status": "running"
+      }
+    ],
+    "paired": [
+      {
+        "a": {
+          "component": "web",
+          "deployment_id": "dpl_2b00000000000001",
+          "kind": "custom",
+          "role": "web",
+          "status": "running"
+        },
+        "b": {
+          "component": "web",
+          "deployment_id": "dpl_2b00000000000003",
+          "kind": "custom",
+          "role": "web",
+          "status": "running"
+        },
+        "binding": {
+          "a": null,
+          "b": null
+        },
+        "component": "web",
+        "source": {
+          "a": {
+            "image": "registry.fixture.invalid/g2/web@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "kind": "custom",
+            "mode": "image"
+          },
+          "b": {
+            "git_ref": "main",
+            "git_url": "https://git.fixture.invalid/g2/shop.git",
+            "kind": "custom",
+            "mode": "dockerfile"
+          },
+          "diverges": true
+        },
+        "variables": {
+          "different": [
+            "APP_MODE"
+          ],
+          "only_in_a": [
+            "API_TOKEN"
+          ],
+          "only_in_b": [],
+          "same": [
+            "LOG_LEVEL"
+          ]
+        }
+      }
+    ],
+    "pairing": "component",
+    "project_id": "prj_2b0000000000000000000001"
+  },
+  "impreza_configure_pitr:disable_active": {
+    "provider_deployment_id": "dpl_7a00000000000003",
+    "state": "disabling",
+    "updated": true
+  },
+  "impreza_create_environment:created": {
+    "environment_id": "env_f598e29f7f7e02b8d1ec97c7",
+    "name": "b4-env-h",
+    "replayed": false
+  },
+  "impreza_create_preview:private_given_keys": {
+    "note": "preview created for feature-b5e — private (client authorization required from first publication)",
+    "ok": true,
+    "preview": {
+      "branch": "feature-b5e",
+      "created_at": "2026-10-02T08:41:31Z",
+      "expires_at": "2026-10-03T11:41:31Z",
+      "git_credential_source": null,
+      "id": "dpl_4ccb84360bd6466a",
+      "name": "b5e-pvp-keys-h-pr-feature-b5e-475f2cbc",
+      "onion": null,
+      "preview_of": "dpl_5e00000000000043",
+      "protected": false,
+      "status": "pending",
+      "url": null,
+      "warning": null
+    }
+  },
+  "impreza_create_preview:private_minted_key": {
+    "note": "preview created for feature-b5e — private (client authorization required from first publication)",
+    "ok": true,
+    "preview": {
+      "branch": "feature-b5e",
+      "created_at": "2026-10-02T08:41:31Z",
+      "expires_at": "2026-10-03T11:41:31Z",
+      "git_credential_source": null,
+      "id": "dpl_eb589d069ea98e47",
+      "name": "b5e-pvp-mint-h-pr-feature-b5e-475f2cbc",
+      "onion": null,
+      "preview_of": "dpl_5e00000000000041",
+      "protected": false,
+      "status": "pending",
+      "url": null,
+      "warning": null
+    },
+    "reviewer_note": "Shown only in this response — never stored, never shown again. After deployment, prefix this value with the 56-character service address (without .onion) and a colon. Save the resulting <service-id>:descriptor:x25519:<key> as reviewer.auth_private under your Tor ClientOnionAuthDir."
+  },
+  "impreza_create_project:created": {
+    "name": "b4-new-h",
+    "project_id": "prj_dc903851b0482bdfdcaf20a5",
+    "replayed": false
+  },
+  "impreza_delete_environment:deleted": {
+    "deleted": true,
+    "environment_id": "env_8b0000000000000000000003"
+  },
+  "impreza_delete_project:deleted": {
+    "deleted": true,
+    "project_id": "prj_8b0000000000000000000004"
+  },
+  "impreza_deploy_catalog_app:generated_credentials": {
+    "agent_id": "agt_f18b5e0000000000000001",
+    "app_name": "f18b5e-creds",
+    "app_version": "1.0.0",
+    "connection_info": null,
+    "created_at": "2026-10-02T08:41:31Z",
+    "credentials_note": "Shown once, at creation only — store them now. Later reads (impreza_list_deployments / GET) mask these and cannot recover them.",
+    "domain": null,
+    "id": "dpl_c4d1f036688827e7",
+    "last_error": null,
+    "last_health_at": null,
+    "last_operation": {
+      "cancellation": {
+        "can_cancel": true,
+        "confirmed_at": null,
+        "phase": "queued",
+        "reason": null,
+        "requested_at": null,
+        "state": "none"
+      },
+      "command_id": "cmd_989857f97150cc56",
+      "completed_at": null,
+      "created_at": "2026-10-02T08:41:31Z",
+      "kind": "deploy",
+      "progress": {
+        "age_seconds": null,
+        "label": "Waiting for agent",
+        "reason": null,
+        "recovery": "none",
+        "reported_at": null,
+        "step": "queued",
+        "supported": false
+      },
+      "status": "pending"
+    },
+    "network_mode": "http",
+    "onion": null,
+    "onion_exported_at": null,
+    "onion_profile": "standard",
+    "runtime": {
+      "age_seconds": null,
+      "counts": null,
+      "fresh_for_seconds": 120,
+      "last_reported_state": null,
+      "observed_at": null,
+      "reason": "agent_offline",
+      "scope": "containers",
+      "state": "unknown"
+    },
+    "signup_window": null,
+    "status": "pending",
+    "vars": {
+      "ADMIN_PASSWORD": "********",
+      "ADMIN_USER": "b5eadm",
+      "DEPLOYMENT_ID": "dpl_c4d1f036688827e7",
+      "DOMAIN_URL": "http://localhost:20000",
+      "HOST_PORT": "20000",
+      "PUBLIC_IP": "192.0.2.51"
+    }
+  },
+  "impreza_deploy_custom:git_dockerfile": {
+    "agent_id": "agt_f18b5e0000000000000001",
+    "build_secret_names": [],
+    "build_strategy": "dockerfile",
+    "context_id": "",
+    "cpus": 1,
+    "created_at": "2026-10-02T08:41:32Z",
+    "domain": "b5e-git-h.fixture.invalid",
+    "git_auth": {
+      "fingerprint": null,
+      "method": "none",
+      "public_key": null
+    },
+    "git_ref": "main",
+    "git_url": "https://git.fixture.invalid/b1/web.git",
+    "go_package": null,
+    "healthcheck_path": null,
+    "id": "dpl_7d0d1add458e90af",
+    "image": "",
+    "last_error": null,
+    "last_health_at": null,
+    "last_operation": {
+      "cancellation": {
+        "can_cancel": true,
+        "confirmed_at": null,
+        "phase": "queued",
+        "reason": null,
+        "requested_at": null,
+        "state": "none"
+      },
+      "command_id": "cmd_73026673b13d76a0",
+      "completed_at": null,
+      "created_at": "2026-10-02T08:41:32Z",
+      "kind": "deploy",
+      "progress": {
+        "age_seconds": null,
+        "label": "Waiting for agent",
+        "reason": null,
+        "recovery": "none",
+        "reported_at": null,
+        "step": "queued",
+        "supported": false
+      },
+      "status": "pending"
+    },
+    "memory_mb": 512,
+    "mode": "dockerfile",
+    "name": "b5e-git-h",
+    "node_package_manager": null,
+    "npm_workspace": null,
+    "onion": null,
+    "onion_exported_at": null,
+    "onion_profile": "standard",
+    "php_document_root": null,
+    "project_dir": null,
+    "project_plan": null,
+    "proxy_metrics": null,
+    "public_build_vars": null,
+    "python_package_manager": null,
+    "runtime": {
+      "age_seconds": null,
+      "counts": null,
+      "fresh_for_seconds": 120,
+      "last_reported_state": null,
+      "observed_at": null,
+      "reason": "agent_offline",
+      "scope": "containers",
+      "state": "unknown"
+    },
+    "service_binding": null,
+    "shield": {
+      "mode": "audit",
+      "profile": "off"
+    },
+    "source_artifact": null,
+    "start_command": null,
+    "startup_health": {
+      "require_healthy_start": false,
+      "startup_timeout_seconds": null
+    },
+    "static_options": null,
+    "static_spa": null,
+    "status": "pending",
+    "tor_egress": false,
+    "vars": {
+      "CPUS": "1",
+      "DEPLOYMENT_ID": "dpl_7d0d1add458e90af",
+      "DOMAIN": "b5e-git-h.fixture.invalid",
+      "DOMAIN_URL": "https://b5e-git-h.fixture.invalid",
+      "HOST_PORT": "20003",
+      "MEMORY_MB": "512",
+      "TARGET_PORT": "80"
+    },
+    "zero_downtime": null
+  },
+  "impreza_deploy_custom:image_onion_only": {
+    "agent_id": "agt_f18b5e0000000000000001",
+    "build_secret_names": [],
+    "build_strategy": null,
+    "context_id": "",
+    "cpus": 1,
+    "created_at": "2026-10-02T08:41:32Z",
+    "domain": null,
+    "git_auth": {
+      "fingerprint": null,
+      "method": "none",
+      "public_key": null
+    },
+    "git_ref": "",
+    "git_url": "",
+    "go_package": null,
+    "healthcheck_path": null,
+    "id": "dpl_c340bc190f777f57",
+    "image": "registry.fixture.invalid/b1/app:2",
+    "last_error": null,
+    "last_health_at": null,
+    "last_operation": {
+      "cancellation": {
+        "can_cancel": true,
+        "confirmed_at": null,
+        "phase": "queued",
+        "reason": null,
+        "requested_at": null,
+        "state": "none"
+      },
+      "command_id": "cmd_43d48b16a034baf3",
+      "completed_at": null,
+      "created_at": "2026-10-02T08:41:32Z",
+      "kind": "deploy",
+      "progress": {
+        "age_seconds": null,
+        "label": "Waiting for agent",
+        "reason": null,
+        "recovery": "none",
+        "reported_at": null,
+        "step": "queued",
+        "supported": false
+      },
+      "status": "pending"
+    },
+    "memory_mb": 512,
+    "mode": "image",
+    "name": "b5e-img-h",
+    "node_package_manager": null,
+    "npm_workspace": null,
+    "onion": null,
+    "onion_exported_at": null,
+    "onion_profile": "standard",
+    "php_document_root": null,
+    "project_dir": null,
+    "project_plan": null,
+    "proxy_metrics": null,
+    "public_build_vars": null,
+    "python_package_manager": null,
+    "runtime": {
+      "age_seconds": null,
+      "counts": null,
+      "fresh_for_seconds": 120,
+      "last_reported_state": null,
+      "observed_at": null,
+      "reason": "agent_offline",
+      "scope": "containers",
+      "state": "unknown"
+    },
+    "service_binding": null,
+    "shield": {
+      "mode": "audit",
+      "profile": "off"
+    },
+    "source_artifact": null,
+    "start_command": null,
+    "startup_health": {
+      "require_healthy_start": false,
+      "startup_timeout_seconds": null
+    },
+    "static_options": null,
+    "static_spa": null,
+    "status": "pending",
+    "tor_egress": false,
+    "vars": {
+      "API_TOKEN": "********",
+      "CPUS": "1",
+      "DEPLOYMENT_ID": "dpl_c340bc190f777f57",
+      "DOMAIN_URL": "http://localhost:20002",
+      "HOST_PORT": "20002",
+      "MEMORY_MB": "512",
+      "SITE_NAME": "B1",
+      "TARGET_PORT": "80"
+    },
+    "zero_downtime": null
+  },
+  "impreza_deploy_environment:started": {
+    "batch_id": "edb_e04c474e9c3a8248d1d62f45",
+    "created_at": "2026-10-02T08:41:32Z",
+    "cursor": 0,
+    "environment_id": "env_8b0000000000000000000009",
+    "error": null,
+    "finished_at": null,
+    "note": "Stages run in role order (database → cache → worker → web), each gated on the previous stage reporting a healthy start. A failed stage fails the batch; earlier stages stay deployed.",
+    "project_id": "prj_8b0000000000000000000001",
+    "replayed": false,
+    "require_healthy": true,
+    "stages": [
+      {
+        "command_id": "cmd_17a0e4754c1b3c97",
+        "component": "web",
+        "deployment_id": "dpl_8b00000000000005",
+        "role": "web",
+        "startup_gate": "requested",
+        "status": "queued"
+      }
+    ],
+    "status": "running"
+  },
+  "impreza_deploy_project_plan:deploy_static": {
+    "agent_id": "agt_8b0000000000000000000001",
+    "build_secret_names": [],
+    "build_strategy": "static_files",
+    "context_id": "ctx_8b0000000000000000000001",
+    "cpus": 1,
+    "created_at": "2026-10-02T08:41:32Z",
+    "domain": null,
+    "git_auth": {
+      "fingerprint": null,
+      "method": "none",
+      "public_key": null
+    },
+    "git_ref": "",
+    "git_url": "",
+    "go_package": null,
+    "healthcheck_path": null,
+    "id": "dpl_e044ff1878ed51c6",
+    "image": "",
+    "last_error": null,
+    "last_health_at": null,
+    "last_operation": {
+      "cancellation": {
+        "can_cancel": true,
+        "confirmed_at": null,
+        "phase": "queued",
+        "reason": null,
+        "requested_at": null,
+        "state": "none"
+      },
+      "command_id": "cmd_40686f4d9a6129e0",
+      "completed_at": null,
+      "created_at": "2026-10-02T08:41:32Z",
+      "kind": "deploy",
+      "progress": {
+        "age_seconds": null,
+        "label": "Waiting for agent",
+        "reason": null,
+        "recovery": "none",
+        "reported_at": null,
+        "step": "queued",
+        "supported": false
+      },
+      "status": "pending"
+    },
+    "memory_mb": 512,
+    "mode": "dockerfile",
+    "name": "b4-planned-h",
+    "node_package_manager": null,
+    "npm_workspace": null,
+    "onion": null,
+    "onion_exported_at": null,
+    "onion_profile": "standard",
+    "php_document_root": null,
+    "project_dir": ".",
+    "project_plan": {
+      "inspection_revision": "fad1b36a945e819977c5cf2fe97319d670a8b694bd877028945ccd8f4be54f83",
+      "option_index": 0,
+      "plan_id": "plan_8b0000000000000000000001",
+      "source_sha256": "532fdc703ce959250b737e227cdff6c3b37b0ff3e2b834e74ca95203686dc007"
+    },
+    "proxy_metrics": null,
+    "public_build_vars": null,
+    "python_package_manager": null,
+    "runtime": {
+      "age_seconds": null,
+      "counts": null,
+      "fresh_for_seconds": 120,
+      "last_reported_state": null,
+      "observed_at": null,
+      "reason": "not_reported",
+      "scope": "containers",
+      "state": "unknown"
+    },
+    "service_binding": null,
+    "shield": {
+      "mode": "audit",
+      "profile": "off"
+    },
+    "source_artifact": {
+      "context_id": "ctx_8b0000000000000000000001",
+      "retained": true,
+      "sha256": "532fdc703ce959250b737e227cdff6c3b37b0ff3e2b834e74ca95203686dc007",
+      "size_bytes": 151
+    },
+    "start_command": null,
+    "startup_health": {
+      "require_healthy_start": false,
+      "startup_timeout_seconds": null
+    },
+    "static_options": null,
+    "static_spa": false,
+    "status": "pending",
+    "tor_egress": false,
+    "vars": {
+      "CPUS": "1",
+      "DEPLOYMENT_ID": "dpl_e044ff1878ed51c6",
+      "DOMAIN_URL": "http://localhost:20000",
+      "HOST_PORT": "20000",
+      "MEMORY_MB": "512",
+      "TARGET_PORT": "8080"
+    },
+    "zero_downtime": null
+  },
+  "impreza_detach_environment_service:detached": {
+    "deployment_id": "dpl_8b00000000000003",
+    "detached": true,
+    "replayed": false
+  },
+  "impreza_export_app_config:git_app": {
+    "deployment_id": "dpl_1a00000000000011",
+    "document": {
+      "bindings": [
+        {
+          "binding_id": "bnd_1a0000000000000001",
+          "provider_deployment_id": "dpl_1a00000000000012",
+          "variable": "DATABASE_URL"
+        }
+      ],
+      "domain": "web.fixture.invalid",
+      "name": "g1-web",
+      "resources": {
+        "cpus": 1.5,
+        "memory_mb": 768
+      },
+      "schema": "impreza.app.v1",
+      "source": {
+        "git": {
+          "ref": "main",
+          "url": "https://git.fixture.invalid/g1/web.git"
+        }
+      },
+      "vars": {
+        "API_TOKEN": {
+          "secret": true
+        },
+        "DATABASE_URL": {
+          "secret": true
+        },
+        "SITE_NAME": "Fixture"
+      }
+    },
+    "document_text": "{\n    \"schema\": \"impreza.app.v1\",\n    \"name\": \"g1-web\",\n    \"source\": {\n        \"git\": {\n            \"url\": \"https://git.fixture.invalid/g1/web.git\",\n            \"ref\": \"main\"\n        }\n    },\n    \"vars\": {\n        \"API_TOKEN\": {\n            \"secret\": true\n        },\n        \"DATABASE_URL\": {\n            \"secret\": true\n        },\n        \"SITE_NAME\": \"Fixture\"\n    },\n    \"resources\": {\n        \"cpus\": 1.5,\n        \"memory_mb\": 768\n    },\n    \"domain\": \"web.fixture.invalid\",\n    \"bindings\": [\n        {\n            \"binding_id\": \"bnd_1a0000000000000001\",\n            \"variable\": \"DATABASE_URL\",\n            \"provider_deployment_id\": \"dpl_1a00000000000012\"\n        }\n    ]\n}\n",
+    "exported_at": "2026-10-02T09:25:11+00:00",
+    "name": "g1-web",
+    "schema": "impreza.app.v1",
+    "secrets": "references_only"
+  },
+  "impreza_export_onion_key:queue_export_after_confirmation": {
+    "command_id": "cmd_52beef6b6e0fc17d",
+    "note": "Export queued. The agent seals the key to your recipient key; retrieve the sealed blob once via GET .../onion/export/cmd_52beef6b6e0fc17d after it completes."
+  },
+  "impreza_fetch_onion_key_export:read_sealed_once": {
+    "command_id": "cmd_6f0000000000000000000001",
+    "note": "Shown once — this read removed the blob from the platform. Unseal it locally with the recipient private key.",
+    "onion": "sixfsharedhaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion"
+  },
+  "impreza_get_config_plan:pending": {
+    "changes": [
+      "vars: LOG_LEVEL changed",
+      "resources: 1.00 CPU / 512 MB -> 2 CPU / 1024 MB"
+    ],
+    "deployment_id": "dpl_2b00000000000001",
+    "diff_text": "vars: LOG_LEVEL changed\nresources: 1.00 CPU / 512 MB -> 2 CPU / 1024 MB\nvars: API_TOKEN kept (secret, value stays server-side)\nsource: image registry.fixture.invalid/g2/web@sha256:1111111111111111111111111111111111111111111111111111111111111111 (unchanged)",
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "may_interrupt_traffic": true,
+    "name": "g2-web-staging",
+    "no_changes": false,
+    "operation": "config_apply",
+    "plan_id": "cplan_2b0000000000000000000001",
+    "preserves_data": true,
+    "receipt": null,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "secrets": "references_resolved_server_side",
+    "status": "stale"
+  },
+  "impreza_get_config_promotion:pending": {
+    "components": [
+      {
+        "component": "web",
+        "deployment_id": "dpl_2b00000000000003",
+        "kept_on_target": [],
+        "role": "web",
+        "variables": {
+          "different": [
+            "APP_MODE"
+          ],
+          "only_in_source": [
+            "API_TOKEN"
+          ],
+          "only_in_target": [],
+          "same": [
+            "LOG_LEVEL"
+          ]
+        }
+      }
+    ],
+    "copies_secret_values": "inside the sealed review only; re-sealed under the target on apply, never returned",
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "group_variables": {
+      "different": [],
+      "only_in_source": [
+        "FEATURE_FLAG"
+      ],
+      "only_in_target": [],
+      "same": []
+    },
+    "operation": "promote_configuration",
+    "promotion_id": "cpro_2b0000000000000000000001",
+    "receipt": null,
+    "replaces_target_user_variables": true,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "source_environment_id": "env_2b0000000000000000000001",
+    "source_environment_name": "staging",
+    "status": "stale",
+    "takes_effect": "on the next deploy of each component — nothing running is restarted by this apply",
+    "target_environment_id": "env_2b0000000000000000000002",
+    "target_environment_name": "production",
+    "unpaired_components": {
+      "only_in_source": [
+        "db",
+        "worker"
+      ],
+      "only_in_target": [
+        "cache"
+      ]
+    }
+  },
+  "impreza_get_database_restore:pending": {
+    "cutover": "none — the restore lands in a new database; switching the application to it is a separate, deliberate step",
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "operation": "database_restore",
+    "plan_id": "rspl_2b0000000000000000000001",
+    "receipt": null,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "source_backup": {
+      "backup_id": "bkp_2b00000000000001",
+      "created_at": "2026-09-30 09:00:00",
+      "tables": 12,
+      "total_bytes": 10485760
+    },
+    "source_deployment_id": "dpl_2b00000000000001",
+    "status": "stale",
+    "target": {
+      "binding_id": "bnd_2b0000000000000000000001",
+      "database": "imp_restore_2b00000000000001",
+      "owner": "ibo_2b0000000000000000000001",
+      "provider_deployment_id": "dpl_2b00000000000002"
+    }
+  },
+  "impreza_get_environment_deploy:running": {
+    "batch_id": "edb_2b0000000000000000000003",
+    "created_at": "2026-10-01T10:00:00Z",
+    "cursor": 0,
+    "environment_id": "env_2b0000000000000000000001",
+    "error": null,
+    "finished_at": null,
+    "note": "Stages run in role order (database → cache → worker → web), each gated on the previous stage reporting a healthy start. A failed stage fails the batch; earlier stages stay deployed.",
+    "project_id": "prj_2b0000000000000000000001",
+    "require_healthy": true,
+    "stages": [
+      {
+        "command_id": "cmd_2b0000000000000000000005",
+        "component": "db",
+        "deployment_id": "dpl_2b00000000000002",
+        "role": "database",
+        "startup_gate": "requested",
+        "status": "queued"
+      },
+      {
+        "command_id": null,
+        "component": "web",
+        "deployment_id": "dpl_2b00000000000001",
+        "role": "web",
+        "startup_gate": "requested",
+        "status": "waiting"
+      }
+    ],
+    "status": "running"
+  },
+  "impreza_get_image_promotion:pending_with_domain": {
+    "copies_source_variables": false,
+    "evidence": "recorded_success_not_live_health",
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "image": "registry.fixture.invalid/g2/web@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "may_interrupt_traffic": true,
+    "previous_image": "registry.fixture.invalid/g2/web@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "promotion_id": "prom_2b0000000000000000000001",
+    "receipt": null,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "source_command_id": "cmd_2b0000000000000000000031",
+    "source_deployment_id": "dpl_2b00000000000005",
+    "status": "stale",
+    "target_agent_id": "agt_f18byo0000000000000001",
+    "target_cpus": 1.5,
+    "target_deployment_id": "dpl_2b00000000000001",
+    "target_domain": "shop-staging.fixture.invalid",
+    "target_memory_mb": 512,
+    "target_variable_names": [
+      "API_TOKEN",
+      "APP_MODE",
+      "LOG_LEVEL"
+    ]
+  },
+  "impreza_get_pitr_restore:pending": {
+    "base": {
+      "created_at": "2026-09-30 00:00:00",
+      "id": "base_2b0000000001",
+      "start_segment": "000000010000000000000003"
+    },
+    "cutover": "none — the recovery lands in a new database; switching the application to it is a separate, deliberate step",
+    "database_provider": {
+      "database": "imp_2b0000000000000000000001",
+      "deployment_id": "dpl_2b00000000000002"
+    },
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "last_drain_at": "2026-09-30 11:55:00",
+    "operation": "pitr_restore",
+    "phases": "recover to the instant in a scratch cluster, then a verified logical restore into the new database",
+    "plan_id": "ppl_2b0000000000000000000001",
+    "receipt": null,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "status": "stale",
+    "target": {
+      "binding_id": "bnd_2b0000000000000000000001",
+      "consumer_deployment_id": "dpl_2b00000000000001",
+      "restore_database": "imp_restore_2b00000000000011"
+    },
+    "target_time": "2026-09-30T11:30:00Z",
+    "wal_segments_available": 7
+  },
+  "impreza_get_service_binding_plan:rotate": {
+    "binding_id": "bnd_2b0000000000000000000001",
+    "cleanup_only": false,
+    "consumer_deployment_id": "dpl_2b00000000000001",
+    "consumer_name": "g2-web-staging",
+    "credential_delivery": "agent_only",
+    "database_data_retained": true,
+    "environment_id": "env_2b0000000000000000000001",
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "may_interrupt_traffic": true,
+    "operation": "rotate",
+    "plan_id": "bplan_2b0000000000000000000003",
+    "provider_deployment_id": "dpl_2b00000000000002",
+    "provider_engine": "postgres",
+    "receipt": null,
+    "require_healthy_start": true,
+    "retry": false,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "rotation_id": "brot_2b0000000000000000000001",
+    "startup_timeout_seconds": 120,
+    "status": "stale",
+    "variable": "DATABASE_URL"
+  },
+  "impreza_get_shield:policy": {
+    "shield": {
+      "audit_review": {
+        "blocked_requests": 0,
+        "note": "Requests are counted once; a request can match several rules. Counts include policies used within the window. WAF counters start after a Shield v2 route is applied; earlier v1 traffic is not included. No visitor identity is collected.",
+        "top_rules": [
+          {
+            "category": "protocol",
+            "description": "Method is not allowed by policy",
+            "matches": 3,
+            "rule_id": 911100
+          },
+          {
+            "category": "protocol",
+            "description": "Invalid HTTP Request Line",
+            "matches": 1,
+            "rule_id": 920100
+          }
+        ],
+        "window_hours": 24,
+        "would_block_requests": 4
+      },
+      "controls": {
+        "attack_expires_at": 0,
+        "pow_difficulty": null,
+        "pow_paths": [],
+        "rate_limit_rpm": null,
+        "trusted_sources": []
+      },
+      "controls_required_capability": "shield-v2-controls",
+      "controls_supported": false,
+      "deployment_id": "dpl_1a00000000000011",
+      "exclusions": [
+        {
+          "path_prefix": "/api",
+          "rule_id": 920100
+        }
+      ],
+      "minimum_agent_version": "0.6.27",
+      "mode": "audit",
+      "policy_updated_at": "2026-09-25 10:00:00",
+      "profile": "hardened",
+      "required_capability": "shield-v2",
+      "revision": 2,
+      "under_attack": {
+        "active": false,
+        "difficulty": 4,
+        "expires_at": null,
+        "remaining_seconds": 0
+      },
+      "v2_supported": false
+    }
+  },
+  "impreza_get_traffic_switch:pending": {
+    "expires_at": "2026-10-02T09:40:09+00:00",
+    "health_requirement": "target container running, with any configured Docker healthcheck healthy; a local HTTPS route probe rejects network errors and 5xx responses",
+    "may_interrupt_traffic": true,
+    "operation": "traffic_switch",
+    "receipt": null,
+    "review_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "rollback": "routing recovery is attempted on failure; a host crash or failed recovery requires reconciliation; the source application is never stopped",
+    "source_deployment_id": "dpl_2b00000000000001",
+    "source_hostname": "shop-staging.fixture.invalid",
+    "source_hostname_removed": true,
+    "source_name": "g2-web-staging",
+    "status": "stale",
+    "switch_id": "tsw_2b0000000000000000000001",
+    "target_deployment_id": "dpl_2b00000000000003",
+    "target_name": "g2-web-production",
+    "target_state": "running",
+    "target_upstream": "dpl_2b00000000000003-app:8080"
+  },
+  "impreza_get_update_policy:stable_never_reported": {
+    "agent_id": "agt_3c3c000000000002",
+    "end_of_life": null,
+    "last_job": null,
+    "maintenance_window_utc": null,
+    "offer": {
+      "offered": false,
+      "reason": "channel_unavailable"
+    },
+    "pinned_version": null,
+    "supported_command": false,
+    "update": {
+      "channel": "stable",
+      "check_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --check",
+      "installed_version": null,
+      "latest_version": null,
+      "note": "Run on this server only when deployment operations have finished. Restarts the agent; does not re-register or update app containers. Confirm the reported version after the next heartbeat.",
+      "update_available": null,
+      "update_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --apply"
+    },
+    "update_channel": "stable"
+  },
+  "impreza_get_variable_group:environment_group": {
+    "environment_id": "env_2b0000000000000000000001",
+    "group_id": "evg_2b0000000000000000000002",
+    "note": "Secret values are never returned — names only. Deploy-time resolution is project → environment → app, the narrower level winning per name. Send the value __IMPREZA_KEEP__ to keep a stored value without retyping it, and base_revision to refuse overwriting a group that changed since this read.",
+    "project_id": "prj_2b0000000000000000000001",
+    "revision": 1,
+    "variables": [
+      {
+        "name": "API_PASSWORD",
+        "secret": false,
+        "value": "********"
+      },
+      {
+        "name": "FEATURE_FLAG",
+        "secret": false,
+        "value": "on"
+      }
+    ]
+  },
+  "impreza_get_variable_group:project_group": {
+    "environment_id": null,
+    "group_id": "evg_2b0000000000000000000001",
+    "note": "Secret values are never returned — names only. Deploy-time resolution is project → environment → app, the narrower level winning per name. Send the value __IMPREZA_KEEP__ to keep a stored value without retyping it, and base_revision to refuse overwriting a group that changed since this read.",
+    "project_id": "prj_2b0000000000000000000001",
+    "revision": 3,
+    "variables": [
+      {
+        "name": "DB_PASSWORD",
+        "secret": true,
+        "value": null
+      },
+      {
+        "name": "LOG_LEVEL",
+        "secret": false,
+        "value": "info"
+      },
+      {
+        "name": "SENTRY_DSN",
+        "secret": false,
+        "value": "********"
+      }
+    ]
+  },
+  "impreza_list_alerts:with_alerts": {
+    "alerts": [
+      {
+        "alert_id": "alr_1a0000000000000001",
+        "duration_minutes": 5,
+        "evidence": {
+          "memory_pct": 93,
+          "minutes": 5
+        },
+        "metric": "memory_pct",
+        "opened_at": "2026-10-01T10:00:00Z",
+        "resolved_at": null,
+        "status": "open",
+        "threshold": 90
+      },
+      {
+        "alert_id": "alr_1a0000000000000002",
+        "duration_minutes": null,
+        "evidence": [],
+        "metric": "down",
+        "opened_at": "2026-09-20T10:00:00Z",
+        "resolved_at": "2026-09-20T10:10:00Z",
+        "status": "resolved",
+        "threshold": null
+      }
+    ],
+    "deployment_id": "dpl_1a00000000000011",
+    "rules": [
+      {
+        "created_at": "2026-09-10 10:00:00",
+        "deployment_id": "dpl_1a00000000000011",
+        "duration_minutes": 5,
+        "enabled": 1,
+        "metric": "memory_pct",
+        "rule_id": "arl_1a0000000000000001",
+        "threshold": 90
+      },
+      {
+        "created_at": "2026-09-11 10:00:00",
+        "deployment_id": "dpl_1a00000000000011",
+        "duration_minutes": 3,
+        "enabled": 0,
+        "metric": "down",
+        "rule_id": "arl_1a0000000000000002",
+        "threshold": 1
+      }
+    ]
+  },
+  "impreza_list_environment_deploys:staging_batches": {
+    "batches": [
+      {
+        "batch_id": "edb_2b0000000000000000000003",
+        "created_at": "2026-10-01T10:00:00Z",
+        "cursor": 0,
+        "error": null,
+        "finished_at": null,
+        "require_healthy": true,
+        "stage_count": 2,
+        "status": "running"
+      },
+      {
+        "batch_id": "edb_2b0000000000000000000002",
+        "created_at": "2026-09-30T10:00:00Z",
+        "cursor": 0,
+        "error": "Stage db failed: the database did not report a healthy start.",
+        "finished_at": "2026-09-30T10:03:00Z",
+        "require_healthy": false,
+        "stage_count": 2,
+        "status": "failed"
+      },
+      {
+        "batch_id": "edb_2b0000000000000000000001",
+        "created_at": "2026-09-29T10:00:00Z",
+        "cursor": 2,
+        "error": null,
+        "finished_at": "2026-09-29T10:06:00Z",
+        "require_healthy": true,
+        "stage_count": 3,
+        "status": "succeeded"
+      }
+    ],
+    "environment_id": "env_2b0000000000000000000001",
+    "note": "Newest first, at most 20. A running batch keeps running regardless of who watches it; follow one with the batch_id on the single-batch read.",
+    "project_id": "prj_2b0000000000000000000001"
+  },
+  "impreza_list_prepared_deployments:list": {
+    "limit": 20,
+    "prepared_deployments": [
+      {
+        "agent_public_ip": "192.0.2.11",
+        "configuration": {
+          "agent_id": "agt_f18byo0000000000000001",
+          "build_secret_names": [],
+          "cpus": 1,
+          "domain": "shop-preview.fixture.invalid",
+          "environment_values_hidden": true,
+          "environment_variable_names": [
+            "APP_MODE",
+            "LOG_LEVEL"
+          ],
+          "memory_mb": 512,
+          "name": "g2-shop-preview",
+          "onion": false,
+          "target_port": 3000,
+          "volumes": []
+        },
+        "configuration_digest": "f27b4d5ac402cf91e211d8e6adb9118ffcdde30450bb9be146f48b22f535c6c7",
+        "created_at": "2026-09-30T10:00:00+00:00",
+        "execution_id": "pdep_2b0000000000000000000002",
+        "expires_at": "2026-09-30T12:00:00+00:00",
+        "option_index": 0,
+        "plan_id": "plan_2b0000000000000000000001",
+        "receipt": {
+          "accepted_at": "2026-09-30T10:05:00+00:00",
+          "command_id": "cmd_2b0000000000000000000011",
+          "configuration_digest": "f27b4d5ac402cf91e211d8e6adb9118ffcdde30450bb9be146f48b22f535c6c7",
+          "deployment_id": "dpl_2b00000000000011",
+          "execution_id": "pdep_2b0000000000000000000002",
+          "status": "accepted"
+        },
+        "reserves_capacity": false,
+        "source": {
+          "context_id": "ctx_2b0000000000000000000001",
+          "sha256": "9bbcadaa220ebb365379545181891155fc1cc31466cc55474225f69ed1701c26",
+          "size_bytes": 40960
+        },
+        "status": "accepted"
+      },
+      {
+        "agent_public_ip": "192.0.2.11",
+        "configuration": {
+          "agent_id": "agt_f18byo0000000000000001",
+          "build_secret_names": [],
+          "cpus": 1,
+          "domain": "shop-preview.fixture.invalid",
+          "environment_values_hidden": true,
+          "environment_variable_names": [
+            "APP_MODE",
+            "LOG_LEVEL"
+          ],
+          "memory_mb": 512,
+          "name": "g2-shop-preview",
+          "onion": false,
+          "target_port": 3000,
+          "volumes": []
+        },
+        "configuration_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+        "created_at": "2026-10-01T09:00:00+00:00",
+        "execution_id": "pdep_2b0000000000000000000001",
+        "expires_at": "2026-10-03T09:25:09+00:00",
+        "option_index": 0,
+        "plan_id": "plan_2b0000000000000000000001",
+        "receipt": null,
+        "reserves_capacity": false,
+        "source": {
+          "context_id": "ctx_2b0000000000000000000001",
+          "sha256": "9bbcadaa220ebb365379545181891155fc1cc31466cc55474225f69ed1701c26",
+          "size_bytes": 40960
+        },
+        "status": "stale"
+      }
+    ]
+  },
+  "impreza_list_prepared_deployments:one_pending": {
+    "agent_public_ip": "192.0.2.11",
+    "configuration": {
+      "agent_id": "agt_f18byo0000000000000001",
+      "build_secret_names": [],
+      "cpus": 1,
+      "domain": "shop-preview.fixture.invalid",
+      "environment_values_hidden": true,
+      "environment_variable_names": [
+        "APP_MODE",
+        "LOG_LEVEL"
+      ],
+      "memory_mb": 512,
+      "name": "g2-shop-preview",
+      "onion": false,
+      "target_port": 3000,
+      "volumes": []
+    },
+    "configuration_digest": "c0bdcabc1f264105605a095d36c75c63653633deee19512accf5380de53b66c3",
+    "created_at": "2026-10-01T09:00:00+00:00",
+    "execution_id": "pdep_2b0000000000000000000001",
+    "expires_at": "2026-10-03T09:25:09+00:00",
+    "option_index": 0,
+    "plan_id": "plan_2b0000000000000000000001",
+    "receipt": null,
+    "reserves_capacity": false,
+    "source": {
+      "context_id": "ctx_2b0000000000000000000001",
+      "sha256": "9bbcadaa220ebb365379545181891155fc1cc31466cc55474225f69ed1701c26",
+      "size_bytes": 40960
+    },
+    "status": "stale"
+  },
+  "impreza_list_project_plans:list": {
+    "limit": 20,
+    "plans": [
+      {
+        "analysis": {
+          "analysis_id": "prep_2b0000000000000000000001",
+          "commands": {
+            "build": "npm run build",
+            "start": "npm start"
+          },
+          "creates_resources": false,
+          "deployment_options": [
+            {
+              "label": "Node.js (npm)",
+              "parameters": {
+                "build_strategy": "node_npm",
+                "project_dir": "."
+              }
+            }
+          ],
+          "dockerfile_path": null,
+          "explicit_tcp_ports": [
+            3000
+          ],
+          "findings": [
+            {
+              "code": "inspection_limits",
+              "message": "File presence is not build readiness."
+            }
+          ],
+          "framework": "express",
+          "package_manager": "npm",
+          "source_verified": false,
+          "status": "needs_review",
+          "suggested_target_port": 3000
+        },
+        "created_at": "2026-08-31T10:00:00+00:00",
+        "executes_code": false,
+        "expires_at": "2026-09-01T10:00:00+00:00",
+        "inspection_revision": "fad1b36a945e819977c5cf2fe97319d670a8b694bd877028945ccd8f4be54f83",
+        "inventory": {
+          "candidate_limit": 50,
+          "entries": 42,
+          "expanded_bytes": 183402,
+          "project_directories": [
+            "."
+          ],
+          "sensitive_filename_count": 0
+        },
+        "npm_workspace": null,
+        "plan_id": "plan_2b0000000000000000000003",
+        "project_dir": ".",
+        "reserves_capacity": false,
+        "reusable": true,
+        "source": {
+          "context_id": "ctx_2b0000000000000000000003",
+          "sha256": "019ca3e7f51fd1a098e5e9fa6e79c9593d07e3293cca6400d2d7a9de3a80bc26",
+          "size_bytes": 40960
+        },
+        "status": "expired"
+      },
+      {
+        "analysis": {
+          "analysis_id": "prep_2b0000000000000000000001",
+          "commands": {
+            "build": "npm run build",
+            "start": "npm start"
+          },
+          "creates_resources": false,
+          "deployment_options": [
+            {
+              "label": "Node.js (npm)",
+              "parameters": {
+                "build_strategy": "node_npm",
+                "project_dir": "."
+              }
+            }
+          ],
+          "dockerfile_path": null,
+          "explicit_tcp_ports": [
+            3000
+          ],
+          "findings": [
+            {
+              "code": "inspection_limits",
+              "message": "File presence is not build readiness."
+            }
+          ],
+          "framework": "express",
+          "package_manager": "npm",
+          "source_verified": false,
+          "status": "needs_review",
+          "suggested_target_port": 3000
+        },
+        "created_at": "2026-09-30T11:00:00+00:00",
+        "executes_code": false,
+        "expires_at": "2026-10-03T09:25:09+00:00",
+        "inspection_revision": "a0277defa0cd8dcb62a911f2af1789f08223fa7682f0512caf9f8f120c6d8352",
+        "inventory": {
+          "candidate_limit": 50,
+          "entries": 42,
+          "expanded_bytes": 183402,
+          "project_directories": [
+            "."
+          ],
+          "sensitive_filename_count": 0
+        },
+        "npm_workspace": null,
+        "plan_id": "plan_2b0000000000000000000002",
+        "project_dir": ".",
+        "reserves_capacity": false,
+        "reusable": true,
+        "source": {
+          "context_id": "ctx_2b0000000000000000000002",
+          "origin": {
+            "commit": "abababababababababababababababababababab",
+            "url": "https://git.fixture.invalid/g2/shop.git"
+          },
+          "sha256": "a12a6d21c736079655349585d9cba108d7ffdaef7ceb76657ae146604b2a28ca",
+          "size_bytes": 40960
+        },
+        "status": "stale"
+      },
+      {
+        "analysis": {
+          "analysis_id": "prep_2b0000000000000000000001",
+          "commands": {
+            "build": "npm run build",
+            "start": "npm start"
+          },
+          "creates_resources": false,
+          "deployment_options": [
+            {
+              "label": "Node.js (npm)",
+              "parameters": {
+                "build_strategy": "node_npm",
+                "project_dir": "."
+              }
+            }
+          ],
+          "dockerfile_path": null,
+          "explicit_tcp_ports": [
+            3000
+          ],
+          "findings": [
+            {
+              "code": "inspection_limits",
+              "message": "File presence is not build readiness."
+            }
+          ],
+          "framework": "express",
+          "package_manager": "npm",
+          "source_verified": false,
+          "status": "needs_review",
+          "suggested_target_port": 3000
+        },
+        "created_at": "2026-09-30T10:00:00+00:00",
+        "executes_code": false,
+        "expires_at": "2026-10-03T09:25:09+00:00",
+        "inspection_revision": "fad1b36a945e819977c5cf2fe97319d670a8b694bd877028945ccd8f4be54f83",
+        "inventory": {
+          "candidate_limit": 50,
+          "entries": 42,
+          "expanded_bytes": 183402,
+          "project_directories": [
+            "."
+          ],
+          "sensitive_filename_count": 0
+        },
+        "npm_workspace": null,
+        "plan_id": "plan_2b0000000000000000000001",
+        "project_dir": ".",
+        "reserves_capacity": false,
+        "reusable": true,
+        "source": {
+          "context_id": "ctx_2b0000000000000000000001",
+          "sha256": "9bbcadaa220ebb365379545181891155fc1cc31466cc55474225f69ed1701c26",
+          "size_bytes": 40960
+        },
+        "status": "source_unavailable"
+      }
+    ]
+  },
+  "impreza_list_project_plans:one_plan_expired": {
+    "analysis": {
+      "analysis_id": "prep_2b0000000000000000000001",
+      "commands": {
+        "build": "npm run build",
+        "start": "npm start"
+      },
+      "creates_resources": false,
+      "deployment_options": [
+        {
+          "label": "Node.js (npm)",
+          "parameters": {
+            "build_strategy": "node_npm",
+            "project_dir": "."
+          }
+        }
+      ],
+      "dockerfile_path": null,
+      "explicit_tcp_ports": [
+        3000
+      ],
+      "findings": [
+        {
+          "code": "inspection_limits",
+          "message": "File presence is not build readiness."
+        }
+      ],
+      "framework": "express",
+      "package_manager": "npm",
+      "source_verified": false,
+      "status": "needs_review",
+      "suggested_target_port": 3000
+    },
+    "created_at": "2026-08-31T10:00:00+00:00",
+    "executes_code": false,
+    "expires_at": "2026-09-01T10:00:00+00:00",
+    "inspection_revision": "fad1b36a945e819977c5cf2fe97319d670a8b694bd877028945ccd8f4be54f83",
+    "inventory": {
+      "candidate_limit": 50,
+      "entries": 42,
+      "expanded_bytes": 183402,
+      "project_directories": [
+        "."
+      ],
+      "sensitive_filename_count": 0
+    },
+    "npm_workspace": null,
+    "plan_id": "plan_2b0000000000000000000003",
+    "project_dir": ".",
+    "reserves_capacity": false,
+    "reusable": true,
+    "source": {
+      "context_id": "ctx_2b0000000000000000000003",
+      "sha256": "019ca3e7f51fd1a098e5e9fa6e79c9593d07e3293cca6400d2d7a9de3a80bc26",
+      "size_bytes": 40960
+    },
+    "status": "expired"
+  },
+  "impreza_list_projects:list": {
+    "projects": [
+      {
+        "name": "g2-empty",
+        "project_id": "prj_2b0000000000000000000002"
+      },
+      {
+        "name": "g2-shop",
+        "project_id": "prj_2b0000000000000000000001"
+      }
+    ],
+    "services_loaded": false
+  },
+  "impreza_list_projects:one_project_with_environments": {
+    "projects": [
+      {
+        "environments": [
+          {
+            "environment_id": "env_2b0000000000000000000002",
+            "name": "production",
+            "services": [
+              {
+                "agent_id": "agt_f18byo0000000000000001",
+                "component": "cache",
+                "deployment_id": "dpl_2b00000000000004",
+                "kind": "catalog",
+                "role": "cache",
+                "status": "running"
+              },
+              {
+                "agent_id": "agt_f18byo0000000000000001",
+                "component": "web",
+                "deployment_id": "dpl_2b00000000000003",
+                "kind": "custom",
+                "role": "web",
+                "status": "running"
+              }
+            ]
+          },
+          {
+            "environment_id": "env_2b0000000000000000000001",
+            "name": "staging",
+            "services": [
+              {
+                "agent_id": "agt_f18byo0000000000000001",
+                "component": "db",
+                "deployment_id": "dpl_2b00000000000002",
+                "kind": "catalog",
+                "role": "database",
+                "status": "running"
+              },
+              {
+                "agent_id": "agt_f18byo0000000000000001",
+                "component": "web",
+                "deployment_id": "dpl_2b00000000000001",
+                "kind": "custom",
+                "role": "web",
+                "status": "running"
+              },
+              {
+                "agent_id": "agt_f18byo0000000000000001",
+                "component": "worker",
+                "deployment_id": "dpl_2b00000000000005",
+                "kind": "custom",
+                "role": "worker",
+                "status": "running"
+              }
+            ]
+          }
+        ],
+        "name": "g2-shop",
+        "project_id": "prj_2b0000000000000000000001"
+      }
+    ],
+    "services_loaded": true
+  },
+  "impreza_onion_auth_list:restricted": {
+    "clients": [
+      {
+        "created_at": "2026-09-10T10:00:00Z",
+        "name": "g1-laptop"
+      },
+      {
+        "created_at": "2026-09-11T10:00:00Z",
+        "name": "g1-phone"
+      }
+    ],
+    "restricted": true
+  },
+  "impreza_onion_auth_revoke:revoke_after_confirmation": {
+    "command_id": "cmd_0b48a8eeb4dea3ba",
+    "name": "f18-revoke-h",
+    "revoked": true
+  },
+  "impreza_plan_project:inspect_upload": {
+    "analysis": {
+      "analysis_id": "prep_8d6fa9007195057a241a22f8",
+      "commands": [],
+      "creates_resources": false,
+      "deployment_options": [
+        {
+          "parameters": {
+            "build_strategy": "static_files",
+            "mode": "dockerfile",
+            "project_dir": ".",
+            "target_port": 8080
+          },
+          "port_basis": "recipe_default",
+          "requires_review": true
+        }
+      ],
+      "dockerfile_path": null,
+      "explicit_tcp_ports": [],
+      "findings": [
+        {
+          "code": "static_files_review",
+          "message": "Static files recipe: the selected project folder is served as-is by unprivileged Nginx — no build step and no package manager. Requires a regular index.html; symlinks are refused; hidden dotfiles are never served and .env files are never copied. Up to 10000 files and 256 MiB. Unknown paths return 404 by default; SPA routing serves index.html instead. Every file in the folder is public — review it before deploying."
+        },
+        {
+          "code": "build_recipe_required",
+          "message": "Choose a Dockerfile committed to the repository or opt in to an applicable generated Node npm, Python pip, PHP Composer, static files or Go recipe after reviewing its requirements. This analysis does not build or deploy it."
+        },
+        {
+          "code": "port_selection",
+          "message": "Confirm the container HTTP port; no unique explicit TCP port was found in the final Dockerfile stage."
+        },
+        {
+          "code": "configuration_review",
+          "message": "Review runtime variables, build requirements, persistent volumes and server resources. Only the submitted configuration files were analyzed."
+        },
+        {
+          "code": "inspection_limits",
+          "message": "File presence is not build readiness. Lockfile consistency, dependency resolution, ignore rules, runtime behavior, external services and capacity still need verification."
+        }
+      ],
+      "framework": "static",
+      "go_build_recipe": {
+        "blockers": [],
+        "status": "not_assessed",
+        "strategy": "go_build",
+        "unverified": [
+          "source_contents",
+          "self_contained_module",
+          "dependency_downloads",
+          "http_listener",
+          "runtime_configuration"
+        ]
+      },
+      "node_npm_recipe": {
+        "blockers": [],
+        "status": "not_assessed",
+        "strategy": "node_npm",
+        "unverified": [
+          "lockfile",
+          "node_engine",
+          "production_start",
+          "runtime_dependencies",
+          "http_listener",
+          "build_requirements"
+        ]
+      },
+      "package_manager": null,
+      "php_composer_recipe": {
+        "blockers": [],
+        "status": "not_assessed",
+        "strategy": "php_composer",
+        "unverified": [
+          "source_contents",
+          "matching_lockfile",
+          "php_extensions",
+          "public_directory",
+          "application_bootstrap",
+          "dependency_distributions"
+        ]
+      },
+      "python_pip_recipe": {
+        "blockers": [],
+        "status": "not_assessed",
+        "strategy": "python_pip",
+        "unverified": [
+          "source_contents",
+          "python_compatibility",
+          "dependency_resolution",
+          "production_start",
+          "http_listener",
+          "system_dependencies"
+        ]
+      },
+      "source_verified": false,
+      "static_files_recipe": {
+        "blockers": [],
+        "status": "needs_verification",
+        "strategy": "static_files",
+        "unverified": [
+          "source_contents",
+          "public_files_review",
+          "no_server_logic"
+        ]
+      },
+      "static_npm_recipe": {
+        "blockers": [],
+        "status": "not_assessed",
+        "strategy": "node_npm_static",
+        "unverified": [
+          "lockfile",
+          "node_engine",
+          "static_output",
+          "browser_configuration",
+          "build_requirements"
+        ]
+      },
+      "status": "needs_review",
+      "suggested_target_port": null
+    },
+    "created_at": "2026-10-02T08:42:09+00:00",
+    "executes_code": false,
+    "expires_at": "2026-10-03T11:42:09+00:00",
+    "inspection_revision": "fad1b36a945e819977c5cf2fe97319d670a8b694bd877028945ccd8f4be54f83",
+    "inventory": {
+      "candidate_limit": 50,
+      "entries": 1,
+      "expanded_bytes": 2048,
+      "project_directories": [],
+      "sensitive_filename_count": 0
+    },
+    "npm_workspace": null,
+    "plan_id": "plan_42a644912a513af52d3c0108",
+    "project_dir": ".",
+    "reserves_capacity": false,
+    "reusable": true,
+    "source": {
+      "context_id": "ctx_8b0000000000000000000001",
+      "sha256": "532fdc703ce959250b737e227cdff6c3b37b0ff3e2b834e74ca95203686dc007",
+      "size_bytes": 151
+    },
+    "status": "needs_review"
+  },
+  "impreza_prepare_compose:ready": {
+    "analysis_id": "compose_a5e81e13ebeafd7c344d9c7b0f932da77fd665a3bae52cf5c6764e15f8251d0b",
+    "auxiliary_files": [],
+    "changes": [
+      "services.web: default restart policy unless-stopped.",
+      "services.web: original host port bindings removed; only the selected HTTP service receives a platform-managed loopback port and proxy route.",
+      "services.web: container name becomes deployment-specific.",
+      "services.db: default restart policy unless-stopped.",
+      "services.db: container name becomes deployment-specific."
+    ],
+    "environment_files": [],
+    "errors": [],
+    "parameters": {
+      "compose_review_id": "compose_a5e81e13ebeafd7c344d9c7b0f932da77fd665a3bae52cf5c6764e15f8251d0b",
+      "mode": "compose",
+      "target_port": 80,
+      "web_service": "web"
+    },
+    "services": [
+      {
+        "depends_on": [
+          "db"
+        ],
+        "environment_names": [
+          "DB_PASSWORD",
+          "MODE"
+        ],
+        "has_healthcheck": false,
+        "image": "ghcr.io/fixture/web:1.0.0",
+        "name": "web",
+        "tcp_ports": [
+          80
+        ],
+        "volumes": [
+          {
+            "read_only": false,
+            "source": "data",
+            "target": "/data",
+            "type": "volume"
+          }
+        ]
+      },
+      {
+        "depends_on": [],
+        "environment_names": [],
+        "has_healthcheck": false,
+        "image": "postgres:16",
+        "name": "db",
+        "tcp_ports": [],
+        "volumes": [
+          {
+            "read_only": false,
+            "source": "db",
+            "target": "/var/lib/postgresql/data",
+            "type": "volume"
+          }
+        ]
+      }
+    ],
+    "source_context_id": null,
+    "source_files": [],
+    "status": "ready_for_review",
+    "target_port": 80,
+    "unverified": [
+      "image_access",
+      "image_architecture",
+      "application_startup",
+      "http_listener",
+      "data_compatibility",
+      "server_capacity"
+    ],
+    "variables": [
+      {
+        "name": "DB_PASSWORD",
+        "nonempty": true,
+        "required": true,
+        "services": [
+          "web"
+        ]
+      },
+      {
+        "name": "MODE",
+        "nonempty": false,
+        "required": false,
+        "services": [
+          "web"
+        ]
+      }
+    ],
+    "volumes": [
+      "data",
+      "db"
+    ],
+    "warnings": [
+      {
+        "code": "mutable_image",
+        "message": "services.web uses an image without a digest; a later pull can obtain different contents.",
+        "path": "services.web.image"
+      },
+      {
+        "code": "resource_limits",
+        "message": "services.web: review per-service cpus and mem_limit. The portal CPU/memory fields do not limit imported services.",
+        "path": "services.web"
+      },
+      {
+        "code": "mutable_image",
+        "message": "services.db uses an image without a digest; a later pull can obtain different contents.",
+        "path": "services.db.image"
+      },
+      {
+        "code": "resource_limits",
+        "message": "services.db: review per-service cpus and mem_limit. The portal CPU/memory fields do not limit imported services.",
+        "path": "services.db"
+      }
+    ],
+    "web_service": "web"
+  },
+  "impreza_prepare_config_promotion:staging_to_production": {
+    "components": [
+      {
+        "component": "web",
+        "deployment_id": "dpl_8b00000000000008",
+        "kept_on_target": [],
+        "role": "web",
+        "variables": {
+          "different": [
+            "APP_MODE"
+          ],
+          "only_in_source": [],
+          "only_in_target": [],
+          "same": [
+            "LOG_LEVEL"
+          ]
+        }
+      }
+    ],
+    "copies_secret_values": "inside the sealed review only; re-sealed under the target on apply, never returned",
+    "expires_at": "2026-10-02T11:57:10+00:00",
+    "group_variables": {
+      "different": [],
+      "only_in_source": [
+        "FEATURE_FLAG",
+        "SHARED_SECRET"
+      ],
+      "only_in_target": [],
+      "same": []
+    },
+    "operation": "promote_configuration",
+    "promotion_id": "cpro_8ef4f0e811eb2a4549375b5d",
+    "receipt": null,
+    "replaces_target_user_variables": true,
+    "review_digest": "2c177d9cd87e6e4c387d8d0316e0568a5f35cc8317778818708794a78521325e",
+    "source_environment_id": "env_8b0000000000000000000011",
+    "source_environment_name": "staging-h",
+    "status": "ready_for_review",
+    "takes_effect": "on the next deploy of each component — nothing running is restarted by this apply",
+    "target_environment_id": "env_8b0000000000000000000012",
+    "target_environment_name": "production-h",
+    "unpaired_components": {
+      "only_in_source": [],
+      "only_in_target": []
+    }
+  },
+  "impreza_prepare_image_promotion:promote_digest": {
+    "copies_source_variables": false,
+    "evidence": "recorded_success_not_live_health",
+    "expires_at": "2026-10-02T11:57:10+00:00",
+    "image": "registry.fixture.invalid/b4/web@sha256:b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8",
+    "may_interrupt_traffic": true,
+    "previous_image": "registry.fixture.invalid/b4/web@sha256:8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b",
+    "promotion_id": "prom_7c0ab4e4c48ab570aea070e0",
+    "receipt": null,
+    "review_digest": "409e6737841dcad417b2da1e80f29c0acb0e9d4c2c5caac9ddd1b9ef17b78826",
+    "source_command_id": "cmd_8b0000000000000000000011",
+    "source_deployment_id": "dpl_8b00000000000011",
+    "status": "ready_for_review",
+    "target_agent_id": "agt_8b0000000000000000000001",
+    "target_cpus": 1,
+    "target_deployment_id": "dpl_8b00000000000012",
+    "target_domain": "b4-promote-h.fixture.invalid",
+    "target_memory_mb": 512,
+    "target_variable_names": [
+      "APP_MODE",
+      "LOG_LEVEL"
+    ]
+  },
+  "impreza_prepare_project:node_and_dockerfile": {
+    "analysis_id": "prep_72027e62d90b109e23fab0a8",
+    "commands": {
+      "build": "npm run build",
+      "start": "npm run start"
+    },
+    "creates_resources": false,
+    "deployment_options": [
+      {
+        "parameters": {
+          "build_strategy": "dockerfile",
+          "dockerfile_path": "Dockerfile",
+          "mode": "dockerfile",
+          "target_port": 3000
+        },
+        "port_basis": "dockerfile_expose",
+        "requires_review": true
+      },
+      {
+        "parameters": {
+          "build_strategy": "node_npm",
+          "mode": "dockerfile",
+          "target_port": 3000
+        },
+        "port_basis": "recipe_default",
+        "requires_review": true
+      },
+      {
+        "parameters": {
+          "build_strategy": "node_npm_static",
+          "mode": "dockerfile",
+          "target_port": 8080
+        },
+        "port_basis": "recipe_default",
+        "requires_review": true
+      }
+    ],
+    "dockerfile_path": "Dockerfile",
+    "explicit_tcp_ports": [
+      3000
+    ],
+    "findings": [
+      {
+        "code": "package_manager_unconfirmed",
+        "message": "npm is a suggestion; confirm it against the project lockfile."
+      },
+      {
+        "code": "static_or_ssr",
+        "message": "Confirm whether this Vite project produces static files or an SSR server; the production serving method depends on that choice."
+      },
+      {
+        "code": "static_npm_candidate",
+        "message": "The static recipe is an option only if the selected manager run build produces a complete static site at dist/index.html. It uses Nginx with SPA fallback, not SSR or server functions. Runtime variables do not change browser bundles; review generated files because they are public."
+      },
+      {
+        "code": "node_npm_candidate",
+        "message": "The submitted package metadata has no detected Node recipe blocker. Before selecting it, verify a matching manager lockfile, Node 24 compatibility, a production start command and an HTTP listener on 0.0.0.0 at the configured port."
+      },
+      {
+        "code": "node_npm_runtime_dependencies",
+        "message": "Node npm recipe removes devDependencies before starting. Packages needed by scripts.start must be production dependencies. Use explicit build_secrets for private credentials; never put them in public build variables."
+      },
+      {
+        "code": "dockerfile_review",
+        "message": "EXPOSE is metadata, not a health check. Confirm the HTTP server listens on 0.0.0.0 and the selected port. Base-image ports and variable expressions are not resolved."
+      },
+      {
+        "code": "configuration_review",
+        "message": "Review runtime variables, build requirements, persistent volumes and server resources. Only the submitted configuration files were analyzed."
+      }
+    ],
+    "framework": "vite",
+    "go_build_recipe": {
+      "blockers": [],
+      "status": "not_assessed",
+      "strategy": "go_build",
+      "unverified": [
+        "source_contents",
+        "self_contained_module",
+        "dependency_downloads",
+        "http_listener",
+        "runtime_configuration"
+      ]
+    },
+    "node_npm_recipe": {
+      "blockers": [],
+      "status": "needs_verification",
+      "strategy": "node_npm",
+      "unverified": [
+        "lockfile",
+        "node_engine",
+        "production_start",
+        "runtime_dependencies",
+        "http_listener",
+        "build_requirements"
+      ]
+    },
+    "package_manager": "npm",
+    "php_composer_recipe": {
+      "blockers": [],
+      "status": "not_assessed",
+      "strategy": "php_composer",
+      "unverified": [
+        "source_contents",
+        "matching_lockfile",
+        "php_extensions",
+        "public_directory",
+        "application_bootstrap",
+        "dependency_distributions"
+      ]
+    },
+    "python_pip_recipe": {
+      "blockers": [],
+      "status": "not_assessed",
+      "strategy": "python_pip",
+      "unverified": [
+        "source_contents",
+        "python_compatibility",
+        "dependency_resolution",
+        "production_start",
+        "http_listener",
+        "system_dependencies"
+      ]
+    },
+    "source_verified": false,
+    "static_files_recipe": {
+      "blockers": [],
+      "status": "not_assessed",
+      "strategy": "static_files",
+      "unverified": [
+        "source_contents",
+        "public_files_review",
+        "no_server_logic"
+      ]
+    },
+    "static_npm_recipe": {
+      "blockers": [],
+      "status": "needs_verification",
+      "strategy": "node_npm_static",
+      "unverified": [
+        "lockfile",
+        "node_engine",
+        "static_output",
+        "browser_configuration",
+        "build_requirements"
+      ]
+    },
+    "status": "needs_review",
+    "suggested_target_port": 3000
+  },
+  "impreza_prepare_project_deployment:prepare_static": {
+    "agent_public_ip": "192.0.2.84",
+    "configuration": {
+      "agent_id": "agt_8b0000000000000000000001",
+      "build_secret_names": [],
+      "build_strategy": "static_files",
+      "context_id": "ctx_8b0000000000000000000001",
+      "cpus": 1,
+      "domain": "",
+      "environment_values_hidden": true,
+      "environment_variable_names": [
+        "GREETING"
+      ],
+      "memory_mb": 512,
+      "mode": "dockerfile",
+      "name": "b4-prepared-h",
+      "onion": true,
+      "project_dir": ".",
+      "target_port": 8080,
+      "volumes": []
+    },
+    "configuration_digest": "5300159f021a717c5f8ff1b5afde0442d6083c8ba4e13ec62ba74b5e56310057",
+    "created_at": "2026-10-02T08:42:11+00:00",
+    "execution_id": "pdep_a4760ef1a77c5e1b14802716",
+    "expires_at": "2026-10-03T11:41:26+00:00",
+    "option_index": 0,
+    "plan_id": "plan_8b0000000000000000000003",
+    "receipt": null,
+    "reserves_capacity": false,
+    "source": {
+      "context_id": "ctx_8b0000000000000000000001",
+      "sha256": "532fdc703ce959250b737e227cdff6c3b37b0ff3e2b834e74ca95203686dc007",
+      "size_bytes": 151
+    },
+    "status": "ready_for_review"
+  },
+  "impreza_prepare_service_binding:create_with_wire": {
+    "binding_id": "bnd_3d2c4457a43dfbab34ed645b",
+    "consumer_deployment_id": "dpl_8b00000000000031",
+    "consumer_name": "b4-bind-web-h",
+    "copies_provider_password": false,
+    "credential_delivery": "agent_only",
+    "database": "imp_3d2c4457a43dfbab34ed645b",
+    "environment_id": "env_8b0000000000000000000015",
+    "expires_at": "2026-10-02T11:57:11+00:00",
+    "may_interrupt_traffic": true,
+    "opens_host_port": false,
+    "operation": "create",
+    "plan_id": "bplan_e9272735043cafe8af72f587",
+    "provider_deployment_id": "dpl_8b00000000000032",
+    "provider_engine": "postgres",
+    "receipt": null,
+    "review_digest": "9fd4f155626c2c267d7468285f1f22655dfd92eadd0633ff6717674ebe535ece",
+    "status": "ready_for_review",
+    "variable": "DATABASE_URL",
+    "wire": true,
+    "wire_components": [
+      "dpl_8b00000000000035"
+    ],
+    "wire_note": "Each component gets its own credential (never the consumer's); components already bound, busy or with an incompatible shape are skipped, not failed."
+  },
+  "impreza_prepare_service_binding_removal:remove_active": {
+    "binding_id": "bnd_8b0000000000000000000001",
+    "cleanup_retry": false,
+    "consumer_deployment_id": "dpl_8b00000000000041",
+    "consumer_name": "b4-bound-web-remove-h",
+    "copies_provider_password": false,
+    "database": "imp_8b0000000000000000000001",
+    "database_data_retained": true,
+    "environment_id": "env_8b0000000000000000000017",
+    "expires_at": "2026-10-02T11:57:11+00:00",
+    "login_disabled_after_replacement": true,
+    "may_interrupt_traffic": true,
+    "opens_host_port": false,
+    "operation": "remove",
+    "plan_id": "bplan_33ac321bc680362d1de95bda",
+    "provider_deployment_id": "dpl_8b00000000000042",
+    "provider_engine": "postgres",
+    "receipt": null,
+    "review_digest": "56b5124a37b8c80121b5d1ea088690b17e63accefa5a5dba35221fb190cf733a",
+    "status": "ready_for_review",
+    "variable": "DATABASE_URL"
+  },
+  "impreza_prepare_service_binding_rotation:rotate_current": {
+    "binding_id": "bnd_8b0000000000000000000003",
+    "cleanup_only": false,
+    "consumer_deployment_id": "dpl_8b00000000000051",
+    "consumer_name": "b4-bound-web-rotate-h",
+    "credential_delivery": "agent_only",
+    "database_data_retained": true,
+    "environment_id": "env_8b0000000000000000000019",
+    "expires_at": "2026-10-02T11:57:11+00:00",
+    "may_interrupt_traffic": true,
+    "operation": "rotate",
+    "plan_id": "bplan_86f3bb27b046eee029158241",
+    "provider_deployment_id": "dpl_8b00000000000052",
+    "provider_engine": "postgres",
+    "receipt": null,
+    "require_healthy_start": true,
+    "retry": false,
+    "review_digest": "ddc5f2ecf910ead54cd26b36c662d98693f20e0bad0fba3ed64238c07a198496",
+    "rotation_id": "brot_e0b095b880b896f6fff3782b",
+    "startup_timeout_seconds": 60,
+    "status": "ready_for_review",
+    "variable": "DATABASE_URL"
+  },
+  "impreza_prepare_traffic_switch:move_hostname": {
+    "expires_at": "2026-10-02T11:57:11+00:00",
+    "health_requirement": "target container running, with any configured Docker healthcheck healthy; a local HTTPS route probe rejects network errors and 5xx responses",
+    "may_interrupt_traffic": true,
+    "operation": "traffic_switch",
+    "receipt": null,
+    "review_digest": "2c2e94a49fdd562c5134a8f16e1657ead3ef55aaf7b79f522c8de5daa046ec57",
+    "rollback": "routing recovery is attempted on failure; a host crash or failed recovery requires reconciliation; the source application is never stopped",
+    "source_deployment_id": "dpl_8b00000000000021",
+    "source_hostname": "b4-switch-h.fixture.invalid",
+    "source_hostname_removed": true,
+    "source_name": "b4-switch-source-h",
+    "status": "ready_for_review",
+    "switch_id": "tsw_481aaf0db55f1d360d26f850",
+    "target_deployment_id": "dpl_8b00000000000022",
+    "target_name": "b4-switch-target-h",
+    "target_state": "running",
+    "target_upstream": "dpl_8b00000000000022-app:8080"
+  },
+  "impreza_purge_onion_key:agent_mode_retained_identity": {
+    "command_id": "cmd_20b692cb0ef45b75",
+    "mode": "agent",
+    "note": "Purge queued, not yet applied. Agent success confirms deletion of retained copies for this deployment on its current host and releases the reservation. Prior exports or external backups are unaffected."
+  },
+  "impreza_redeploy_deployment:image_with_vars": {
+    "agent_id": "agt_f18b5e0000000000000001",
+    "build_secret_names": [],
+    "build_strategy": null,
+    "command_id": "cmd_6e6340dd25b2324c",
+    "context_id": "",
+    "cpus": 1,
+    "created_at": "2026-09-10T10:00:00Z",
+    "domain": null,
+    "git_auth": {
+      "fingerprint": null,
+      "method": "none",
+      "public_key": null
+    },
+    "git_ref": "",
+    "git_url": "",
+    "go_package": null,
+    "healthcheck_path": null,
+    "id": "dpl_5e00000000000003",
+    "image": "registry.fixture.invalid/b1/app:1",
+    "last_error": null,
+    "last_health_at": null,
+    "last_operation": {
+      "cancellation": {
+        "can_cancel": true,
+        "confirmed_at": null,
+        "phase": "queued",
+        "reason": null,
+        "requested_at": null,
+        "state": "none"
+      },
+      "command_id": "cmd_6e6340dd25b2324c",
+      "completed_at": null,
+      "created_at": "2026-10-02T08:42:12Z",
+      "kind": "deploy",
+      "progress": {
+        "age_seconds": null,
+        "label": "Waiting for agent",
+        "reason": null,
+        "recovery": "none",
+        "reported_at": null,
+        "step": "queued",
+        "supported": false
+      },
+      "status": "pending"
+    },
+    "memory_mb": 512,
+    "mode": "image",
+    "name": "b5e-redeploy-h",
+    "node_package_manager": null,
+    "note": "Redeploy queued — rebuilding from current source on the same server. Your domain is unchanged.",
+    "npm_workspace": null,
+    "onion": null,
+    "onion_exported_at": null,
+    "onion_profile": "standard",
+    "php_document_root": null,
+    "project_dir": null,
+    "project_plan": null,
+    "proxy_metrics": null,
+    "public_build_vars": null,
+    "python_package_manager": null,
+    "runtime": {
+      "age_seconds": null,
+      "counts": null,
+      "fresh_for_seconds": 120,
+      "last_reported_state": null,
+      "observed_at": null,
+      "reason": "agent_offline",
+      "scope": "containers",
+      "state": "unknown"
+    },
+    "service_binding": null,
+    "shield": {
+      "mode": "audit",
+      "profile": "off"
+    },
+    "source_artifact": null,
+    "start_command": null,
+    "startup_health": {
+      "require_healthy_start": false,
+      "startup_timeout_seconds": null
+    },
+    "static_options": null,
+    "static_spa": null,
+    "status": "updating",
+    "tor_egress": false,
+    "vars": {
+      "SITE_NAME": "Redeployed B1",
+      "TARGET_PORT": "8080"
+    },
+    "zero_downtime": {
+      "enabled": false,
+      "policy": null
+    }
+  },
+  "impreza_rename_environment:renamed": {
+    "environment_id": "env_8b0000000000000000000001",
+    "name": "renamed-h",
+    "replayed": false
+  },
+  "impreza_rename_project:renamed": {
+    "name": "b4-renamed-h",
+    "project_id": "prj_8b0000000000000000000002",
+    "replayed": false
+  },
+  "impreza_rollback_deployment:queued_after_confirmation": {
+    "command_id": "cmd_4f8d5bc2e5f4dd39",
+    "deployment_id": "dpl_5e00000000000005",
+    "saved_configuration": {
+      "note": "This release was deployed before its configuration was recorded: the rollback restores the containers, but the saved configuration stays the later one and the next redeploy applies it again.",
+      "restores_on_success": false
+    },
+    "status": "updating",
+    "target_version": "rel_5e0000000005"
+  },
+  "impreza_rotate_onion_key:queue_rotation_after_confirmation": {
+    "command_id": "cmd_740ca2ba60b88ed9",
+    "note": "Rotation queued. The current .onion stops working when the agent applies it; the new address appears on the deployment."
+  },
+  "impreza_set_onion_profile:queue_profile": {
+    "command_id": "cmd_6f9f274cec16d06f",
+    "note": "Profile saved. The agent applies it on its next poll (usually under a minute); max is refused there if the running Tor has no PoW module.",
+    "profile": "max"
+  },
+  "impreza_set_variable_group:environment_group_with_secret": {
+    "environment_id": "env_8b0000000000000000000007",
+    "group_id": "evg_fe81bad3de9d2a69c7fa5fa4",
+    "note": "Secret values are never returned — names only. Deploy-time resolution is project → environment → app, the narrower level winning per name. Send the value __IMPREZA_KEEP__ to keep a stored value without retyping it, and base_revision to refuse overwriting a group that changed since this read.",
+    "project_id": "prj_8b0000000000000000000001",
+    "revision": 1,
+    "variables": [
+      {
+        "name": "API_SECRET",
+        "secret": true,
+        "value": null
+      },
+      {
+        "name": "FEATURE_FLAG",
+        "secret": false,
+        "value": "on"
+      },
+      {
+        "name": "LOG_LEVEL",
+        "secret": false,
+        "value": "debug"
+      }
+    ]
+  },
+  "impreza_set_variable_group:project_group_replaced": {
+    "environment_id": null,
+    "group_id": "evg_8b0000000000000000000006",
+    "note": "Secret values are never returned — names only. Deploy-time resolution is project → environment → app, the narrower level winning per name. Send the value __IMPREZA_KEEP__ to keep a stored value without retyping it, and base_revision to refuse overwriting a group that changed since this read.",
+    "project_id": "prj_8b0000000000000000000006",
+    "revision": 2,
+    "variables": [
+      {
+        "name": "REGION",
+        "secret": false,
+        "value": "b4"
+      }
+    ]
+  },
+  "impreza_account_info:account": {
+    "balance": 12.5,
+    "company": null,
+    "currency": "USD",
+    "email": "owner@fixture.invalid",
+    "first_name": "Fixture",
+    "id": 1,
+    "last_name": "Owner",
+    "registered_at": "2026-01-01"
+  },
+  "impreza_list_servers:list_servers": {
+    "servers": [
+      {
+        "agent_id": "agt_f18new0000000000000001",
+        "agent_update": {
+          "channel": "stable",
+          "check_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --check",
+          "installed_version": null,
+          "latest_version": null,
+          "note": "Run on this server only when deployment operations have finished. Restarts the agent; does not re-register or update app containers. Confirm the reported version after the next heartbeat.",
+          "update_available": null,
+          "update_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --apply"
+        },
+        "capacity": null,
+        "hostname": null,
+        "last_seen_at": null,
+        "origin": "external",
+        "registered_at": "2026-09-01T10:00:00Z",
+        "service_id": null,
+        "status": "pending",
+        "tor": null,
+        "update_policy": {
+          "channel": "stable",
+          "end_of_life": null,
+          "maintenance_window_utc": null,
+          "minimum_supported": null,
+          "offer": {
+            "offered": false,
+            "reason": "channel_unavailable"
+          },
+          "pinned_version": null
+        },
+        "version": null
+      },
+      {
+        "agent_id": "agt_f18vps0000000000000001",
+        "agent_update": {
+          "channel": "stable",
+          "check_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --check",
+          "installed_version": "0.6.24",
+          "latest_version": null,
+          "note": "Run on this server only when deployment operations have finished. Restarts the agent; does not re-register or update app containers. Confirm the reported version after the next heartbeat.",
+          "update_available": null,
+          "update_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --apply"
+        },
+        "capacity": {
+          "cpu_pct": 3,
+          "disk_free_gb": 15,
+          "disk_pct": 25,
+          "disk_total_gb": 20,
+          "mem_free_mb": 724,
+          "mem_pct": 29,
+          "mem_total_mb": 1024,
+          "reported_at": "2026-10-01T12:00:00Z",
+          "stale": true
+        },
+        "hostname": "vps1.fixture.invalid",
+        "last_seen_at": "2026-10-01T12:00:00Z",
+        "origin": "impreza-proxmox",
+        "registered_at": "2026-09-01T10:00:00Z",
+        "service_id": 501,
+        "status": "online",
+        "tor": null,
+        "update_policy": {
+          "channel": "stable",
+          "end_of_life": null,
+          "maintenance_window_utc": null,
+          "minimum_supported": null,
+          "offer": {
+            "offered": false,
+            "reason": "channel_unavailable"
+          },
+          "pinned_version": null
+        },
+        "version": "0.6.24"
+      },
+      {
+        "agent_id": "agt_f18byo0000000000000001",
+        "agent_update": {
+          "channel": "stable",
+          "check_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --check",
+          "installed_version": "0.6.25",
+          "latest_version": null,
+          "note": "Run on this server only when deployment operations have finished. Restarts the agent; does not re-register or update app containers. Confirm the reported version after the next heartbeat.",
+          "update_available": null,
+          "update_command": "curl -fsSL https://raw.githubusercontent.com/imprezahost/agent-public/main/update.sh | sudo sh -s -- --apply"
+        },
+        "capacity": {
+          "cpu_pct": 12.5,
+          "disk_free_gb": 30,
+          "disk_pct": 25,
+          "disk_total_gb": 40,
+          "mem_free_mb": 1148,
+          "mem_pct": 44,
+          "mem_total_mb": 2048,
+          "reported_at": "2026-10-01T12:00:00Z",
+          "stale": true
+        },
+        "hostname": "byo.fixture.invalid",
+        "last_seen_at": "2026-10-01T12:00:00Z",
+        "origin": "external",
+        "registered_at": "2026-09-01T10:00:00Z",
+        "service_id": null,
+        "status": "online",
+        "tor": {
+          "image": "tor@sha256:fixture",
+          "running": true,
+          "version": "0.4.8"
+        },
+        "update_policy": {
+          "channel": "stable",
+          "end_of_life": null,
+          "maintenance_window_utc": null,
+          "minimum_supported": null,
+          "offer": {
+            "offered": false,
+            "reason": "channel_unavailable"
+          },
+          "pinned_version": null
+        },
+        "version": "0.6.25"
+      }
+    ],
+    "total": 3
+  },
+  "impreza_search_docs:search": {
+    "note": "Excerpts are cut to fit. Pass `section` with a result's heading to read the whole thing.",
+    "query": "backup",
+    "results": [
+      {
+        "excerpt": "…\nthe DevKit CLI and the Go SDK do not include it yet. When enabled, a replication slot and periodic WAL\r\ndrains write base backups and WAL into the customer's bucket. Each base\r\nincludes the checkpoint WAL needed to replay it independently; later drains\r\nextend that recovery range. The configured drain interval is 5–60 minutes\r\n(default 15). The reported recoverable boundary\r\nadvances only after a complete WAL segment covering that instant is stored in\r\nthe bucket; an empty or failed drain does not advance it. Each forced segment\r\nswitch can add storage usage, and the configured interval is not a promise of\r\nzero data loss. A reviewed restore replays to a selected UTC\n…",
+        "matched": [
+          "backup"
+        ],
+        "score": 36,
+        "title": "Backup + restore — into the customer's own S3",
+        "trail": "Deploy reference"
+      },
+      {
+        "excerpt": "Available with agent **0.6.18+** and the capabilities below. Update existing agents explicitly. Managed database verification runs within the existing backup workflow; assisted restoration uses the portal, REST API and MCP.\r\n\r\nA backup of a supported managed PostgreSQL binding adds a consistent `pg_dump` and mandatory restoration into a temporary verification database. Verification receives a temporary, operation-scoped login with no membership of the stable database owner; the serving login is confined to the dump stage. The result includes the verified table count and dump checksum, and the agent removes the temporary database and login before reporting success. An unverified database back\n…",
+        "matched": [
+          "backup"
+        ],
+        "score": 36,
+        "title": "Consistent backups and assisted restore",
+        "trail": "Guide: Review a managed database connection"
+      },
+      {
+        "excerpt": "Use **Download** on a completed backup, or `impreza_download_backup` with\r\n`backup_id`. REST: `POST /v1/backups/{id}/download-link`.\r\nThe response provides presigned URLs for the manifest and chunks in your own\r\nstorage bucket, expiring after five minutes. Download every part required by\r\nthe manifest. These URLs grant access to backup contents until expiry: do not\r\ncommit them, put them in tickets or share them with untrusted recipients.\r\nBucket credentials are not returned and backup bytes do not pass through the\r\nportal. Incomplete backups and unreadable manifests cannot be downloaded by\r\nthis workflow; ownership and manifest-size/part limits are enforced.",
+        "matched": [
+          "backup"
+        ],
+        "score": 36,
+        "title": "Download a backup",
+        "trail": "Guide: Review configuration, monitor apps and recover data"
+      }
+    ],
+    "source": "https://docs.imprezahost.com/llms-full.txt",
+    "total": 3
+  },
+  "impreza_get_shield:controls_under_attack": {
+    "shield": {
+      "audit_review": {
+        "blocked_requests": 7,
+        "note": "Requests are counted once; a request can match several rules. Counts include policies used within the window. WAF counters start after a Shield v2 route is applied; earlier v1 traffic is not included. No visitor identity is collected.",
+        "top_rules": [
+          {
+            "category": "SQLi",
+            "description": "SQL Injection Attack Detected via libinjection",
+            "matches": 7,
+            "rule_id": 942100
+          }
+        ],
+        "window_hours": 24,
+        "would_block_requests": 2
+      },
+      "controls": {
+        "attack_expires_at": 1790986964,
+        "pow_difficulty": 3,
+        "pow_paths": [
+          "/api/",
+          "/login"
+        ],
+        "rate_limit_rpm": 600,
+        "trusted_sources": [
+          "198.51.100.0/24",
+          "2001:db8::/48"
+        ]
+      },
+      "controls_required_capability": "shield-v2-controls",
+      "controls_supported": true,
+      "deployment_id": "dpl_9a00000000000001",
+      "exclusions": [
+        {
+          "rule_id": 941100
+        },
+        {
+          "path_prefix": "/search",
+          "rule_id": 942100
+        }
+      ],
+      "minimum_agent_version": "0.6.27",
+      "mode": "enforce",
+      "policy_updated_at": "2026-10-01 11:00:00",
+      "profile": "max",
+      "required_capability": "shield-v2",
+      "revision": 5,
+      "under_attack": {
+        "active": true,
+        "difficulty": 4,
+        "expires_at": "2026-10-03T00:22:44Z",
+        "remaining_seconds": 3528
+      },
+      "v2_supported": true
+    }
+  },
+  "impreza_apply_traffic_switch:first_apply": {
+    "receipt": {
+      "accepted_at": "2026-10-02T23:24:31+00:00",
+      "command_id": "cmd_272f6eaa0058ff23",
+      "hostname": "b4-switch-h.fixture.invalid",
+      "source_deployment_id": "dpl_8b00000000000021",
+      "status": "accepted",
+      "switch": "not_yet_verified",
+      "switch_id": "tsw_e5ebeba018de7a3d1b48b638",
+      "target_deployment_id": "dpl_8b00000000000022"
+    },
+    "replayed": false
+  },
+  "impreza_prepare_database_restore:fresh_review": {
+    "cutover": "none — the restore lands in a new database; switching the application to it is a separate, deliberate step",
+    "expires_at": "2026-10-02T23:39:27+00:00",
+    "operation": "database_restore",
+    "plan_id": "rspl_ca0b3d78c2b5d642734615b9",
+    "receipt": null,
+    "review_digest": "d6f8522cf381fd3318453f949a891a06b047ccc0f0a33855e71776f49cc3ad55",
+    "source_backup": {
+      "backup_id": "bkp_9c00000000000001",
+      "created_at": "2026-09-30 09:00:00",
+      "tables": 12,
+      "total_bytes": 1048576
+    },
+    "source_deployment_id": "dpl_9c00000000000001",
+    "status": "ready_for_review",
+    "target": {
+      "binding_id": "bnd_9c0000000000000000000001",
+      "database": "imp_restore_4ba15eeb08064480",
+      "owner": "ibo_9c0000000000000000000001",
+      "provider_deployment_id": "dpl_9c00000000000002"
+    }
+  },
+  "impreza_prepare_pitr_restore:fresh_review": {
+    "base": {
+      "created_at": "2026-09-30T00:00:00Z",
+      "id": "pbase_9c00000000000001",
+      "start_segment": "000000010000000000000003"
+    },
+    "cutover": "none — the recovery lands in a new database; switching the application to it is a separate, deliberate step",
+    "database_provider": {
+      "database": "imp_9c0000000000000000000001",
+      "deployment_id": "dpl_9c00000000000002"
+    },
+    "expires_at": "2026-10-02T23:39:28+00:00",
+    "last_drain_at": "2026-09-30T11:55:00Z",
+    "operation": "pitr_restore",
+    "phases": "recover to the instant in a scratch cluster, then a verified logical restore into the new database",
+    "plan_id": "ppl_bcf2a8b4bbc5de367c4f96c6",
+    "receipt": null,
+    "review_digest": "fd08f1063e30b377e52e29a90bb64821ed85fee9d3b13bb6d93c0fa97f2c52c0",
+    "status": "ready_for_review",
+    "target": {
+      "binding_id": "bnd_9c0000000000000000000001",
+      "consumer_deployment_id": "dpl_9c00000000000001",
+      "restore_database": "imp_restore_8c12776f7ab776c4"
+    },
+    "target_time": "2026-09-30T11:30:00Z",
+    "wal_segments_available": 7
+  },
+  "impreza_vps_offer:offer": {
+    "apps": {
+      "default": "@agent",
+      "note": "'@agent' installs the Impreza agent so the VPS can receive app deployments; '@agent-mcp' adds the agent's MCP; 'none' is a bare OS; '@panel-*' makes it a control-panel server; any other value is a catalog app (GET /v1/platform/apps) installed on first boot.",
+      "options": [
+        "none",
+        "@agent",
+        "@agent-mcp",
+        "@panel-aapanel",
+        "@panel-aapanel-full",
+        "@panel-aapanel-tor",
+        "@panel-aapanel-tor-fast",
+        "@panel-cyberpanel",
+        "@panel-cloudpanel",
+        "@panel-cpanel",
+        "f18b5e-plain",
+        "f18b5e-creds",
+        "f18b2-onion",
+        "f18g1-bare",
+        "f18g1-notes"
+      ]
+    },
+    "balance": "12.50",
+    "billing_cycles": [
+      {
+        "cycle": "monthly",
+        "months": 1
+      },
+      {
+        "cycle": "quarterly",
+        "months": 3
+      },
+      {
+        "cycle": "annually",
+        "months": 12
+      }
+    ],
+    "currency": "USD",
+    "description": "Fixture configurable VPS",
+    "limits": {
+      "disk_gb_per_core": "50.00",
+      "memory_gb_per_core": "4.00"
+    },
+    "locations": [
+      {
+        "id": 9311,
+        "name": "Romania",
+        "slug": "romania"
+      },
+      {
+        "id": 9312,
+        "name": "Iceland",
+        "slug": "iceland",
+        "surcharge": {
+          "annually": "10.80",
+          "monthly": "1.00",
+          "quarterly": "2.85"
+        }
+      }
+    ],
+    "name": "F18 Cloud VPS",
+    "operating_systems": [
+      {
+        "family": "ubuntu",
+        "id": 9321,
+        "name": "Ubuntu 24.04",
+        "slug": "ubuntu-24.04"
+      },
+      {
+        "family": "debian",
+        "id": 9322,
+        "name": "Debian 12",
+        "slug": "debian-12"
+      }
+    ],
+    "order": "POST /v1/orders with billing_cycle, location, os, cpu_cores, memory_gb and disk_gb (plus app and hostname if you like). location and os take the id, the slug or the name listed here.",
+    "pricing": "The price for a cycle is the sum of each resource's quantity times its price_per_unit for that cycle, plus any location or OS surcharge. GET /v1/products/vps/quote prices one configuration exactly.",
+    "product_id": 9301,
+    "resources": {
+      "cpu_cores": {
+        "max": 16,
+        "min": 1,
+        "price_per_unit": {
+          "annually": "21.60",
+          "monthly": "2.00",
+          "quarterly": "5.70"
+        },
+        "setup_fee_per_unit": {
+          "monthly": "0.50"
+        },
+        "unit": "vCPU"
+      },
+      "disk_gb": {
+        "max": 200,
+        "min": 20,
+        "price_per_unit": {
+          "annually": "0.54",
+          "monthly": "0.05",
+          "quarterly": "0.14"
+        },
+        "type": "NVMe SSD",
+        "unit": "GB"
+      },
+      "memory_gb": {
+        "max": 32,
+        "min": 1,
+        "price_per_unit": {
+          "annually": "16.20",
+          "monthly": "1.50",
+          "quarterly": "4.25"
+        },
+        "unit": "GB"
+      }
+    },
+    "starting_at": {
+      "annually": "48.60",
+      "monthly": "5.00",
+      "quarterly": "12.75"
+    }
+  },
+  "impreza_vps_offer:quote": {
+    "balance": "12.50",
+    "balance_covers": false,
+    "billing_cycle": "monthly",
+    "configuration": {
+      "app": "@agent",
+      "billing_cycle": "monthly",
+      "cpu_cores": 2,
+      "disk_gb": 40,
+      "location": {
+        "id": 9312,
+        "name": "Iceland",
+        "slug": "iceland"
+      },
+      "memory_gb": 4,
+      "os": {
+        "id": 9322,
+        "name": "Debian 12",
+        "slug": "debian-12"
+      }
+    },
+    "currency": "USD",
+    "due_today": "14.00",
+    "due_today_cents": 1400,
+    "exact": true,
+    "lines": [
+      {
+        "amount": "1.00",
+        "item": "Location: Iceland",
+        "quantity": 1,
+        "unit_price": "1.00"
+      },
+      {
+        "amount": "4.00",
+        "item": "CPU Cores",
+        "quantity": 2,
+        "setup_fee": "1.00",
+        "unit_price": "2.00"
+      },
+      {
+        "amount": "6.00",
+        "item": "Memory",
+        "quantity": 4,
+        "unit_price": "1.50"
+      },
+      {
+        "amount": "2.00",
+        "item": "Disk Space",
+        "quantity": 40,
+        "unit_price": "0.05"
+      }
+    ],
+    "location_available": null,
+    "months": 1,
+    "order": {
+      "body": {
+        "app": "@agent",
+        "billing_cycle": "monthly",
+        "cpu_cores": 2,
+        "disk_gb": 40,
+        "location": "iceland",
+        "memory_gb": 4,
+        "os": "debian-12"
+      },
+      "method": "POST",
+      "path": "/v1/orders"
+    },
+    "product": "F18 Cloud VPS",
+    "product_id": 9301,
+    "recurring": "13.00",
+    "renews": "13.00 USD every 1 month",
+    "setup_fee": "1.00",
+    "top_up_needed": "1.50"
+  },
+  "impreza_get_zero_downtime:catalog": {
+    "app_kind": "catalog",
+    "deployment_id": "dpl_1a00000000000001",
+    "zero_downtime": {
+      "agent_supported": false,
+      "can_opt_in": false,
+      "eligible": false,
+      "enabled": false,
+      "ineligible_reason": "Catalog apps are not eligible for zero-downtime redeploys: their recipes can run database migrations, pin host ports or share volumes between copies.",
+      "last": null,
+      "minimum_agent_released": false,
+      "minimum_agent_version": "0.6.27",
+      "policy": null,
+      "reasons": [
+        {
+          "code": "catalog_app",
+          "message": "Catalog apps are not eligible for zero-downtime redeploys: their recipes can run database migrations, pin host ports or share volumes between copies.",
+          "remedy": "Deploy the app as a custom app with one web service to use zero-downtime redeploys.",
+          "scope": "app"
+        }
+      ]
+    }
+  },
+  "impreza_get_zero_downtime:eligible": {
+    "app_kind": "custom",
+    "deployment_id": "dpl_15e0000000000001",
+    "zero_downtime": {
+      "agent_supported": true,
+      "can_opt_in": true,
+      "eligible": true,
+      "enabled": false,
+      "ineligible_reason": null,
+      "last": null,
+      "minimum_agent_released": false,
+      "minimum_agent_version": "0.6.27",
+      "policy": null,
+      "reasons": []
+    }
+  },
+  "impreza_get_zero_downtime:old_agent_opted_in": {
+    "app_kind": "custom",
+    "deployment_id": "dpl_15e0000000000002",
+    "zero_downtime": {
+      "agent_supported": false,
+      "can_opt_in": true,
+      "eligible": false,
+      "enabled": true,
+      "ineligible_reason": null,
+      "last": null,
+      "minimum_agent_released": false,
+      "minimum_agent_version": "0.6.27",
+      "policy": {
+        "drain_seconds": 5,
+        "path": "/healthz",
+        "status_max": 399,
+        "status_min": 200,
+        "timeout_seconds": 60
+      },
+      "reasons": [
+        {
+          "code": "agent_unsupported",
+          "message": "This server's agent does not support zero-downtime redeploys (agent 0.6.27 or newer, not yet released).",
+          "remedy": "Update the agent with the customer update command once agent 0.6.27 is released. Until then, redeploys run normally.",
+          "scope": "agent"
+        }
+      ]
+    }
+  },
+  "impreza_get_zero_downtime:several_reasons": {
+    "app_kind": "custom",
+    "deployment_id": "dpl_15e0000000000003",
+    "zero_downtime": {
+      "agent_supported": true,
+      "can_opt_in": false,
+      "eligible": false,
+      "enabled": false,
+      "ineligible_reason": "Only single-service apps (one service named app) are eligible; this app has 2 services. Compose apps with several services cannot run two copies safely. The app publishes a fixed port on the host; a second copy cannot bind it. Only apps reached through the proxy are eligible. The app has a writable volume (/var/lib/app); two copies writing the same data is not safe. Read-only volumes are fine.",
+      "last": null,
+      "minimum_agent_released": false,
+      "minimum_agent_version": "0.6.27",
+      "policy": null,
+      "reasons": [
+        {
+          "code": "multiple_services",
+          "message": "Only single-service apps (one service named app) are eligible; this app has 2 services. Compose apps with several services cannot run two copies safely.",
+          "remedy": "Keep one service named app and move the others (databases, workers, caches) to their own apps.",
+          "scope": "app"
+        },
+        {
+          "code": "fixed_host_port",
+          "message": "The app publishes a fixed port on the host; a second copy cannot bind it. Only apps reached through the proxy are eligible.",
+          "remedy": "Remove the fixed host port and reach the app through its domain or onion address.",
+          "scope": "app"
+        },
+        {
+          "code": "writable_volume",
+          "message": "The app has a writable volume (/var/lib/app); two copies writing the same data is not safe. Read-only volumes are fine.",
+          "remedy": "Mount the volume read-only (:ro), or keep the data in a separate database or storage app.",
+          "scope": "app"
+        }
+      ]
+    }
+  },
+  "impreza_list_previews:none": {
+    "deployment_id": "dpl_1a00000000000012",
+    "note": "No live previews. Push to a branch other than \"main\" to make one.",
+    "previews": [],
+    "settings": {
+      "enabled": false,
+      "inherit_vars": [],
+      "inheritance_applies_to": "new_previews_only",
+      "max": 5,
+      "ttl_hours": 24,
+      "watched_branch": "main"
+    }
+  },
+  "impreza_list_previews:with_previews": {
+    "deployment_id": "dpl_1a00000000000011",
+    "note": null,
+    "previews": [
+      {
+        "branch": "feature-x",
+        "created_at": "2026-09-30T10:00:00Z",
+        "expires_at": "2026-10-30T10:00:00Z",
+        "git_credential_source": "dpl_1a00000000000011",
+        "id": "dpl_1a00000000000013",
+        "name": "g1-web-pv-feature",
+        "onion": "g1fixturecccccccccccccccccccccccccccccccccccccccccccccc.onion",
+        "preview_of": "dpl_1a00000000000011",
+        "protected": false,
+        "status": "running",
+        "teardown": {
+          "backups": "Backups already saved to your S3 account remain until you delete them or your retention policy expires them.",
+          "billing": "The VPS and its billing continue. Removing a preview stops its compute; it does not cancel the server or refund the VPS charge.",
+          "onion_keys": "The hidden service stops. The agent parks its old keys for a 30-day recovery retention; pruning is best-effort during later Tor operations. Reopening creates fresh keys.",
+          "volumes": "Preview-owned Docker volumes are deleted after the agent confirms teardown. Production volumes are never copied or deleted."
+        },
+        "url": "http://g1fixturecccccccccccccccccccccccccccccccccccccccccccccc.onion",
+        "warning": null
+      },
+      {
+        "branch": "docs",
+        "created_at": "2026-10-01T09:00:00Z",
+        "expires_at": null,
+        "git_credential_source": null,
+        "id": "dpl_1a00000000000015",
+        "name": "g1-web-pv-docs",
+        "onion": null,
+        "preview_of": "dpl_1a00000000000011",
+        "protected": false,
+        "status": "building",
+        "teardown": {
+          "backups": "Backups already saved to your S3 account remain until you delete them or your retention policy expires them.",
+          "billing": "The VPS and its billing continue. Removing a preview stops its compute; it does not cancel the server or refund the VPS charge.",
+          "onion_keys": "The hidden service stops. The agent parks its old keys for a 30-day recovery retention; pruning is best-effort during later Tor operations. Reopening creates fresh keys.",
+          "volumes": "Preview-owned Docker volumes are deleted after the agent confirms teardown. Production volumes are never copied or deleted."
+        },
+        "url": null,
+        "warning": null
+      }
+    ],
+    "settings": {
+      "enabled": true,
+      "inherit_vars": [
+        "SITE_NAME"
+      ],
+      "inheritance_applies_to": "new_previews_only",
+      "max": 3,
+      "ttl_hours": 12,
+      "watched_branch": "main"
+    }
+  }
+}
