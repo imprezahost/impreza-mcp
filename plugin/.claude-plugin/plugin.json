@@ -6,7 +6,7 @@
   "termsOfServiceUrl": "https://impreza.host/terms/",
   "supportUrl": "https://portal.imprezahost.com/supporttickets",
   "documentationUrl": "https://docs.imprezahost.com/",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "homepage": "https://github.com/imprezahost/impreza-mcp",
   "repository": "https://github.com/imprezahost/impreza-mcp",

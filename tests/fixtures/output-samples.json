@@ -3022,5 +3022,126 @@
       "ttl_hours": 12,
       "watched_branch": "main"
     }
+  },
+  "impreza_vps_resize_recommendation:no_agent": {
+    "evaluated_at": "2026-10-07T18:55:56Z",
+    "next_steps": [],
+    "nothing_ordered": "This is advice only: nothing is ordered or charged. To apply it, resize the VPS (POST /v1/services/9613/resize, or impreza_vps_resize), which quotes the price again and asks for its own confirmation.",
+    "reason": "No Impreza agent reports this VPS's load. The agent is optional; without it there is no evidence to base a recommendation on.",
+    "service_id": 9613,
+    "status": "insufficient_data",
+    "window": {
+      "complete_hour_minutes": 45,
+      "complete_hours_needed": 48,
+      "hours": 72
+    }
+  },
+  "impreza_vps_resize_recommendation:recommended": {
+    "app_limits": [],
+    "evaluated_at": "2026-10-07T18:55:55Z",
+    "next_steps": [],
+    "nothing_ordered": "This is advice only: nothing is ordered or charged. To apply it, resize the VPS (POST /v1/services/9611/resize, or impreza_vps_resize), which quotes the price again and asks for its own confirmation.",
+    "proposal": {
+      "from": {
+        "cpu_cores": 1,
+        "disk_gb": 20,
+        "memory_gb": 1
+      },
+      "quote": null,
+      "to": {
+        "cpu_cores": 2,
+        "disk_gb": 20,
+        "memory_gb": 1
+      },
+      "why": [
+        "CPU averaged at or above 80% in 72 of 72 complete hours, and 90.0% over the last 6."
+      ]
+    },
+    "proposal_error": {
+      "code": "INVALID_REQUEST",
+      "message": "The price could not be quoted right now, so nothing is proposed for purchase. GET /v1/services/9611/resize/quote with these sizes says why."
+    },
+    "resources": {
+      "cpu": {
+        "close": false,
+        "hours": 72,
+        "observed": {
+          "hours_at_or_above": 72,
+          "mean_pct": 90,
+          "peak_hour_pct": 90,
+          "recent_hours": 6,
+          "recent_mean_pct": 90
+        },
+        "open": true,
+        "recommended": true,
+        "state": "sustained",
+        "thresholds": {
+          "close_pct": 65,
+          "open_pct": 80
+        },
+        "why": "CPU averaged at or above 80% in 72 of 72 complete hours, and 90.0% over the last 6."
+      },
+      "disk": {
+        "close": true,
+        "hours": 72,
+        "observed": {
+          "last_hours": 24,
+          "latest_pct": 40,
+          "lowest_peak_last_hours_pct": 40
+        },
+        "open": false,
+        "recommended": false,
+        "state": "ok",
+        "thresholds": {
+          "close_pct": 75,
+          "open_pct": 85
+        },
+        "why": "The disk did not stay at or above 85% for 24 hours (latest 40.0%)."
+      },
+      "memory": {
+        "close": true,
+        "hours": 72,
+        "observed": {
+          "hours_at_or_above": 0,
+          "mean_pct": 39,
+          "peak_hour_pct": 39,
+          "recent_hours": 6,
+          "recent_mean_pct": 39
+        },
+        "open": false,
+        "recommended": false,
+        "state": "ok",
+        "thresholds": {
+          "close_pct": 70,
+          "open_pct": 85
+        },
+        "why": "Memory was at or above 85% in 0 of 72 complete hours (75% are needed), 39.0% over the last 6; a peak is not a reason to resize."
+      }
+    },
+    "service_id": 9611,
+    "status": "recommended",
+    "window": {
+      "complete_hour_minutes": 45,
+      "complete_hours": 72,
+      "complete_hours_needed": 48,
+      "hours": 72,
+      "last_report_at": "2026-10-07T18:55:26Z"
+    }
+  },
+  "impreza_vps_resize_recommendation:stale": {
+    "app_limits": [],
+    "evaluated_at": "2026-10-07T18:55:56Z",
+    "next_steps": [],
+    "nothing_ordered": "This is advice only: nothing is ordered or charged. To apply it, resize the VPS (POST /v1/services/9612/resize, or impreza_vps_resize), which quotes the price again and asks for its own confirmation.",
+    "reason": "The agent has not reported this VPS's load in the last 15 minutes, so its current load is unknown.",
+    "service_id": 9612,
+    "status": "stale",
+    "window": {
+      "complete_hour_minutes": 45,
+      "complete_hours": 72,
+      "complete_hours_needed": 48,
+      "hours": 72,
+      "last_report_at": "2026-10-01T12:00:00Z"
+    }
   }
 }

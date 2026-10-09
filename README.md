@@ -10,6 +10,16 @@ loaded, Claude calls `impreza_deploy_custom` directly — packages your
 project, uploads it, builds + runs on your Impreza VPS, and reports
 back the URL.
 
+## Pair the local CLI
+
+Generate a one-time code in clientarea under **Impreza API → Connect an AI assistant**, choosing the permissions the assistant needs. Run `npx -y impreza-mcp login --code <code-from-clientarea>` on the machine running the local MCP server. Codes expire after 10 minutes and can be used once.
+
+The CLI exchanges the code at `POST /v1/mcp/pair` without sending any existing API credentials. It saves the returned key, secret, scopes and expiry in `~/.impreza/credentials.json`; the code and secret are never printed. The directory uses mode `0700` and the file `0600` on POSIX. Windows uses a protected ACL granting access only to your account. The server reads this file automatically when neither credential environment variable is set. Explicit `IMPREZA_API_KEY` and `IMPREZA_API_SECRET` take precedence together; partial environment credentials never use a saved counterpart.
+
+Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is required; a v3 onion endpoint requires `IMPREZA_PROXY` with an explicit SOCKS5 proxy and never falls back to a direct connection. The endpoint and proxy are saved with the credential. A different API URL refuses the saved credential. Pairing never follows redirects or retries a code automatically.
+
+An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
+
 ## Deployment progress and agent restarts
 
 Compose review and deployment accept
@@ -268,7 +278,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.47.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.48.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -280,7 +290,7 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 196 tools on both sides**. Declared, one-direction gaps remain:
+catalog — 212 tools in the local package**. Declared, one-direction gaps remain:
 `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
 requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and
@@ -731,6 +741,52 @@ installs, imported manifests and external service bindings are unsupported.
 See the [Tor runtime guide](https://docs.imprezahost.com/onion-services.html#runtime-egress)
 for availability and verification. This option is separate from using Tor to
 connect the MCP client itself and from publishing an inbound onion address.
+
+## Jurisdiction failover and safer reads (0.48.0)
+
+**Reviewed cold failover.** Fourteen tools move an app to a cold standby on
+another server you own, in a different country, through a review you confirm.
+The reviewed app in this release is **Memos 0.31.0** from the catalog. Create
+the standby with `impreza_deploy_catalog_app` and `standby: true`, without a
+domain or onion; it starts with no public route. Then pair and read it
+(`impreza_pair_failover_standby`, `impreza_get_failover_standby`). For an
+external server, first declare its country with
+`impreza_declare_external_failover_country` (declared by you, not verified by
+Impreza; managed servers report theirs). Confirm the exact
+backup/restore/redeploy chain (`impreza_confirm_failover_sync`), then prepare,
+read and apply a review (`impreza_prepare_failover`, `impreza_get_failover`,
+`impreza_apply_failover`, and `impreza_retry_failover_activation` when target
+activation needs another try).
+
+After a verified failover, `impreza_prepare_failback`, `impreza_get_failback`
+and `impreza_apply_failback` release the old host and invert the pair: the old
+primary becomes the cold standby, and no traffic moves. Returning traffic is an
+ordinary backup, restore, sync confirmation and reviewed failover.
+`impreza_set_failover_drill_policy`, `impreza_run_failover_drill` and
+`impreza_get_failover_drill` refresh the standby with a platform-run cold copy,
+on demand or every 60 to 10080 minutes, and record how long each step took.
+
+What moves: a hostname in the managed zone, or a public onion address through
+its sealed export. Custom domains, private onion services, database bindings
+and dedicated servers are not supported. Applying stops the source and can
+interrupt traffic or lose writes made since the restored backup: review the
+source, target and backup age with the user, then pass the exact `cutover_id`
+(or `failback_id`), `review_digest` and `confirm: true`. Acceptance is
+asynchronous: read the review until it is verified or reports an actionable
+failure. Where failover is not enabled on the API, these tools return the API's
+404. The hosted connector requires an unconfined account credential. Guide:
+[jurisdiction failover](https://docs.imprezahost.com/jurisdiction-failover.html).
+
+**Also in 0.48.0:**
+- `impreza_vps_resize_recommendation`: whether a configurable VPS needs more
+  CPU, memory or disk, judged from the sustained load its agent reports.
+- `impreza_get_host_inventory` omits SSH host key fingerprints unless you pass
+  `include_ssh_fingerprints: true`.
+- API errors come back as `structuredContent` with a `code` and `next_steps`.
+- `npx -y impreza-mcp login --code <code>` pairs the local server with a
+  one-time code from the client area (see [Pair the local CLI](#pair-the-local-cli)).
+- The publish playbook diagnoses a failed deployment with `impreza_doctor` and
+  `impreza_get_logs`.
 
 ## Account overview, playbooks and safer operations (0.47.0)
 

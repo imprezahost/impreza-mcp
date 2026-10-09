@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import type {ImprezaClient} from './client.js';
+import { ApiError } from './client.js';
 
 export const CUSTOMER_TOOLS = [
   {
@@ -357,7 +358,21 @@ export function isCustomerTool(name:string):boolean { return Object.hasOwn(route
 export async function callCustomerTool(client:ImprezaClient,name:string,args:Record<string,unknown>):Promise<unknown> {
  const validator=validators[name], route=routes[name];
  if(!validator || !route) throw new Error('Unknown customer workflow');
- const p=validator.parse(args) as Record<string,unknown>;
+ let p:Record<string,unknown>;
+ try{p=validator.parse(args) as Record<string,unknown>;}
+ catch(err){
+  // A local argument refusal speaks the same INVALID_REQUEST family
+  // the server does, with the structured step (the field names come from the
+  // validator's own issues — schema-public, never caller prose).
+  if(err&&typeof err==='object'&&Array.isArray((err as {issues?:unknown[]}).issues)){
+   const issues=(err as {issues:Array<{path:Array<string|number>;message:string}>}).issues;
+   const missing=[...new Set(issues.map((i)=>i.path.join('.')).filter((x)=>x!==''))];
+   throw new ApiError('INVALID_REQUEST',`Invalid arguments for ${name}: ${issues.map((i)=>i.message).join('; ')}`,[
+    {action:'Retry the same call with the arguments named in missing.',...(missing.length?{missing}:{}),doc:'https://docs.imprezahost.com/tutorials/rest-api.html#errors'},
+   ]);
+  }
+  throw err;
+ }
  if(name==='impreza_set_alert_rule' && (p.metric==='shield_blocked' || p.metric==='shield_rate_limited') && p.duration_minutes!==undefined && p.duration_minutes!==5) throw new Error('Shield spike duration_minutes must be 5');
  if(name==='impreza_set_alert_rule' && ((p.metric==='down' && p.threshold!==1) || (p.metric==='memory_pct' && Number(p.threshold)>100))) throw new Error('Invalid threshold for metric');
  const [method,template]=route;

@@ -9,3 +9,4 @@ coverage/
 .env
 .env.local
 .npmrc
+.test-runs/

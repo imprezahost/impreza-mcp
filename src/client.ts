@@ -36,6 +36,23 @@ export interface ImprezaConfig {
   proxy?: string;
 }
 
+/**
+ * An API refusal that carried the structured next step. The thrown
+ * message keeps the exact "CODE: message" text the package always had; the
+ * code and the steps ride along so the server can attach structuredContent
+ * to the error result without reparsing prose.
+ */
+export class ApiError extends Error {
+  readonly code: string;
+  readonly nextSteps: Array<Record<string, unknown>>;
+  constructor(code: string, message: string, nextSteps: Array<Record<string, unknown>>) {
+    super(`${code}: ${message}`);
+    this.name = 'ApiError';
+    this.code = code;
+    this.nextSteps = nextSteps;
+  }
+}
+
 export class ImprezaClient {
   private readonly baseURL: string;
   private readonly apiKey: string;
@@ -82,6 +99,31 @@ export class ImprezaClient {
       body: JSON.stringify(body ?? {}),
     });
     return this.parseEnvelope<T>(res);
+  }
+
+  /** Anonymous, non-retrying exchange. Bound the untrusted credential response. */
+  async pairCode(code: string): Promise<Record<string, unknown>> {
+    if (this.apiKey || this.apiSecret) throw new Error('Pairing must be anonymous.');
+    const response = await this.fetch(new URL(this.baseURL + '/v1/mcp/pair'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+    });
+    if (!response.ok || !response.body) throw new Error('Pairing refused.');
+    const reader = response.body.getReader();
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    const timer = setTimeout(() => { void reader.cancel(); }, this.timeoutMs);
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        size += next.value.length;
+        if (size > 16384) throw new Error('Pairing response too large.');
+        parts.push(next.value);
+      }
+      const envelope = JSON.parse(Buffer.concat(parts).toString('utf8'));
+      if (envelope.success !== true || !envelope.data || typeof envelope.data !== 'object' || Array.isArray(envelope.data)) throw new Error('Pairing response invalid.');
+      return envelope.data as Record<string, unknown>;
+    } finally { clearTimeout(timer); await reader.cancel(); }
   }
 
   /**
@@ -266,7 +308,7 @@ export class ImprezaClient {
 
   private async parseEnvelope<T>(res: Response): Promise<T> {
     const text = await res.text();
-    let env: { success?: boolean; data?: T; error?: { code?: string; message?: string }; meta?: { request_id?: string } };
+    let env: { success?: boolean; data?: T; error?: { code?: string; message?: string; next_steps?: Array<Record<string, unknown>> }; meta?: { request_id?: string } };
     try {
       env = text ? JSON.parse(text) : {};
     } catch {
@@ -276,7 +318,9 @@ export class ImprezaClient {
       const code = env.error?.code ?? `HTTP_${res.status}`;
       const msg = env.error?.message ?? `request failed (HTTP ${res.status})`;
       const reqId = env.meta?.request_id ? ` [req=${env.meta.request_id}]` : '';
-      throw new Error(`${code}: ${msg}${reqId}`);
+      // Keep the text identical, carry the structured steps.
+      const steps = Array.isArray(env.error?.next_steps) ? env.error.next_steps : [];
+      throw new ApiError(code, `${msg}${reqId}`, steps);
     }
     return (env.data as T) ?? (undefined as unknown as T);
   }

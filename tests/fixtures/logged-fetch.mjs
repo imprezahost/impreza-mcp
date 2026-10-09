@@ -57,6 +57,7 @@ const ROUTES = [
   ['GET', '/v1/docs/search', 'impreza_search_docs:search'],
   ['GET', '/v1/products/vps', 'impreza_vps_offer:offer'],
   ['GET', '/v1/products/vps/quote', 'impreza_vps_offer:quote'],
+  ['GET', `/v1/services/${ID}/resize/recommendation`, 'impreza_vps_resize_recommendation:recommended'],
   // Writes: deployments.
   ['POST', CUSTOM, (r) => r.body?.mode === 'image' ? 'impreza_deploy_custom:image_onion_only' : 'impreza_deploy_custom:git_dockerfile', 201],
   ['POST', DEPLOY, 'impreza_deploy_catalog_app:generated_credentials', 201, (r, data) => ({ ...data, credentials: { ADMIN_PASSWORD: synthetic() } })],

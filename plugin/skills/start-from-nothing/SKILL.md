@@ -68,10 +68,16 @@ People choose this host for privacy, and the honest version of that includes
 the parts that are not flattering. If a customer is deciding, these are true and
 they should hear them:
 
-- The API and MCP hosts sit behind Cloudflare, which terminates TLS. There is
-  **no .onion mirror for the API or MCP** — only for the client area.
+- The clearnet API and MCP hosts sit behind Cloudflare, which terminates TLS.
+  Both also provide onion endpoints: the [hosted MCP connector](http://mcp.imprezareshna326gqgmbdzwmnad2wnjmeowh45bs2buxarh5qummjad.onion/mcp)
+  and the [API](http://api.imprezareshna326gqgmbdzwmnad2wnjmeowh45bs2buxarh5qummjad.onion).
+  Hosted OAuth needs a client that can reach the endpoint through Tor and
+  validate its issuer. The local MCP uses API-key credentials and an explicit
+  SOCKS5 proxy with the onion API. Follow the [connection guide](https://docs.imprezahost.com/connect-mcp.html).
 - The caller's IP is recorded on every API call.
-- Deployment environment variables are stored in the clear.
+- Prepared deployment configurations encrypt environment values at rest;
+  their review summaries return variable names only. This protects the saved
+  configuration, not the running application's own environment.
 - `impreza_privacy_report` is not marketing: it **measures** what the account
   actually holds, table by table, and reports whether our own retention windows
   are being honoured. If someone asks what is kept about them, call it rather

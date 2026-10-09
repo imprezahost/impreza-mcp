@@ -66,7 +66,8 @@ try {
  assert(get, 'impreza_get_zero_downtime is listed');
  assert.equal(get.annotations.readOnlyHint, true, 'it only reads');
  assert.deepEqual(get.inputSchema.required, ['deployment_id']);
- assert(get.outputSchema && get.outputSchema.properties.zero_downtime, 'it declares the outputSchema');
+ const zdProps = get.outputSchema && (get.outputSchema.properties || ((get.outputSchema.anyOf || []).find(x => x.properties && x.properties.zero_downtime) || {}).properties);
+ assert(zdProps && zdProps.zero_downtime, 'it declares the outputSchema');
  for (const [dep, key, codes] of [
   ['dpl_15e0000000000001', 'eligible', []],
   ['dpl_15e0000000000002', 'old_agent_opted_in', ['agent_unsupported']],

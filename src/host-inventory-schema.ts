@@ -18,7 +18,7 @@ export const hostInventoryOutputSchema = {
       "type": "string",
       "maxLength": 128,
       "enum": [
-        "0.6.28 (not yet released)"
+        "0.6.28"
       ]
     },
     "supported": {

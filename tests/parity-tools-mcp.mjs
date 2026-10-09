@@ -65,6 +65,24 @@ try {
   ['impreza_delete_environment',{environment_id:'env_bad',confirm:'staging'}],
   ['impreza_set_shield',{deployment_id:'dpl_app',shield_profile:'standard',surprise:1}],
  ]) assert((await client.callTool({name,arguments:args})).isError,name+' accepted '+JSON.stringify(args));
+ // The patterns themselves, each refused before any request.
+ const before=mcp.count();
+ for(const [name,args] of [
+  ['impreza_rename_project',{project_id:prj,name:'Shop'}],
+  ['impreza_rename_project',{project_id:prj,name:'shop/../x'}],
+  ['impreza_rename_project',{project_id:prj,name:'-shop'}],
+  ['impreza_rename_project',{project_id:prj,name:'s'+'x'.repeat(48)}],
+  ['impreza_rename_project',{project_id:prj,name:'shop\n'}],
+  ['impreza_request_agent_update',{agent_id:'e'.repeat(16),confirm:true}],
+  ['impreza_request_agent_update',{agent_id:'agt_'+'E'.repeat(16),confirm:true}],
+  ['impreza_request_agent_update',{agent_id:'agt_'+'e'.repeat(15),confirm:true}],
+  ['impreza_request_agent_update',{agent_id:'agt_'+'e'.repeat(16)+'/x',confirm:true}],
+  ['impreza_apply_config_promotion',{promotion_id:cpro,review_digest:'A'.repeat(64),confirm:true}],
+  ['impreza_apply_config_promotion',{promotion_id:cpro,review_digest:'a'.repeat(63),confirm:true}],
+  ['impreza_apply_config_promotion',{promotion_id:cpro,review_digest:'a'.repeat(64)+'\n',confirm:true}],
+  ['impreza_apply_config_promotion',{promotion_id:cpro,review_digest:'g'.repeat(64),confirm:true}],
+ ]) assert((await client.callTool({name,arguments:args})).isError,'pattern: '+name+' accepted '+JSON.stringify(args));
+ assert.equal(mcp.count(),before,'a refused pattern made a request');
  // a refused confirm never leaves the process
  let g=await client.callTool({name:'impreza_get_update_policy',arguments:{agent_id:agt}});assert(!g.isError,JSON.stringify(g));const c0=mcp.count();
  await client.callTool({name:'impreza_request_agent_update',arguments:{agent_id:agt,confirm:false}});

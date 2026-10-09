@@ -4,8 +4,7 @@
 //
 // Boots over stdio so AI tools (Claude Code, Cursor, Codex, Continue,
 // Zed, ...) can attach via the standard `command + args` MCP transport.
-// Auth is the customer's Impreza API key + secret, passed in via env
-// (`IMPREZA_API_KEY` / `IMPREZA_API_SECRET`).
+// Auth uses a privately paired credential or both credential environment variables.
 //
 // Iterations:
 //   A — list servers/apps/deployments, deploy_custom (3 modes), uninstall.
@@ -18,6 +17,7 @@
 
 import { listPrompts, getPrompt } from './playbooks.js';
 import { hostInventoryOutputSchema } from './host-inventory-schema.js';
+import { hostInventoryForMcp } from './host-inventory-privacy.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -40,20 +40,32 @@ import {
   type DeploymentList,
   type ServerList,
   tarProjectDir,
+  ApiError,
 } from './client.js';
 import { runSetup } from './setup.js';
+import { runLogin, LoginError } from './login.js';
+import { credentialEnvironment } from './credentials.js';
 import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-assets.js';
 import { envSchema } from './env.js';
 import { VERSION } from './version.js';
 import { OUTPUT_SCHEMAS, STRUCTURED_OMIT } from './output-schemas.js';
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
 import {PITR_TOOLS,isPitrTool,callPitrTool} from './pitr-workflows.js';
+import {FAILOVER_TOOLS,isFailoverTool,callFailoverTool} from './failover-workflows.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Subcommand dispatch — `setup` short-circuits before env validation.
 // ─────────────────────────────────────────────────────────────────────
 
 const sub = process.argv[2];
+if (sub === 'login') {
+  try { await runLogin(process.argv.slice(3)); }
+  catch (error) {
+    console.error(error instanceof LoginError ? error.message : 'Pairing failed. Check the code, API configuration and private credential storage.');
+    process.exit(2);
+  }
+  process.exit(0);
+}
 if (sub === 'setup') {
   runSetup(process.argv.slice(3));
   // runSetup() calls process.exit; this line never executes.
@@ -61,10 +73,11 @@ if (sub === 'setup') {
 if (sub === '--help' || sub === '-h' || sub === 'help') {
   console.log('Usage:');
   console.log('  impreza-mcp                       Run the MCP server over stdio (default).');
-  console.log('                                    Requires IMPREZA_API_KEY + IMPREZA_API_SECRET env.');
+  console.log('                                    Uses paired credentials or IMPREZA_API_KEY + IMPREZA_API_SECRET env.');
   console.log('  impreza-mcp setup --tool <name>   Print a ready-to-paste config snippet.');
   console.log('                                    Tools: claude-code | cursor | continue | zed | codex-cli');
   console.log('  impreza-mcp --version             Print version.');
+  console.log('  impreza-mcp login --code <code>   Pair and save a private credential.');
   process.exit(0);
 }
 if (sub === '--version' || sub === '-V' || sub === 'version') {
@@ -80,7 +93,7 @@ if (sub === '--version' || sub === '-V' || sub === 'version') {
 
 let cfg: z.infer<typeof envSchema>;
 try {
-  cfg = envSchema.parse(process.env);
+  cfg = envSchema.parse(credentialEnvironment(process.env));
 } catch (err) {
   // Log to stderr (stdout is the MCP transport stream — must stay clean).
   if (err instanceof z.ZodError) {
@@ -92,7 +105,7 @@ try {
       '\nSet IMPREZA_API_KEY + IMPREZA_API_SECRET in your MCP config env (see README).',
     );
   } else {
-    console.error('[impreza-mcp] env parse error:', err);
+    console.error('[impreza-mcp] credential configuration failed. Pair again or provide both credential environment variables.');
   }
   process.exit(2);
 }
@@ -141,6 +154,7 @@ function isIpAddress(value: string): boolean {
 const TOOLS = [
 ...CUSTOMER_TOOLS,
 ...PITR_TOOLS,
+...FAILOVER_TOOLS,
 {
   "name": "impreza_create_preview",
   "description": "Create (or refresh) the preview of one branch now, without waiting for a push. With protect=true the preview gets an HTTPS address on the shared preview domain — a random label, so the branch name still reaches no DNS record or CT log — gated by a generated password returned ONLY in this response: it is never stored in plaintext and cannot be retrieved later; the username is \"preview\". Calling again for the same branch refreshes the existing preview and never mints a new password; changing protection on a live preview means retiring it first. Requires deploy scope; the agent must support preview-basic-auth-v1 for protected previews.",
@@ -779,8 +793,8 @@ const TOOLS = [
   {
     name: 'impreza_get_host_inventory',
     title: 'Read host inventory',
-    description: 'Read the latest allowlisted host facts for one server: OS, kernel, cached package candidates, supported services, SSH policy and public fingerprints, real filesystems and component versions. Requests a fresh read at most once per 15 minutes; background collection is every six hours. No host changes, package refresh, private files or model submission. Requires host-inventory-v1 and agent 0.6.28 (not yet released); unknown, stale, partial and offline states are explicit.',
-    inputSchema: {type:'object',properties:{agent_id:{type:'string',pattern:'^agt_[a-f0-9]{16,24}$'}},required:['agent_id'],additionalProperties:false},
+    description: 'Read the latest allowlisted host facts for one server: OS, kernel, cached package candidates, supported services, SSH policy, real filesystems and component versions. SSH host-key fingerprints are withheld by default (fingerprints is an empty array). Set include_ssh_fingerprints to true only when the customer explicitly requests them: a third-party AI provider can receive these values and correlate a server or .onion service with its public IP through scan databases. Requests a fresh read at most once per 15 minutes; background collection is every six hours. No host changes, package refresh or automatic model submission by Impreza. Requires host-inventory-v1 and agent 0.6.28 or newer; unknown, stale, partial and offline states are explicit.',
+    inputSchema: {type:'object',properties:{agent_id:{type:'string',pattern:'^agt_[a-f0-9]{16,24}$'},include_ssh_fingerprints:{type:'boolean',description:'Include public SSH host-key fingerprints only on explicit customer request. They can let a third-party AI provider correlate this server or a .onion service with a public IP.'}},required:['agent_id'],additionalProperties:false},
     outputSchema: hostInventoryOutputSchema,
   },
   {
@@ -1427,6 +1441,7 @@ const TOOLS = [
         agent_id: { type: 'string', description: 'Target VPS agent_id.' },
         app_version: { type: 'string', description: 'Optional pinned version. Default: latest published.' },
         domain: { type: 'string', description: 'Public hostname for clearnet TLS. Omit + set onion:true for onion-only.' },
+        standby: { type: 'boolean', description: 'Create a reviewed Memos 0.31.0 cold standby without a public hostname or onion. Requires jurisdiction failover enabled on the API. Omit domain/onion and vars.domain; then pair with the primary in a different country.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service mirror.' },
         onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier of the hidden service (requires onion: true): standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard.' },
         onion_import: {
@@ -3043,6 +3058,26 @@ const TOOLS = [
 
   // ── VPS lifecycle (Proxmox KVM) ────────────────────────────────────
   {
+    name: 'impreza_vps_resize_recommendation',
+    description:
+      'Whether a configurable VPS needs more CPU, memory or disk, judged from its sustained load — the answer to ' +
+      '"is my server too small?". Reads the hourly load the optional Impreza agent reports (kept 14 days): a short ' +
+      'peak is not a reason; a verdict needs 48 complete hours in the last 72. `status` is recommended, ' +
+      'no_recommendation, insufficient_data (not enough hours, no agent, or the VPS changed size), stale (no report ' +
+      'in 15 minutes) or not_applicable (VPS not active). When recommended, `proposal` has the sizes, why, and the ' +
+      "billing system's own quote; nothing is ordered — to apply it, call `impreza_vps_resize` with `proposal.to`, " +
+      'after the customer agrees. `app_limits` lists apps at their own container memory limit, which a larger VPS ' +
+      'does not raise. Read-only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'impreza_vps_status',
     description:
       "Get a Proxmox VPS's live power state + resource usage (CPU, memory, disk, network, uptime). Find the " +
@@ -3707,6 +3742,7 @@ const A_DESTRUCTIVE_EXT_IDEM: ToolAnnotations = { readOnlyHint: false, destructi
 const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   ...Object.fromEntries(CUSTOMER_TOOLS.map(t=>[t.name,t.annotations])),
   ...Object.fromEntries(PITR_TOOLS.map(t=>[t.name,t.annotations])),
+  ...Object.fromEntries(FAILOVER_TOOLS.map(t=>[t.name,t.annotations])),
   // ── platform: apps / deployments ──────────────────────────────────────────
   impreza_get_host_inventory: A_READ,
   impreza_list_servers: A_READ,
@@ -3930,6 +3966,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
   // ── VPS lifecycle (Proxmox) ───────────────────────────────────────────────
   impreza_vps_status: A_READ,
+  impreza_vps_resize_recommendation: A_READ,
   impreza_vps_list_backups: A_READ,
   impreza_vps_list_templates: A_READ,
   impreza_vps_list_snapshots: A_READ,
@@ -4199,10 +4236,16 @@ function projectOntoSchema(value: unknown, schema: unknown): unknown {
   if (branches && value !== null && typeof value === 'object' && !Array.isArray(value)) {
     // The branch whose required properties this object has (first match).
     const v = value as Record<string, unknown>;
-    const branch = branches.find((b) => {
+    // Prefer a branch whose required properties the object carries; fall back
+    // to the first branch that demands nothing (a wrapper anyOf whose real
+    // constraints live one level down — the projector wraps every schema, so the
+    // success branch of an anyOf-shaped tool has no required of its own).
+    const has = (b: unknown) => {
       const req = (b as { required?: unknown }).required;
-      return Array.isArray(req) && req.every((k) => typeof k === 'string' && k in v);
-    });
+      return Array.isArray(req) && req.length > 0 && req.every((k) => typeof k === 'string' && k in v);
+    };
+    const open = (b: unknown) => !Array.isArray((b as { required?: unknown }).required);
+    const branch = branches.find(has) ?? branches.find(open);
     return branch ? projectOntoSchema(value, branch) : value;
   }
   if (Array.isArray(value)) {
@@ -4246,12 +4289,13 @@ async function callTool(req: CallToolRequest) {
       throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
     }
     if(isPitrTool(name)) return toResult(await callPitrTool(impreza,name,args));
+    if(isFailoverTool(name)) return toResult(await callFailoverTool(impreza,name,args));
     if(isCustomerTool(name)) return toResult(await callCustomerTool(impreza,name,args));
     switch (name) {
       case 'impreza_get_host_inventory': {
-        const id=String(args.agent_id??'');
-        if(!/^agt_[a-f0-9]{16,24}$/.test(id)) return toError('agent_id is required');
-        return toStructuredResult(await impreza.get<unknown>(`/v1/platform/servers/${encodeURIComponent(id)}/inventory`));
+        const p = z.object({ agent_id: z.string().regex(/^agt_[a-f0-9]{16,24}$/), include_ssh_fingerprints: z.boolean().optional() }).strict().parse(args);
+        const inventory = await impreza.get<unknown>(`/v1/platform/servers/${encodeURIComponent(p.agent_id)}/inventory`);
+        return toStructuredResult(hostInventoryForMcp(inventory, p.include_ssh_fingerprints === true));
       }
 
       case 'impreza_list_servers':
@@ -4725,6 +4769,10 @@ async function callTool(req: CallToolRequest) {
         const body: Record<string, unknown> = { app_name: appName, agent_id: agentId };
         if (typeof args.app_version === 'string') body.app_version = args.app_version;
         if (typeof args.domain === 'string') body.domain = args.domain;
+        if (args.standby !== undefined) {
+          if (typeof args.standby !== 'boolean') return toError('standby must be a boolean');
+          body.standby = args.standby;
+        }
         if (typeof args.onion === 'boolean') body.onion = args.onion;
         if (typeof args.onion_profile === 'string') body.onion_profile = args.onion_profile;
         if (typeof args.onion_import === 'object' && args.onion_import !== null) body.onion_import = args.onion_import;
@@ -5483,7 +5531,11 @@ async function callTool(req: CallToolRequest) {
           }
         }
 
-        return toResult(await impreza.get<unknown>('/v1' + path, query));
+        const payload = await impreza.get<unknown>('/v1' + path, query);
+        // Generic reads cannot opt in; match the resolved catalogue operation.
+        return toResult(/^\/platform\/servers\/\{[^/{}]+\}\/inventory$/.test(hit.path)
+          ? hostInventoryForMcp(payload)
+          : payload);
       }
 
       case 'impreza_update_account': {
@@ -5655,6 +5707,13 @@ async function callTool(req: CallToolRequest) {
       }
 
       // ── VPS lifecycle (Proxmox) ──────────────────────────────────────
+      case 'impreza_vps_resize_recommendation': {
+        // Advice only — the server checks the owner and orders nothing.
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        return toResult(await impreza.get<unknown>(`/v1/services/${sid}/resize/recommendation`));
+      }
+
       case 'impreza_vps_status': {
         const sid = svcId(args);
         if (!sid) return toError('service_id is required (numeric)');
@@ -5974,7 +6033,11 @@ async function callTool(req: CallToolRequest) {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return toError(msg);
+    // An ApiError carries the refusal's structured steps verbatim.
+    const apiErr = err instanceof ApiError ? err : null;
+    return apiErr && apiErr.nextSteps.length
+      ? toErrorWithSteps(msg, apiErr.code, apiErr.nextSteps)
+      : toError(msg);
   }
 }
 
@@ -6300,6 +6363,21 @@ function toError(message: string): { content: Array<{ type: 'text'; text: string
     content: [{ type: 'text', text: message }],
     isError: true,
   };
+}
+
+/**
+ * An API refusal that carried the structured next step answers the
+ * model with structuredContent.error as well — text and isError EXACTLY as
+ * before (the confirmation challenge depends on them), additive only.
+ */
+function toErrorWithSteps(message: string, code: string, nextSteps: Array<Record<string, unknown>>): {
+  content: Array<{ type: 'text'; text: string }>;
+  isError: true;
+  structuredContent?: Record<string, unknown>;
+} {
+  const base = toError(message);
+  if (!nextSteps.length) return base;
+  return { ...base, structuredContent: { error: { code, message, next_steps: nextSteps } } };
 }
 
 // ─────────────────────────────────────────────────────────────────────

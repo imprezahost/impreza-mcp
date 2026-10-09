@@ -1,3 +1,17 @@
+# MCP 0.48.0
+
+- Jurisdiction failover: fourteen tools to pair a cold standby in another
+  country, confirm the copied backup, review and apply a failover, fail back,
+  and run standby drills. The reviewed app in this release is Memos 0.31.0.
+- `impreza_deploy_catalog_app` accepts `standby: true` to create that standby
+  without a public route (only where failover is enabled on the API).
+- New `impreza_vps_resize_recommendation`.
+- `impreza_get_host_inventory` returns SSH fingerprints only with
+  `include_ssh_fingerprints: true`.
+- API errors carry `code` and `next_steps` in `structuredContent`.
+- `impreza-mcp login --code` pairs the local server with a one-time code.
+- 212 tools in the local package.
+
 # MCP 0.47.0
 
 - New `impreza_get_account_overview`: the account at a glance in one read-only
