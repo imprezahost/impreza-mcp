@@ -1,3 +1,8 @@
+# MCP 0.48.1
+
+- The cold standby for jurisdiction failover also covers **Uptime Kuma 2.5.5**, next to
+  Memos 0.31.0 (`impreza_deploy_catalog_app` with `standby: true`).
+
 # MCP 0.48.0
 
 - Jurisdiction failover: fourteen tools to pair a cold standby in another

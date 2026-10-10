@@ -278,7 +278,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.48.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.48.1.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -746,8 +746,8 @@ connect the MCP client itself and from publishing an inbound onion address.
 
 **Reviewed cold failover.** Fourteen tools move an app to a cold standby on
 another server you own, in a different country, through a review you confirm.
-The reviewed app in this release is **Memos 0.31.0** from the catalog. Create
-the standby with `impreza_deploy_catalog_app` and `standby: true`, without a
+The reviewed apps are **Memos 0.31.0** and, since 0.48.1, **Uptime Kuma 2.5.5**
+from the catalog. Create the standby with `impreza_deploy_catalog_app` and `standby: true`, without a
 domain or onion; it starts with no public route. Then pair and read it
 (`impreza_pair_failover_standby`, `impreza_get_failover_standby`). For an
 external server, first declare its country with

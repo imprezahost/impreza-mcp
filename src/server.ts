@@ -1441,7 +1441,7 @@ const TOOLS = [
         agent_id: { type: 'string', description: 'Target VPS agent_id.' },
         app_version: { type: 'string', description: 'Optional pinned version. Default: latest published.' },
         domain: { type: 'string', description: 'Public hostname for clearnet TLS. Omit + set onion:true for onion-only.' },
-        standby: { type: 'boolean', description: 'Create a reviewed Memos 0.31.0 cold standby without a public hostname or onion. Requires jurisdiction failover enabled on the API. Omit domain/onion and vars.domain; then pair with the primary in a different country.' },
+        standby: { type: 'boolean', description: 'Create a reviewed Memos 0.31.0 or Uptime Kuma 2.5.5 cold standby without a public hostname or onion. Requires jurisdiction failover enabled on the API. Omit domain/onion and vars.domain; then pair with the primary in a different country.' },
         onion: { type: 'boolean', description: 'Also publish a Tor v3 hidden service mirror.' },
         onion_profile: { type: 'string', enum: ['standard', 'hardened', 'max'], description: 'Hardening tier of the hidden service (requires onion: true): standard = intro-point rate limiting; hardened = tighter limits + max streams; max = + experimental proof-of-work. Default standard.' },
         onion_import: {
