@@ -1,3 +1,14 @@
+# MCP 0.49.0
+
+- New `impreza_install_agent` and `impreza_get_agent_install`: offer and follow the
+  one-click agent install on a managed VPS, with a two-call confirmation.
+- New `impreza_prepare_secret_entry` and `impreza_get_secret_entry`: secret values are
+  typed by the account owner on a single-use portal page, never in the chat; tools refuse
+  secret values in their arguments and point to that page.
+- `impreza_deploy_custom` accepts `standby: true` for jurisdiction failover of custom
+  projects (same pinned source, declared data, cutover only after a verified drill).
+- 216 tools in the local package.
+
 # MCP 0.48.1
 
 - The cold standby for jurisdiction failover also covers **Uptime Kuma 2.5.5**, next to

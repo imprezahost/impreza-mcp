@@ -4228,8 +4228,236 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
               }
             }
           },
+          "agentless_servers": {
+            "type": "array",
+            "$comment": "Only with an unrestricted credential; never present for a confined one.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "service_id",
+                "hostname",
+                "product",
+                "agent_installable",
+                "reason",
+                "detail"
+              ],
+              "properties": {
+                "service_id": {
+                  "type": "integer"
+                },
+                "hostname": {
+                  "type": "string"
+                },
+                "product": {
+                  "type": "string"
+                },
+                "agent_installable": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "generated_at": {
             "type": "string"
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "next_steps"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z_0-9]{1,63}$"
+              },
+              "message": {
+                "type": "string"
+              },
+              "next_steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "doc"
+                  ],
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "missing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "doc": {
+                      "type": "string",
+                      "pattern": "^https://docs[.]imprezahost[.]com/"
+                    },
+                    "requires": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "impreza_get_agent_install": {
+    "type": "object",
+    "anyOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "service_id",
+          "hostname",
+          "product",
+          "agent_installable",
+          "reason",
+          "detail",
+          "about",
+          "script_sha256",
+          "state",
+          "job",
+          "agent"
+        ],
+        "properties": {
+          "service_id": {
+            "type": "integer"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "agent_installable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "server_stopped",
+              "guest_agent_unavailable",
+              "os_rhel_family",
+              "os_unsupported",
+              "os_unknown",
+              "service_not_active",
+              "not_provisioned",
+              "control_panel_server",
+              "install_in_progress",
+              "agent_present",
+              "platform_unavailable",
+              "not_checked",
+              null
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "about": {
+            "type": "string"
+          },
+          "script_sha256": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "not_started",
+              "installing",
+              "registering",
+              "registered",
+              "online",
+              "failed"
+            ]
+          },
+          "job": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "attempts",
+              "created_at",
+              "last_error"
+            ],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "attempts": {
+                "type": "integer"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "last_error": {
+                "type": "string"
+              }
+            }
+          },
+          "agent": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "version"
+            ],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -7775,6 +8003,98 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
             "type": "string"
           }
         }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "next_steps"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z_0-9]{1,63}$"
+              },
+              "message": {
+                "type": "string"
+              },
+              "next_steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "doc"
+                  ],
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "missing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "doc": {
+                      "type": "string",
+                      "pattern": "^https://docs[.]imprezahost[.]com/"
+                    },
+                    "requires": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "impreza_get_secret_entry": {
+    "type": "object",
+    "anyOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^sen_[a-f0-9]{32}$"
+          },
+          "variable_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "stored",
+              "expired",
+              "cancelled"
+            ]
+          }
+        },
+        "required": [
+          "session_id",
+          "variable_name",
+          "status"
+        ]
       },
       {
         "type": "object",
@@ -14138,6 +14458,114 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
             "type": "boolean"
           }
         }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "next_steps"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z_0-9]{1,63}$"
+              },
+              "message": {
+                "type": "string"
+              },
+              "next_steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "doc"
+                  ],
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    },
+                    "missing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "doc": {
+                      "type": "string",
+                      "pattern": "^https://docs[.]imprezahost[.]com/"
+                    },
+                    "requires": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "impreza_prepare_secret_entry": {
+    "type": "object",
+    "anyOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^sen_[a-f0-9]{32}$"
+          },
+          "variable_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "stored",
+              "expired",
+              "cancelled"
+            ]
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "onion_url": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "variable_name",
+          "status",
+          "expires_at",
+          "url",
+          "onion_url",
+          "note"
+        ]
       },
       {
         "type": "object",

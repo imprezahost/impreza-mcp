@@ -48,6 +48,7 @@ import { credentialEnvironment } from './credentials.js';
 import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-assets.js';
 import { envSchema } from './env.js';
 import { VERSION } from './version.js';
+import { secretInputRefusal } from './secret-entry.js';
 import { OUTPUT_SCHEMAS, STRUCTURED_OMIT } from './output-schemas.js';
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
 import {PITR_TOOLS,isPitrTool,callPitrTool} from './pitr-workflows.js';
@@ -152,6 +153,8 @@ function isIpAddress(value: string): boolean {
 }
 
 const TOOLS = [
+  {name:'impreza_prepare_secret_entry',description:'Prepare a ten-minute, single-use portal link for a secret variable of an existing app or project/environment group. Send only target identifiers and variable_name, NEVER a value. The account owner opens the link and signs in. The secret is encrypted and applies on the next deployment.',inputSchema:{type:'object',properties:{deployment_id:{type:'string',pattern:'^dpl_[a-f0-9]{16,24}$'},project_id:{type:'string',pattern:'^prj_[a-f0-9]{24}$'},environment_id:{type:'string',pattern:'^env_[a-f0-9]{24}$'},variable_name:{type:'string',pattern:'^[A-Za-z_][A-Za-z0-9_]{0,127}$'}},required:['variable_name'],additionalProperties:false}},
+  {name:'impreza_get_secret_entry',description:'Poll a session created by this credential: variable name and pending, stored, expired or cancelled only; never the secret value or its hash.',inputSchema:{type:'object',properties:{session_id:{type:'string',pattern:'^sen_[a-f0-9]{32}$'}},required:['session_id'],additionalProperties:false}},
 ...CUSTOMER_TOOLS,
 ...PITR_TOOLS,
 ...FAILOVER_TOOLS,
@@ -639,6 +642,48 @@ const TOOLS = [
   },
   "title": "Queue agent update"
 },
+{
+  "name": "impreza_install_agent",
+  "description": "Install the Impreza agent on one of the customer's managed VPS that does not have it yet (impreza_get_account_overview lists them in agentless_servers, with agent_installable and the reason when it is false). Offer it ONLY when what the customer asked for needs the agent (deploying an app, metrics, app backups or app logs), never on your own initiative. The agent is a small service that runs as root on the server: it lets Impreza deploy and update apps, back them up, read their logs and show metrics; it reports a heartbeat and the server load (CPU, memory, disk), never the content of the apps, and it can be paused or removed later from My Apps. Before installing, explain this in a few lines and get the customer's explicit agreement; never install without it. Then follow the install with impreza_get_agent_install until state is online (usually a few minutes). Refused for credentials confined to specific resources, and for servers where the one-click install does not apply (stopped, no QEMU guest agent, AlmaLinux/Rocky for now, control-panel servers): those keep the manual one-line install from My Apps > + Add another server, which is also the only way for a server outside Impreza. Requires manage scope. NEEDS THE CUSTOMER'S AGREEMENT — takes two calls: the first installs nothing and returns a confirm_token, the second repeats the same service_id plus confirm_token and installs.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "The VPS service id, from agentless_servers in impreza_get_account_overview."
+      },
+      "confirm_token": {
+        "type": "string",
+        "description": "Confirmation token from the first call. Call this tool WITHOUT it to receive one, confirm the action with the customer, then repeat the call with the same arguments plus this token. Valid 5 minutes, for this exact call only."
+      }
+    },
+    "required": [
+      "service_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Install the Impreza agent"
+},
+{
+  "name": "impreza_get_agent_install",
+  "description": "Read the one-click agent install state of one managed VPS: whether it can take the install now (agent_installable and, when false, the reason), what the agent is, the install job (status, attempts, last error without addresses) and the agent once it registers. state is one of not_started, installing, registering, registered, online or failed. Use it to follow an install started with impreza_install_agent. Read only; it never installs anything.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "service_id": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "The VPS service id."
+      }
+    },
+    "required": [
+      "service_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Get agent install state"
+},
   {
     "name": "impreza_get_shield",
     "description": "Read the Shield policy revision, CRS exclusions and the last 24 hours of WAF audit findings for one app: requests that would have been blocked, blocked requests and the top five static CRS rules. No visitor identity. Requires read scope.",
@@ -886,6 +931,7 @@ const TOOLS = [
         git_ref: { type: 'string', description: 'Branch / tag / commit for git_url (default main).' },
         git_auth_method: { type: 'string', enum: ['none', 'deploy_key', 'pat'], description: 'Private-repo auth for git_url: none (default), deploy_key (SSH), or pat (token).' },
         git_pat: { type: 'string', description: 'Fine-grained, repo-scoped, Contents:Read token (required with git_auth_method=pat).' },
+        standby: { type: 'boolean', description: 'Create a custom cold standby on another server: same source as the primary, PINNED — mode=image requires the digest (name@sha256:…), a git build requires git_ref to be the exact 40-hex commit; uploaded Compose/context sources are compared by their frozen content. No public hostname or onion. Requires jurisdiction failover enabled and the agent startup-health-v1 capability; pair the two with impreza_pair_failover_standby.' },
         build_strategy: {"type": "string", "enum": ["dockerfile", "node_npm", "node_npm_static", "python_pip", "php_composer", "static_files", "go_build"], "description": "static_files serves the selected project folder as plain static files with unprivileged Nginx: no build step, requires a regular index.html, no symlinks, up to 10000 files and 256 MiB; static_spa=false (default) returns 404 for unknown paths, true serves index.html; the fixed health check probes /index.html. go_build compiles one static binary with the pinned Go 1.25 toolchain from go.mod in the project folder (go.sum required when the module declares dependencies; read-only module downloads; no toolchain downloads, vendoring, workspaces or cgo), then runs it as a non-root busybox user; go_package selects the main package folder (default .). Default port 8080 (1024-65535). php_composer uses PHP 8.4/Apache and Composer 2, composer.json plus a matching composer.lock, public HTTPS archive dependencies and php_document_root (default public, containing index.php). Non-root runtime, default port 8080 (1024-65535), strict 2xx health. No scripts/plugins, custom repositories, private credentials, asset builds, migrations or .htaccess overrides. python_pip uses Python 3.13, a flat requirements.txt of PyPI packages and an explicit start_command. Non-root build/runtime; default port 8000. No dependency options/includes/URLs/local projects, system package installation or private build credentials. Compose 2.17+ and BuildKit required. node_npm generates a Node 24 npm server recipe. node_npm_static builds dist/index.html with npm and serves it with unprivileged Nginx and SPA fallback; requires build instead of start. Static runtime variables do not change browser bundles. Both require package.json and the selected manager lockfile (package-lock.json for default npm) in project_dir, and Compose 2.17+ with BuildKit. node_npm requires a production start script; node_npm_static requires a build script. Select npm workspaces with npm_workspace. build_secrets supplies credentials and node_package_manager selects pinned standalone pnpm/Yarn. Dockerfile is the default."},
         go_package: {"type": "string", "maxLength": 120, "description": "go_build only: main package folder relative to project_dir (default .), such as cmd/server. Up to 120 ASCII characters and five segments; no hidden or parent segments. Saved at creation and inherited by previews/redeploys."},
         php_document_root: { type: 'string', maxLength: 120, description: 'php_composer only: public subfolder relative to project_dir, containing index.php; default public. Up to 120 ASCII characters and five segments; no hidden/parent/vendor/node_modules segments or symlinks. Saved at creation and inherited by previews/redeploys.' },
@@ -3861,6 +3907,8 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_list_environment_deploys: A_READ,
   // Same annotation values as the hosted connector — kept at parity.
   impreza_get_variable_group: A_READ,
+  impreza_prepare_secret_entry: A_WRITE,
+  impreza_get_secret_entry: A_READ,
   impreza_set_variable_group: A_WRITE_IDEM,
   impreza_rename_project: A_WRITE_IDEM,
   impreza_delete_project: A_DESTRUCTIVE_IDEM,
@@ -3876,6 +3924,9 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_pause_agent: A_WRITE,
   impreza_resume_agent: A_WRITE,
   impreza_request_agent_update: A_WRITE,
+  // A second install of a server with a queued job returns that job.
+  impreza_install_agent: A_WRITE_IDEM,
+  impreza_get_agent_install: A_READ,
   impreza_get_shield: A_READ,
   impreza_set_shield: A_WRITE_EXT_IDEM,
   impreza_tail_logs: A_READ,
@@ -4151,7 +4202,7 @@ function basicCloudUnavailable(name: string): boolean {
   return name.startsWith('impreza_cloud_') && name !== 'impreza_cloud_power';
 }
 const ANNOTATED_TOOLS = TOOLS.filter(tool => !basicCloudUnavailable(tool.name)).map((tool) => {
-  const description = tool.description + (['impreza_get_update_policy','impreza_get_app_read','impreza_get_cli_run','impreza_list_tasks'].includes(tool.name)
+  const description = tool.description + (['manifest','document','compose_yaml','dockerfile','composer_json'].some(field => field in (tool.inputSchema.properties || {})) ? ' Never include credentials in source text: secret detection cannot inspect arbitrary source or configuration. Enter runtime secrets through the owner portal link.' : '') + (['impreza_get_update_policy','impreza_get_app_read','impreza_get_cli_run','impreza_list_tasks'].includes(tool.name)
     ? ' This read may reconcile expired operational state and clean up expired internal jobs.' : '');
   const annotations = TOOL_ANNOTATIONS[tool.name];
   if (!annotations) throw new Error(`Tool ${tool.name} has no entry in TOOL_ANNOTATIONS`);
@@ -4288,10 +4339,28 @@ async function callTool(req: CallToolRequest) {
     if (basicCloudUnavailable(name)) {
       throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
     }
+    const secretRefusal=secretInputRefusal(args);
+    if(secretRefusal)return toErrorWithSteps(secretRefusal.message,'SECRET_ENTRY_REQUIRED',secretRefusal.steps);
+    if(['vars','set','replace'].some(field=>args[field]&&typeof args[field]==='object')&&(typeof args.deployment_id==='string'||typeof args.app_name==='string'||typeof args.project_id==='string')) {
+      const target:Record<string,unknown>={};for(const key of ['deployment_id','app_name','app_version','project_id','environment_id'])if(args[key]!==undefined)target[key]=args[key];
+      const policy=await impreza.post<{secret_names:string[]}>('/v1/platform/secret-entry-policy',target);
+      if(!Array.isArray(policy.secret_names))throw new Error('Secret entry policy is unavailable.');
+      const refusal=secretInputRefusal(args,policy.secret_names);
+      if(refusal)return toErrorWithSteps(refusal.message,'SECRET_ENTRY_REQUIRED',refusal.steps);
+    }
+
     if(isPitrTool(name)) return toResult(await callPitrTool(impreza,name,args));
     if(isFailoverTool(name)) return toResult(await callFailoverTool(impreza,name,args));
     if(isCustomerTool(name)) return toResult(await callCustomerTool(impreza,name,args));
     switch (name) {
+      case 'impreza_prepare_secret_entry': {
+        const p=z.object({deployment_id:z.string().regex(/^dpl_[a-f0-9]{16,24}$/).optional(),project_id:z.string().regex(/^prj_[a-f0-9]{24}$/).optional(),environment_id:z.string().regex(/^env_[a-f0-9]{24}$/).optional(),variable_name:z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)}).strict().parse(args);
+        return toResult(await impreza.post<unknown>('/v1/platform/secret-entries',p));
+      }
+      case 'impreza_get_secret_entry': {
+        const p=z.object({session_id:z.string().regex(/^sen_[a-f0-9]{32}$/)}).strict().parse(args);
+        return toResult(await impreza.get<unknown>('/v1/platform/secret-entries/'+p.session_id));
+      }
       case 'impreza_get_host_inventory': {
         const p = z.object({ agent_id: z.string().regex(/^agt_[a-f0-9]{16,24}$/), include_ssh_fingerprints: z.boolean().optional() }).strict().parse(args);
         const inventory = await impreza.get<unknown>(`/v1/platform/servers/${encodeURIComponent(p.agent_id)}/inventory`);
@@ -5311,6 +5380,29 @@ async function callTool(req: CallToolRequest) {
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/),confirm:z.literal(true)}).strict().parse(args);
         return toResult(await impreza.post<unknown>('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/agent-update',{confirm:p.confirm}));
       }
+      case 'impreza_install_agent': {
+        // The same two calls as the hosted connector. The first reads
+        // the install state (nothing is installed) and hands the consent token
+        // the API minted for THIS key, service and script; the second spends it.
+        const p=z.object({service_id:z.number().int().min(1).max(9999999999),confirm_token:z.string().min(1).max(64).optional()}).strict().parse(args);
+        const path='/v1/platform/services/'+p.service_id+'/agent-install';
+        if(p.confirm_token===undefined){
+          const d=await impreza.get<Record<string,unknown>>(path);
+          if(d.agent_installable!==true) return toError('NOT_INSTALLABLE: '+String(d.reason??'')+': '+String(d.detail??''));
+          if(typeof d.confirm_token!=='string'||d.confirm_token==='') return toError('PLATFORM_UNAVAILABLE: the consent token could not be issued, so nothing was installed. Try again in a few minutes.');
+          return toError("Installing the agent needs the customer's explicit agreement and a second, confirming call. NOTHING has been installed yet. "+String(d.about??'')
+            +' Tell the customer exactly what will happen and get their agreement, then call impreza_install_agent again with the SAME arguments plus confirm_token="'+d.confirm_token+'". '
+            +'The token is valid for 5 minutes and only for this exact call — changing any argument invalidates it.');
+        }
+        const r=await impreza.post<Record<string,unknown>>(path,{confirm_token:p.confirm_token});
+        return toResult({...r,next:'Call impreza_get_agent_install with this service_id until state is online (usually a few minutes).'});
+      }
+      case 'impreza_get_agent_install': {
+        const p=z.object({service_id:z.number().int().min(1).max(9999999999)}).strict().parse(args);
+        // The consent token is the install's, never a read's: dropped here, as the hosted read never has it.
+        const {confirm_token:_token,...state}=await impreza.get<Record<string,unknown>>('/v1/platform/services/'+p.service_id+'/agent-install');
+        return toResult(state);
+      }
       case 'impreza_get_shield': {
         const p=z.object({deployment_id:z.string().min(1)}).strict().parse(args);
         return toResult(await impreza.get<unknown>('/v1/platform/deployments/'+encodeURIComponent(p.deployment_id)+'/shield'));
@@ -6051,6 +6143,7 @@ interface DeployCustomBody {
   agent_id: string;
   mode: string;
   domain?: string;
+  standby?: boolean;
   onion?: boolean;
   onion_profile?: string;
   onion_import?: { secret_key_b64: string; public_key_b64: string };
@@ -6111,6 +6204,10 @@ async function deployCustom(args: Record<string, unknown>): Promise<Deployment &
   if (args.tor_egress !== undefined && typeof args.tor_egress !== 'boolean') throw new Error('tor_egress must be boolean');
   if (args.tor_egress === true && !['image','dockerfile'].includes(mode)) throw new Error('Tor runtime egress requires image or dockerfile mode');
   const body: DeployCustomBody = { name, agent_id: agentId, mode };
+  if (args.standby !== undefined) {
+    if (typeof args.standby !== 'boolean') throw new Error('standby must be a boolean');
+    body.standby = args.standby;
+  }
   if (args.shield_profile !== undefined) {
     if (typeof args.shield_profile !== 'string' || !['off', 'standard', 'hardened', 'max'].includes(args.shield_profile)) {
       throw new Error('shield_profile must be off, standard, hardened or max');

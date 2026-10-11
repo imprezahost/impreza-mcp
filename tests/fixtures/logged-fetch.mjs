@@ -136,6 +136,10 @@ globalThis.fetch = async (url, options = {}) => {
   if (method === 'GET' && path === '/v1/entitlements') return json({ known: true, hidden: [] });
   const request = { method, path, body: options.body ? JSON.parse(options.body) : null, query: Object.fromEntries(parsed.searchParams) };
   appendFileSync(LOG, JSON.stringify(request) + '\n');
+  if (method === 'POST' && path === '/v1/platform/secret-entry-policy') {
+    if (Object.keys(request.body || {}).some(key => !['deployment_id','app_name','app_version','project_id','environment_id'].includes(key))) throw new Error('Policy must receive identifiers only');
+    return json({secret_names: []});
+  }
   if (method === 'GET' && /\/onion\/export\/[^/]+$/.test(path)) {
     if (burned.has(path)) return new Response(JSON.stringify({ success: false, error: { code: 'NOT_FOUND', message: 'The sealed blob was already retrieved (read-once).' } }), { status: 404, headers: { 'content-type': 'application/json' } });
     burned.add(path);

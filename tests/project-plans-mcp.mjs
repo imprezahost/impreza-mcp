@@ -6,7 +6,7 @@ try {
  const plan='plan_'+'a'.repeat(24);
  for(const [name,body,method,path,expected] of [
  ['impreza_plan_project',{context_id:'ctx_aa',project_dir:'apps/api',start_command:'python app.py'},'POST','/v1/platform/deployments/custom/plans',{context_id:'ctx_aa',project_dir:'apps/api',start_command:'python app.py'}],
- ['impreza_plan_project',{git_url:'https://github.com/example/app.git',git_commit:'b'.repeat(40),git_username:'git',git_token:'fixture-token'},'POST','/v1/platform/deployments/custom/plans',{git_url:'https://github.com/example/app.git',git_commit:'b'.repeat(40),git_username:'git',git_token:'fixture-token'}],
+ ['impreza_plan_project',{git_url:'https://github.com/example/app.git',git_commit:'b'.repeat(40),git_username:'git'},'POST','/v1/platform/deployments/custom/plans',{git_url:'https://github.com/example/app.git',git_commit:'b'.repeat(40),git_username:'git'}],
  ['impreza_list_project_plans',{},'GET','/v1/platform/deployments/custom/plans',undefined],
  ['impreza_list_project_plans',{plan_id:plan},'GET','/v1/platform/deployments/custom/plans/'+plan,undefined],
  ['impreza_deploy_project_plan',{plan_id:plan,option_index:0,name:'my-app',agent_id:'agt_example',vars:{SETTING:'value'},target_port:8000},'POST','/v1/platform/deployments/custom/plans/'+plan+'/deploy',{option_index:0,name:'my-app',agent_id:'agt_example',vars:{SETTING:'value'},target_port:8000}]
@@ -16,6 +16,10 @@ try {
   const result=await client.callTool({name,arguments:body});assert(!result.isError,JSON.stringify(result));const out=mcp.last();assert.equal(out.path,path);assert.equal(out.method,method);if(expected)assert.deepEqual(out.body,expected);
   if(name==='impreza_list_project_plans')assert.deepEqual(result.structuredContent,sample(body.plan_id?'impreza_list_project_plans:one_plan_expired':'impreza_list_project_plans:list'));
  }
+ const secretBefore=mcp.count();
+ const secretRefusal=await client.callTool({name:'impreza_plan_project',arguments:{git_url:'https://github.com/example/app.git',git_commit:'b'.repeat(40),git_token:'synthetic-refusal-input'}});
+ assert(secretRefusal.isError);assert.equal(secretRefusal.structuredContent.error.code,'SECRET_ENTRY_REQUIRED');
+ assert.equal(mcp.count(),secretBefore,'Git credentials are refused before HTTP');
  const before=mcp.count();
  for(const name of ['impreza_list_project_plans','impreza_deploy_project_plan'])assert((await client.callTool({name,arguments:{plan_id:'../invalid',option_index:0,name:'app',agent_id:'agt_example'}})).isError);
  assert.equal(mcp.count(),before,'invalid plan IDs must make no HTTP request');

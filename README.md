@@ -20,6 +20,21 @@ Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is req
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
+## Install the agent, enter secrets outside the chat, and protect custom apps (0.49.0)
+
+- **`impreza_install_agent`** offers the Impreza agent on a managed VPS that does not have it yet, only with the
+  customer's explicit agreement: the first call installs nothing and returns a short-lived `confirm_token`; the second
+  call, with the same arguments plus that token, starts the install. **`impreza_get_agent_install`** says whether a VPS
+  can take it and follows the install until the agent is online.
+- **Secrets never pass through the chat.** `impreza_prepare_secret_entry` returns a ten-minute, single-use portal link
+  for a secret variable of an existing app or variable group; the account owner opens it, signs in and types the value
+  there. `impreza_get_secret_entry` reports only `pending`, `stored`, `expired` or `cancelled` — never the value or a
+  hash of it. Tools now refuse secret values (passwords, Git tokens, onion private keys, build secrets) in their
+  arguments and point to the portal instead; the REST API is unchanged.
+- **Jurisdiction failover for custom projects:** `impreza_deploy_custom` accepts `standby: true` to create a cold
+  standby on another server, from the **same pinned source** (image digest, exact git commit, or the frozen Compose
+  upload). The project must declare every persistent volume, and a custom pair cuts over only after a verified drill.
+
 ## Deployment progress and agent restarts
 
 Compose review and deployment accept
@@ -278,7 +293,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.48.1.** The tool catalog covers app deployment plus account +
+**Package version: 0.49.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -290,7 +305,7 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 212 tools in the local package**. Declared, one-direction gaps remain:
+catalog — 216 tools in the local package**. Declared, one-direction gaps remain:
 `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
 requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and

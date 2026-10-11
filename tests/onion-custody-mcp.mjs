@@ -94,29 +94,31 @@ try {
   assert.deepEqual(data.body, {confirm: true, confirm_address: ONION});
  }
 
- // deploy bodies: onion_import (BOTH key files) forwarded with onion; refused without it.
+ // deploy bodies: an onion private key is a customer secret. Since the secret-entry release the MCP never forwards
+ // onion_import (custom or catalog): it refuses with the portal guidance and makes no HTTP request. The REST API still
+ // accepts the import from the customer's own client.
  const IMPORT = {secret_key_b64: Buffer.alloc(96, 3).toString('base64'), public_key_b64: Buffer.alloc(64, 4).toString('base64')};
  {
-  const ok = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't1', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion: true, onion_import: IMPORT}});
-  assert(!ok.isError, ok.content?.[0]?.text);
-  assert.deepEqual(ok.structuredContent, sample('impreza_deploy_custom:image_onion_only'));
-  assert.equal(mcp.last().path, '/v1/platform/deployments/custom');
-  assert.deepEqual(mcp.last().body.onion_import, IMPORT);
   const beforeRefusals = mcp.count();
-  const refused = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't2', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion_import: IMPORT}});
-  assert.equal(refused.isError, true, 'onion_import without onion must be refused');
-  const missingPub = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't3', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion: true, onion_import: {secret_key_b64: IMPORT.secret_key_b64}}});
-  assert.equal(missingPub.isError, true, 'secret file without the public file must be refused');
-  const wrongSize = await client.callTool({name: 'impreza_deploy_custom', arguments: {name: 't4', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion: true, onion_import: {secret_key_b64: IMPORT.public_key_b64, public_key_b64: IMPORT.public_key_b64}}});
-  assert.equal(wrongSize.isError, true, 'wrong-size key files must be refused');
+  for (const args of [
+   {name: 't1', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion: true, onion_import: IMPORT},
+   {name: 't2', agent_id: 'agt_test', mode: 'image', image: 'ghcr.io/x/y:1', onion_import: IMPORT},
+  ]) {
+   const refused = await client.callTool({name: 'impreza_deploy_custom', arguments: args});
+   assert.equal(refused.isError, true, 'onion_import through MCP must be refused');
+   assert.match(refused.content?.[0]?.text ?? '', /entered by the account owner in the portal/);
+   assert(!(refused.content?.[0]?.text ?? '').includes(IMPORT.secret_key_b64), 'the refusal must not echo the key');
+  }
+  const catRefused = await client.callTool({name: 'impreza_deploy_catalog_app', arguments: {app_name: 'vaultwarden', agent_id: 'agt_test', onion: true, onion_import: IMPORT}});
+  assert.equal(catRefused.isError, true, 'catalog onion_import through MCP must be refused');
   assert.equal(mcp.count(), beforeRefusals, 'refused imports must make no HTTP request');
-  const cat = await client.callTool({name: 'impreza_deploy_catalog_app', arguments: {app_name: 'vaultwarden', agent_id: 'agt_test', onion: true, onion_import: IMPORT}});
-  assert(!cat.isError);
+  const cat = await client.callTool({name: 'impreza_deploy_catalog_app', arguments: {app_name: 'vaultwarden', agent_id: 'agt_test', onion: true}});
+  assert(!cat.isError, cat.content?.[0]?.text);
   // Credentials generated at creation are shown once: in the text, never in structuredContent or the log.
   assert.deepEqual(cat.structuredContent, sample('impreza_deploy_catalog_app:generated_credentials'));
   mcp.secretKept(cat, 'credentials', {ADMIN_PASSWORD: 'synthetic-secret-' + (++secrets)});
   assert.equal(mcp.last().path, '/v1/platform/deployments');
-  assert.deepEqual(mcp.last().body.onion_import, IMPORT);
+  assert.equal(mcp.last().body.onion_import, undefined);
  }
 
  // Purge and private preview requests preserve explicit gates and exact bodies.

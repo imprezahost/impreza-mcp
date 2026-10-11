@@ -4,7 +4,7 @@ const mcp=loggedClient('prepared-deployment-test');const client=mcp.client;
 try {
  await mcp.connect();const {tools}=await client.listTools();
  const plan='plan_'+'a'.repeat(24),execution='pdep_'+'b'.repeat(24),digest='c'.repeat(64);
- const runtime={option_index:0,name:'reviewed-app',agent_id:'agt_example',vars:{TOKEN:'fixture-value'},cpus:1,memory_mb:512,target_port:8000,onion:false};
+ const runtime={option_index:0,name:'reviewed-app',agent_id:'agt_example',vars:{APP_MODE:'fixture-value'},cpus:1,memory_mb:512,target_port:8000,onion:false};
  for(const [name,args,method,path,body] of [
  ['impreza_prepare_project_deployment',{plan_id:plan,...runtime},'POST','/v1/platform/deployments/custom/plans/'+plan+'/prepare-deployment',runtime],
  ['impreza_list_prepared_deployments',{},'GET','/v1/platform/deployments/custom/prepared',undefined],
@@ -16,6 +16,7 @@ try {
   if(name==='impreza_list_prepared_deployments')assert.deepEqual(result.structuredContent,sample(args.execution_id?'impreza_list_prepared_deployments:one_pending':'impreza_list_prepared_deployments:list'));
  }
  const before=mcp.count();
+ const refusal=await client.callTool({name:'impreza_prepare_project_deployment',arguments:{plan_id:plan,...runtime,vars:{TOKEN:'fixture-only'}}});assert.equal(refusal.isError,true);assert.equal(refusal.structuredContent.error.code,'SECRET_ENTRY_REQUIRED');assert.equal(mcp.count(),before,'secret value never reaches HTTP');
  for(const name of ['impreza_list_prepared_deployments','impreza_apply_project_deployment'])assert((await client.callTool({name,arguments:{execution_id:'../bad',configuration_digest:digest}})).isError);
  assert.equal(mcp.count(),before,'malformed IDs must make no HTTP request');
  const schema=tools.find(t=>t.name==='impreza_apply_project_deployment').inputSchema;assert.equal(schema.additionalProperties,false);assert.deepEqual(Object.keys(schema.properties),['execution_id','configuration_digest']);

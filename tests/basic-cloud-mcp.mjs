@@ -21,9 +21,9 @@ try {
  }
  for(const [name,field,value] of [['impreza_vps_set_hostname','hostname','app.example.com'],['impreza_vps_reset_password','password','fixture-password']]) {
   const out=await client.callTool({name,arguments:{service_id:101,[field]:value}});
-  assert(out.isError);assert.match(out.content[0].text,/FEATURE_NOT_AVAILABLE/);
+  assert(out.isError);assert.match(out.content[0].text,name==='impreza_vps_reset_password'?/Secret values must be entered/:/FEATURE_NOT_AVAILABLE/);
  }
  const last=await client.callTool({name:'impreza_cloud_power',arguments:{vm_id:'101',action:'boot'}});
- assert.equal(JSON.parse(last.content[0].text).request_count,6,'two service reads, no hostname/password PUT');
+ assert.equal(JSON.parse(last.content[0].text).request_count,5,'one service read, password refusal without HTTP and no hostname/password PUT');
  console.log('PASS: basic Cloud catalog, retired calls, force-stop refusal, hostname/password refused before PUT, valid power dispatch.');
 } finally {await client.close();}
