@@ -20,6 +20,28 @@ Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is req
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
+## Protect an app, safer deployment IDs and bare VPS orders (0.50.0)
+
+- **Protect an app, as a guided prompt.** `prompts/list` adds `impreza_protect_app`. Starting from one of your
+  running apps, it walks the assistant through a cold standby on a server you own in another country: choose the
+  target with the human, create the standby (`impreza_deploy_catalog_app` with `standby: true`), pair it and run the
+  first restore drill, each step behind its own explicit human confirmation. After a verified drill it reports the
+  measured copy age and drill duration; these are measurements, not a guaranteed RPO or RTO. It never buys a server,
+  promotes the standby, switches traffic or changes DNS, and it covers the reviewed failover apps (Memos 0.31.0 and
+  Uptime Kuma 2.5.5). Like every prompt, it grants no authority.
+- **Server locations:** `impreza_list_servers` returns each server's `failover_location` in its structured output:
+  `country_code`, `country_basis` (`verified`, `operator_verified` or `declared`; a country you declared for an
+  external server is not verified by Impreza) and `country_notice`.
+- **Deployment IDs cannot add path segments.** A `deployment_id` that would add or change path segments in an API
+  URL (`.`, `..`, `/`, `\`, `%`, whitespace or control characters) is refused before any request leaves the process.
+  Valid IDs are sent exactly as before.
+- **A VPS ordered through the API is bare by default.** `impreza_order_vps` and `impreza_vps_offer` now describe what
+  the API does: without `app`, the VPS is born with `app: "none"` (bare OS, no agent). Pass `app: "@agent"` explicitly
+  when the customer wants it deployable, or offer `impreza_install_agent` later with the customer's confirmation.
+  After ordering, poll `impreza_list_services`; `impreza_list_servers` lists only servers with an installed agent.
+- **Exact direct dependencies.** The package pins its direct runtime dependencies to the exact versions it was tested
+  with (see [Dependency versions](#dependency-versions)).
+
 ## Install the agent, enter secrets outside the chat, and protect custom apps (0.49.0)
 
 - **`impreza_install_agent`** offers the Impreza agent on a managed VPS that does not have it yet, only with the
@@ -293,7 +315,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.49.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.50.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -480,7 +502,7 @@ and `impreza_api_search` finds anything not named here.
 | **Catalog & ordering** | |
 | `impreza_list_products` | `GET /v1/products` — products + pricing; the VPS is listed at its smallest size (`configurable: true`) |
 | `impreza_vps_offer` | `GET /v1/products/vps` — VPS locations, operating systems, CPU / memory / disk ranges and prices; with a whole configuration, `GET /v1/products/vps/quote` — its exact price |
-| `impreza_order_vps` | `POST /v1/orders` — a VPS by location, OS and size (or a fixed plan by `product_id`); paid from balance; born deployable (`@agent`); 202 + poll `impreza_list_servers` |
+| `impreza_order_vps` | `POST /v1/orders` — a VPS by location, OS and size (or a fixed plan by `product_id`); paid from balance; bare OS by default (`app: "none"`); explicitly request `app: "@agent"` for deployment, or use `impreza_install_agent` later with customer confirmation; 202 + poll `impreza_list_services` |
 | **Domains & DNS** | |
 | `impreza_domain_check` | `GET /v1/domains/check` |
 | `impreza_domain_details` | `GET /v1/domains/{domain}` |
@@ -924,3 +946,9 @@ uninstalled application does not delete key material.
 See the [onion guide](https://docs.imprezahost.com/onion-services.html)
 for permissions, customer update steps and supported limitations.
 
+## Dependency versions
+
+The package manifest pins each direct runtime dependency to an exact version: `@modelcontextprotocol/sdk` 1.29.0,
+`tar` 7.5.22 and `zod` 3.25.76. Source builds use `package-lock.json` for the tested dependency tree. Transitive
+dependencies may still change during a fresh consumer installation; dependency updates require a rebuilt package, a
+clean installation test and a review of the installed tree before release.

@@ -108,6 +108,33 @@ const catalog: {version:number; guardrails:string; prompts:Playbook[]} = {
         "3. Call impreza_request_agent_update with agent_id and confirm=true only after that human confirmation. Stop on pin, maintenance, busy, scope or approval refusals.",
         "4. Poll impreza_list_servers with a bounded wait until a fresh heartbeat verifies the expected version. Queued or downloaded is not verified. Report the version and outcome; if startup failed or the previous binary was restored, report recovery without repeatedly submitting updates. Preserve configuration, applications and credentials."
       ]
+    },
+    {
+      "name": "impreza_protect_app",
+      "description": "Guide a reviewed cold standby in another country and verify its first restore drill; never promote or switch traffic.",
+      "arguments": [
+        {
+          "name": "deployment_id",
+          "kind": "deployment",
+          "required": true,
+          "description": "Owned primary app ID from impreza_list_deployments; no secret."
+        },
+        {
+          "name": "agent_id",
+          "kind": "agent",
+          "required": false,
+          "description": "Optional owned standby server ID in another reported country."
+        }
+      ],
+      "steps": [
+        "1. Read tools/list first. If jurisdiction failover tools or standby creation are unavailable, stop and explain that protection is unavailable for this account. Do not bypass a disabled gate, scope, resource or approval refusal. Call impreza_list_deployments and impreza_list_servers only through visible tools. Match the exact owned primary; require running non-preview Memos 0.31.0 or Uptime Kuma 2.5.5 with an unchanged reviewed standby recipe and an owned hostname. A bound database stack or another recipe needs its own review; do not guess a custom clone.",
+        "2. Inspect failover_location on the source and target server results. Require both online, recent, compatible servers on this account with different country_code values. Keep country_basis and country_notice visible: a customer-declared external country is not verified by Impreza. If location is missing, no other-country server exists, the source has no reviewed recipe, or a server is outside your credential resources, stop with what is missing. Ask the human to choose the exact eligible target; never buy a server or invent country metadata.",
+        "3. Call impreza_get_failover_standby first. An existing pair resumes its saved state instead of creating another copy. A confirmed not-found response permits a new standby; unknown or refused does not. Review the primary, app/version, target and reported countries with the human. Obtain explicit confirmation for standby creation, without a hostname, domain variables or onion. For an unverified customer hostname use the separately visible domain-challenge/verification tools and separate human confirmations; the human publishes TXT and Impreza never changes customer DNS.",
+        "4. Call impreza_deploy_catalog_app with the exact app_name, app_version, target agent_id and standby=true, without domain, onion or copied primary secrets. Record the returned deployment_id before polling impreza_list_deployments with a bounded wait for healthy running state. Pending, timeout or uncertain creation must not be retried as another copy: inspect existing deployments and operation receipts. Failed startup is not protection.",
+        "5. Show the exact primary and new standby IDs and countries. Obtain a fresh explicit human confirmation for pairing, then call impreza_pair_failover_standby with deployment_id, target_deployment_id and mode=cold. The server revalidates ownership, country, recipe, hostname and suspension. Stop on any refusal; do not redeploy elsewhere, widen credentials or declare another country to bypass it. Pairing alone has not copied or verified data.",
+        "6. Explain that the first drill backs up the primary and replaces standby data without moving traffic. Obtain a separate explicit confirmation, then call impreza_run_failover_drill once. Save drill_id and poll impreza_get_failover_drill with a bounded wait. Resume any active saved drill rather than creating another. On failed or uncertain status stop and show its safe receipt status; a retry requires a new human decision.",
+        "7. Only after status=verified read impreza_get_failover_standby and report the dated data_age_seconds and total_seconds measurements from the verified drill. These are measured copy age and restore-drill duration, not a guaranteed RPO or full traffic-cutover RTO; human decision time, DNS TTL and promotion were not measured. Never prepare/apply a cutover, promote, fail back, change a domain, schedule drills, delete old copies or cancel services as part of this assistant."
+      ]
     }
   ]
 };

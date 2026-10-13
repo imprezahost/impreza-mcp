@@ -1,3 +1,18 @@
+# MCP 0.50.0
+
+- New prompt `impreza_protect_app`: guides a cold standby of an app on a server in another
+  country, its pairing and the first restore drill, each step with its own human
+  confirmation; it never promotes the standby or switches traffic.
+- `impreza_list_servers` returns each server's `failover_location` (country code, how the
+  country was established, and a notice).
+- A `deployment_id` that would add path segments to an API URL is refused before any request.
+- `impreza_order_vps` and `impreza_vps_offer`: a VPS ordered through the API is bare by
+  default (`app: "none"`); the agent is installed only on explicit request (`app: "@agent"`,
+  or `impreza_install_agent` later with the customer's confirmation). Poll
+  `impreza_list_services` after ordering.
+- Direct runtime dependencies pinned to the exact tested versions.
+- 216 tools and 6 prompts in the local package.
+
 # MCP 0.49.0
 
 - New `impreza_install_agent` and `impreza_get_agent_install`: offer and follow the

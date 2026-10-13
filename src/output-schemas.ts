@@ -11914,6 +11914,42 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                     "object",
                     "null"
                   ]
+                },
+                "failover_location": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "country_code",
+                        "country_basis",
+                        "country_notice"
+                      ],
+                      "properties": {
+                        "country_code": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{2}$"
+                        },
+                        "country_basis": {
+                          "type": "string",
+                          "enum": [
+                            "verified",
+                            "operator_verified",
+                            "declared"
+                          ]
+                        },
+                        "country_notice": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }

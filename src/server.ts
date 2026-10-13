@@ -3267,7 +3267,7 @@ const TOOLS = [
         cpu_cores: { type: 'number', description: 'Optional: vCPU count, inside the range this tool lists.' },
         memory_gb: { type: 'number', description: 'Optional: memory in GB, inside the range this tool lists.' },
         disk_gb: { type: 'number', description: 'Optional: SSD disk in GB, inside the range this tool lists.' },
-        app: { type: 'string', description: "Optional: what it is born with — '@agent' (default), '@agent-mcp', 'none', a '@panel-*' choice or a catalog app name." },
+        app: { type: 'string', description: "Optional: what it is born with — 'none' (default, bare OS); '@agent' is opt-in, '@agent-mcp', 'none', a '@panel-*' choice or a catalog app name. The customer can request the agent later via impreza_install_agent with confirmation." },
       },
       additionalProperties: false,
     },
@@ -3278,10 +3278,10 @@ const TOOLS = [
       'Order a VPS and pay from the account credit balance — the balance must already cover the price (top up first with ' +
       '`impreza_topup`). For the VPS, choose `location`, `os`, `cpu_cores`, `memory_gb` and `disk_gb` from `impreza_vps_offer` ' +
       '(price that configuration there first) and leave `product_id` out. For a fixed plan such as Tor Hosting, pass its ' +
-      '`product_id` from `impreza_list_products` instead (and `config_options` only if that plan has some). The VPS is born ' +
-      'DEPLOYABLE: unless you pass `app`, the Impreza agent is auto-installed so it appears under `impreza_list_servers` ' +
-      'within a few minutes. Returns immediately (202) — the order provisions in the background, so poll ' +
-      '`impreza_list_servers` until the new agent is online.',
+      '`product_id` from `impreza_list_products` instead (and `config_options` only if that plan has some). The VPS defaults to ' +
+      '`app=none` (bare OS, no agent), matching the cart. Choose `app=@agent` explicitly, or request the agent later via ' +
+      '`impreza_install_agent` with customer confirmation. Returns immediately (202); poll `impreza_list_services`. ' +
+      '`impreza_list_servers` only lists installed agents.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3291,7 +3291,7 @@ const TOOLS = [
         cpu_cores: { type: 'number', description: 'VPS vCPU count, inside the range impreza_vps_offer lists.' },
         memory_gb: { type: 'number', description: 'VPS memory in GB, inside the range impreza_vps_offer lists.' },
         disk_gb: { type: 'number', description: 'VPS SSD disk in GB, inside the range impreza_vps_offer lists.' },
-        app: { type: 'string', description: "Optional. '@agent' (default — deployable), '@agent-mcp', 'none' (bare OS), a '@panel-*' control panel, or a catalog app name from impreza_list_apps." },
+        app: { type: 'string', description: "Optional. 'none' (default, bare OS); '@agent' is opt-in, '@agent-mcp', 'none' (bare OS), a '@panel-*' control panel, or a catalog app name from impreza_list_apps. The customer can request the agent later via impreza_install_agent with confirmation." },
         hostname: { type: 'string', description: 'Optional server hostname (a DNS name such as "web-1"). Two identical VPS orders within a day are refused as a repeat unless their hostnames differ.' },
         product_id: { type: 'number', description: 'Only for a fixed plan (e.g. Tor Hosting) from impreza_list_products. Leave it out for the VPS.' },
         config_options: { type: 'object', description: 'Fixed plans only: configurable options as {optionId: value}, from GET /v1/products/{id}. Each must belong to that plan.' },
@@ -4331,11 +4331,24 @@ function withStructuredContent<R extends { content?: unknown; isError?: unknown;
   return { ...result, structuredContent: projectOntoSchema(structured, OUTPUT_SCHEMAS[name]) as Record<string, unknown> };
 }
 
+/** Reject URL navigation before credentials or policy requests can leave the process.
+ * Encoding alone preserves dot segments, which WHATWG URL normalizes away. */
+function deploymentPathSegment(value: unknown): string {
+  if (typeof value !== 'string' || !value || value !== value.trim() ||
+      value === '.' || value === '..' || /[\\/%\x00-\x20\x7f]/.test(value)) {
+    throw new Error('A valid deployment_id is required; use one identifier without path segments or escapes.');
+  }
+  return encodeURIComponent(value);
+}
+
 async function callTool(req: CallToolRequest) {
   const { name, arguments: rawArgs } = req.params;
   const args = (rawArgs ?? {}) as Record<string, unknown>;
 
   try {
+    // An explicit empty filter has always meant all tasks/backups.
+    const emptyOptionalFilter = args.deployment_id === '' && ['impreza_list_tasks', 'impreza_list_backups'].includes(name);
+    if (args.deployment_id !== undefined && !emptyOptionalFilter) deploymentPathSegment(args.deployment_id);
     if (basicCloudUnavailable(name)) {
       throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
     }
@@ -4411,7 +4424,7 @@ async function callTool(req: CallToolRequest) {
         const body = { purge_data: purge, confirm: true };
         return toResult(
           await impreza.post<{ command_id: string; deployment: Deployment }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/uninstall`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/uninstall`,
             body,
           ),
         );
@@ -4420,7 +4433,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_probe_deployment': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
-        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/${encodeURIComponent(dep)}/probe`, {}));
+        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/${deploymentPathSegment(dep)}/probe`, {}));
       }
 
       case 'impreza_get_logs': {
@@ -4431,7 +4444,7 @@ async function callTool(req: CallToolRequest) {
         if (typeof args.since_seconds === 'number') body.since_seconds = args.since_seconds;
         return toResult(
           await impreza.post<unknown>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/logs`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/logs`,
             body,
           ),
         );
@@ -4447,7 +4460,7 @@ async function callTool(req: CallToolRequest) {
         if (typeof args.lines === 'number') body.lines = args.lines;
         return toResult(
           await impreza.post<unknown>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/reads`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/reads`,
             body,
           ),
         );
@@ -4457,7 +4470,7 @@ async function callTool(req: CallToolRequest) {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
         const readId = String(args.read_id ?? '');
-        const base = `/v1/platform/deployments/${encodeURIComponent(dep)}/reads`;
+        const base = `/v1/platform/deployments/${deploymentPathSegment(dep)}/reads`;
         return toResult(
           await impreza.get<unknown>(readId ? `${base}/${encodeURIComponent(readId)}` : base),
         );
@@ -4471,7 +4484,7 @@ async function callTool(req: CallToolRequest) {
         if (args.args !== undefined) body.args = args.args;
         return toResult(
           await impreza.post<unknown>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/cli`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/cli`,
             body,
           ),
         );
@@ -4481,7 +4494,7 @@ async function callTool(req: CallToolRequest) {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required');
         const runId = String(args.run_id ?? '');
-        const base = `/v1/platform/deployments/${encodeURIComponent(dep)}/cli`;
+        const base = `/v1/platform/deployments/${deploymentPathSegment(dep)}/cli`;
         return toResult(
           await impreza.get<unknown>(runId ? `${base}/${encodeURIComponent(runId)}` : base),
         );
@@ -4545,7 +4558,7 @@ async function callTool(req: CallToolRequest) {
           if (k in args) body[k] = args[k];
         }
         return toResult(
-          await impreza.post(`/v1/backups/schedule/${encodeURIComponent(dep)}`, body),
+          await impreza.post(`/v1/backups/schedule/${deploymentPathSegment(dep)}`, body),
         );
       }
 
@@ -4581,7 +4594,7 @@ async function callTool(req: CallToolRequest) {
         if (!dep) return toError('deployment_id is required');
         return toResult(
           await impreza.post<{ command_id: string; deployment: Deployment }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/restart`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/restart`,
             {},
           ),
         );
@@ -4610,7 +4623,7 @@ async function callTool(req: CallToolRequest) {
             command_id: string;
             note: string;
           }>(
-            `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/redeploy`,
+            `/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/redeploy`,
             body,
           ),
         );
@@ -4620,7 +4633,7 @@ async function callTool(req: CallToolRequest) {
         const dep=String(args.deployment_id ?? '');
         const command=args.command_id;
         if (!dep || typeof command !== 'string' || (!/^cmd_[A-Za-z0-9_-]{1,28}$/.test(command) || command.trim() !== command)) return toError('deployment_id and an exact command_id are required');
-        return toResult(await impreza.post('/v1/platform/deployments/'+encodeURIComponent(dep)+'/cancel',{command_id:command}));
+        return toResult(await impreza.post('/v1/platform/deployments/'+deploymentPathSegment(dep)+'/cancel',{command_id:command}));
       }
 
       case 'impreza_rollback_deployment': {
@@ -4628,7 +4641,7 @@ async function callTool(req: CallToolRequest) {
         const target = String(args.target_version ?? '');
         if (!dep || !/^rel_[A-Za-z0-9._-]{1,100}$/.test(target)) return toError('Valid deployment_id and release target_version are required');
         if (args.confirm !== true) return toError('Explicit customer confirmation is required');
-        return toResult(await impreza.post('/v1/platform/deployments/' + encodeURIComponent(dep) + '/rollback', { target_version: target, confirm: true }));
+        return toResult(await impreza.post('/v1/platform/deployments/' + deploymentPathSegment(dep) + '/rollback', { target_version: target, confirm: true }));
       }
 
       case 'impreza_change_domain': {
@@ -4638,7 +4651,7 @@ async function callTool(req: CallToolRequest) {
         if (!newDomain) return toError('domain is required');
         return toResult(
           await impreza.post<{ command_id: string; deployment: Deployment }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/domain`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/domain`,
             { domain: newDomain },
           ),
         );
@@ -4651,7 +4664,7 @@ async function callTool(req: CallToolRequest) {
         if (typeof args.onion_profile === 'string') body.onion_profile = args.onion_profile;
         return toResult(
           await impreza.post<{ command_id: string; deployment: Deployment }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/add`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/add`,
             body,
           ),
         );
@@ -4664,7 +4677,7 @@ async function callTool(req: CallToolRequest) {
         if (!['standard', 'hardened', 'max'].includes(profile)) return toError('profile must be one of: standard, hardened, max');
         return toResult(
           await impreza.post<{ command_id: string; profile: string; note: string }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/profile`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/profile`,
             { profile },
           ),
         );
@@ -4681,7 +4694,7 @@ async function callTool(req: CallToolRequest) {
         if (args.confirm !== true) return toError('Explicit customer confirmation is required (confirm: true)');
         return toResult(
           await impreza.post<{ command_id: string; note: string }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/export`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/export`,
             { recipient_pubkey: recipient, confirm: true },
           ),
         );
@@ -4694,7 +4707,7 @@ async function callTool(req: CallToolRequest) {
         if (!/^cmd_[A-Za-z0-9_-]{1,28}$/.test(command)) return toError('command_id is required (the cmd_... id from impreza_export_onion_key)');
         return toResult(
           await impreza.get<{ command_id: string; onion: string; sealed: string; note: string }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/export/${encodeURIComponent(command)}`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/export/${encodeURIComponent(command)}`,
           ),
         );
       }
@@ -4707,7 +4720,7 @@ async function callTool(req: CallToolRequest) {
         if (!/^[a-z2-7]{56}\.onion$/.test(address)) return toError('confirm_address must be the current .onion address, verbatim (56 base32 chars + .onion)');
         return toResult(
           await impreza.post<{ command_id: string; note: string }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/rotate`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/rotate`,
             { confirm: true, confirm_address: address },
           ),
         );
@@ -4721,7 +4734,7 @@ async function callTool(req: CallToolRequest) {
         if (!/^[a-z2-7]{56}\.onion$/.test(address)) return toError('confirm_address must be the retained .onion address being destroyed, verbatim (56 base32 chars + .onion)');
         return toResult(
           await impreza.post<{ command_id?: string; mode: string; note: string }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/purge`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/purge`,
             { confirm: true, confirm_address: address },
           ),
         );
@@ -4732,7 +4745,7 @@ async function callTool(req: CallToolRequest) {
         if (!dep) return toError('deployment_id is required');
         return toResult(
           await impreza.get<{ restricted: boolean; clients: Array<{ name: string; created_at: string }> }>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/clients`,
           ),
         );
       }
@@ -4748,7 +4761,7 @@ async function callTool(req: CallToolRequest) {
         if (!generate && !pubkey) return toError('pubkey is required unless generate:true');
         const body: Record<string, unknown> = generate ? { name, generate: true } : { name, pubkey };
         const data = await impreza.post<{ name: string; pubkey: string; private_key?: string }>(
-          `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients`,
+          `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/clients`,
           body,
         );
         if (data.private_key) {
@@ -4773,7 +4786,7 @@ async function callTool(req: CallToolRequest) {
         if (!name) return toError('name is required');
         return toResult(
           await impreza.del<unknown>(
-            `/v1/platform/deployments/${encodeURIComponent(dep)}/onion/clients/${encodeURIComponent(name)}`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/clients/${encodeURIComponent(name)}`,
           ),
         );
       }
@@ -4789,7 +4802,7 @@ async function callTool(req: CallToolRequest) {
             webhook_id: string | null;
             enabled: boolean;
             payload_url: string;
-          }>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/git-webhook`),
+          }>(`/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/git-webhook`),
         );
       }
 
@@ -4808,7 +4821,7 @@ async function callTool(req: CallToolRequest) {
             branch: string;
             note: string;
           }>(
-            `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/git-webhook/connect`,
+            `/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/git-webhook/connect`,
             pat ? { github_pat: pat } : {},
           ),
         );
@@ -4823,7 +4836,7 @@ async function callTool(req: CallToolRequest) {
         }
         return toResult(
           await impreza.post<{ ok: boolean; deleted_on_github: boolean; note: string }>(
-            `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/git-webhook/disconnect`,
+            `/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/git-webhook/disconnect`,
             body,
           ),
         );
@@ -4858,7 +4871,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_rotate_build_secrets': {
         const dep=String(args.deployment_id??'');
         if (!/^dpl_[a-f0-9]{1,64}$/.test(dep) || !args.build_secrets || typeof args.build_secrets!=='object' || Array.isArray(args.build_secrets)) throw new Error('Provide deployment_id and a build_secrets object');
-        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/build-secrets`,{build_secrets:args.build_secrets}));
+        return toResult(await impreza.post<unknown>(`/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/build-secrets`,{build_secrets:args.build_secrets}));
       }
       case 'impreza_set_deployment_vars': {
         const dep = String(args.deployment_id ?? '').trim();
@@ -4873,7 +4886,7 @@ async function callTool(req: CallToolRequest) {
           );
         }
         return toResult(
-          await impreza.post<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/vars`, body),
+          await impreza.post<unknown>(`/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/vars`, body),
         );
       }
 
@@ -5136,7 +5149,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_list_previews': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required (the PARENT deployment, dpl_...)');
-        return toResult(await impreza.get<unknown>(`/v1/platform/deployments/custom/${encodeURIComponent(dep)}/previews`));
+        return toResult(await impreza.get<unknown>(`/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/previews`));
       }
 
       case 'impreza_configure_previews': {
@@ -5147,13 +5160,13 @@ async function callTool(req: CallToolRequest) {
         if (args.ttl_hours !== undefined) body.previews_ttl_hours = Number(args.ttl_hours);
         if (args.max !== undefined) body.previews_max = Number(args.max);
         return toResult(await impreza.post<unknown>(
-          `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/previews/settings`, body));
+          `/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/previews/settings`, body));
       }
 
       case 'impreza_get_zero_downtime': {
         const p = z.object({ deployment_id: z.string().regex(/^dpl_[A-Za-z0-9_-]{1,40}$/) }).strict().parse(args);
         return toResult(await impreza.get<unknown>(
-          `/v1/platform/deployments/${encodeURIComponent(p.deployment_id)}/zero-downtime`));
+          `/v1/platform/deployments/${deploymentPathSegment(p.deployment_id)}/zero-downtime`));
       }
 
       case 'impreza_set_zero_downtime': {
@@ -5168,13 +5181,13 @@ async function callTool(req: CallToolRequest) {
         }).strict().parse(args);
         const { deployment_id: dep, ...body } = p;
         return toResult(await impreza.post<unknown>(
-          `/v1/platform/deployments/custom/${encodeURIComponent(dep)}/zero-downtime`, body));
+          `/v1/platform/deployments/custom/${deploymentPathSegment(dep)}/zero-downtime`, body));
       }
 
       case 'impreza_retire_preview': {
         const dep = String(args.deployment_id ?? '');
         if (!dep) return toError('deployment_id is required (the PREVIEW id from impreza_list_previews)');
-        return toResult(await impreza.del<unknown>(`/v1/platform/previews/${encodeURIComponent(dep)}`));
+        return toResult(await impreza.del<unknown>(`/v1/platform/previews/${deploymentPathSegment(dep)}`));
       }
 
       case 'impreza_list_credentials':
@@ -5405,25 +5418,25 @@ async function callTool(req: CallToolRequest) {
       }
       case 'impreza_get_shield': {
         const p=z.object({deployment_id:z.string().min(1)}).strict().parse(args);
-        return toResult(await impreza.get<unknown>('/v1/platform/deployments/'+encodeURIComponent(p.deployment_id)+'/shield'));
+        return toResult(await impreza.get<unknown>('/v1/platform/deployments/'+deploymentPathSegment(p.deployment_id)+'/shield'));
       }
       case 'impreza_set_shield': {
         const p=z.object({deployment_id:z.string().min(1),shield_profile:z.enum(['off','standard','hardened','max']),shield_mode:z.enum(['audit','enforce']).optional(),confirm_enforce:z.literal(true).optional(),base_revision:z.number().int().nonnegative().optional(),exclusions:z.array(z.object({rule_id:z.number().int().min(900000).max(999999),path_prefix:z.string().max(256).regex(/^\/[A-Za-z0-9/_.-]*$/).optional()}).strict()).max(20).optional(),controls:shieldControlsInput.optional()}).strict().parse(args);
         if((p.exclusions!==undefined||p.controls!==undefined)&&p.base_revision===undefined) return toError('exclusions and controls require base_revision from impreza_get_shield');
         if(p.shield_mode==='enforce'&&p.confirm_enforce!==true) return toError('shield_mode=enforce requires confirm_enforce=true');
         const {deployment_id,...body}=p;
-        return toResult(await impreza.post<unknown>('/v1/platform/deployments/'+encodeURIComponent(deployment_id)+'/shield',body));
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/'+deploymentPathSegment(deployment_id)+'/shield',body));
       }
       case 'impreza_tail_logs': {
         const p=z.object({deployment_id:z.string().min(1),lines:z.number().int().min(1).max(5000).optional(),since_seconds:z.number().int().nonnegative().optional(),wait_seconds:z.number().int().min(0).max(60).optional()}).strict().parse(args);
         const {deployment_id,wait_seconds,...body}=p;
-        const created=await impreza.post<{request_id?:string;reused?:boolean}>('/v1/platform/deployments/'+encodeURIComponent(deployment_id)+'/logs/requests',body);
+        const created=await impreza.post<{request_id?:string;reused?:boolean}>('/v1/platform/deployments/'+deploymentPathSegment(deployment_id)+'/logs/requests',body);
         const requestId=created.request_id??'';
         const wait=Math.max(0,Math.min(60,wait_seconds??20));
         let status='pending',final=false,nextOffset=0,chunksRead=0,logs='';
         const deadline=Date.now()+wait*1000;
         while(wait>0&&requestId!==''&&Date.now()<deadline){
-          const page=await impreza.get<{status?:string;final?:boolean;next_offset?:number;chunks?:Array<{id:number;chunk:string;final?:boolean}>}>('/v1/platform/deployments/'+encodeURIComponent(deployment_id)+'/logs/requests/'+encodeURIComponent(requestId),{after:String(nextOffset)});
+          const page=await impreza.get<{status?:string;final?:boolean;next_offset?:number;chunks?:Array<{id:number;chunk:string;final?:boolean}>}>('/v1/platform/deployments/'+deploymentPathSegment(deployment_id)+'/logs/requests/'+encodeURIComponent(requestId),{after:String(nextOffset)});
           status=page.status??status;
           for(const chunk of page.chunks??[]){nextOffset=chunk.id;chunksRead++;logs+=chunk.chunk;if(chunk.final)final=true;}
           if(page.final)final=true;
@@ -5437,7 +5450,7 @@ async function callTool(req: CallToolRequest) {
         const id=z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/);
         const p=z.object({deployment_id:id,target_deployment_id:id}).strict().parse(args);
         if(p.deployment_id===p.target_deployment_id) return toError('Choose a different target application');
-        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(p.deployment_id)+'/prepare-traffic-switch',{target_deployment_id:p.target_deployment_id}));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+deploymentPathSegment(p.deployment_id)+'/prepare-traffic-switch',{target_deployment_id:p.target_deployment_id}));
       }
       case 'impreza_get_traffic_switch': {
         const p=z.object({switch_id:z.string().regex(/^tsw_[a-f0-9]{24}$/)}).strict().parse(args);
@@ -5451,24 +5464,24 @@ async function callTool(req: CallToolRequest) {
         const p=z.object({deployment_id:z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/),branch:z.string().min(1).max(100),protect:z.boolean().optional(),private:z.boolean().optional(),onion_clients:z.array(z.object({name:z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/),pubkey:z.string().regex(/^[A-Za-z2-7]{52}$/)}).strict()).min(1).max(16).optional()}).strict().parse(args);
         if (p.protect && (p.private || p.onion_clients)) return toError('Private onion previews and password-protected previews are mutually exclusive');
         const {deployment_id,...body}=p;
-        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/previews',body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+deploymentPathSegment(deployment_id)+'/previews',body));
       }
       case 'impreza_prepare_service_binding': {
         const {deployment_id,...body}=args;
         if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.provider_deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(body.provider_deployment_id)) return toError('Valid application and provider IDs are required');
-        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding',body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+deploymentPathSegment(deployment_id)+'/prepare-binding',body));
       }
       case 'impreza_prepare_service_binding_removal': {
         const {deployment_id,...body}=args;
         if (Object.keys(body).length!==1 || !Object.prototype.hasOwnProperty.call(body,'binding_id')) return toError('Supply deployment_id and binding_id only');
         if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.binding_id!=='string'||!/^bnd_[a-f0-9]{24}$/.test(body.binding_id)) return toError('Valid application and binding IDs are required');
-        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding-removal',body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+deploymentPathSegment(deployment_id)+'/prepare-binding-removal',body));
       }
       case 'impreza_prepare_service_binding_rotation': {
         const {deployment_id,...body}=args;
         if (Object.keys(body).length!==2 || !Object.prototype.hasOwnProperty.call(body,'binding_id') || !Object.prototype.hasOwnProperty.call(body,'mode')) return toError('Supply deployment_id, binding_id and mode only');
         if (typeof deployment_id!=='string'||!/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/.test(deployment_id)||typeof body.binding_id!=='string'||!/^bnd_[a-f0-9]{24}$/.test(body.binding_id)||(body.mode!=='rotate'&&body.mode!=='abandon')) return toError('Valid application ID, binding ID and mode (rotate or abandon) are required');
-        return toResult(await impreza.post('/v1/platform/deployments/custom/'+encodeURIComponent(deployment_id)+'/prepare-binding-rotation',body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/'+deploymentPathSegment(deployment_id)+'/prepare-binding-rotation',body));
       }
       case 'impreza_get_service_binding_plan': {
         if (typeof args.binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(args.binding_plan_id)) return toError('Invalid binding_plan_id');
@@ -5482,7 +5495,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_prepare_image_promotion': {
         if (typeof args.deployment_id !== 'string' || !args.deployment_id || typeof args.source_deployment_id !== 'string' || !args.source_deployment_id) return toError('Target and source deployment IDs are required');
         const { deployment_id, ...body } = args;
-        return toResult(await impreza.post('/v1/platform/deployments/custom/' + encodeURIComponent(deployment_id) + '/prepare-promotion', body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/' + deploymentPathSegment(deployment_id) + '/prepare-promotion', body));
       }
       case 'impreza_get_image_promotion': {
         if (typeof args.promotion_id !== 'string' || !/^prom_[a-f0-9]{24}$/.test(args.promotion_id)) return toError('Invalid promotion_id');

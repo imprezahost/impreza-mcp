@@ -1,0 +1,18 @@
+export const deploymentSegmentCases=[
+ ['impreza_uninstall_deployment','POST','/v1/platform/deployments/{id}/uninstall',{purge_data:false}],
+ ['impreza_probe_deployment','POST','/v1/platform/deployments/{id}/probe',{}],
+ ['impreza_get_logs','POST','/v1/platform/deployments/{id}/logs',{lines:5}],
+ ['impreza_inspect_app','POST','/v1/platform/deployments/{id}/reads',{kind:'files'}],
+ ['impreza_get_app_read','GET','/v1/platform/deployments/{id}/reads',{}],
+ ['impreza_app_cli','POST','/v1/platform/deployments/{id}/cli',{cli:'help'}],
+ ['impreza_get_cli_run','GET','/v1/platform/deployments/{id}/cli',{}],
+ ['impreza_restart_deployment','POST','/v1/platform/deployments/{id}/restart',{}],
+ ['impreza_redeploy_deployment','POST','/v1/platform/deployments/custom/{id}/redeploy',{}],
+ ['impreza_rollback_deployment','POST','/v1/platform/deployments/{id}/rollback',{target_version:'rel_test',confirm:true}],
+ ['impreza_add_onion','POST','/v1/platform/deployments/{id}/onion/add',{}],
+ ['impreza_onion_auth_list','GET','/v1/platform/deployments/{id}/onion/clients',{}],
+ ['impreza_onion_auth_revoke','DELETE','/v1/platform/deployments/{id}/onion/clients/name',{name:'name'}],
+ ['impreza_git_webhook_status','GET','/v1/platform/deployments/custom/{id}/git-webhook',{}],
+ ['impreza_list_previews','GET','/v1/platform/deployments/custom/{id}/previews',{}],
+ ['impreza_retire_preview','DELETE','/v1/platform/previews/{id}',{}],
+];
