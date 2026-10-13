@@ -2951,7 +2951,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        amount: { type: 'number', description: 'Top-up amount in the account currency (1.00–10000.00).' },
+        amount: { type: ['string', 'number'], description: 'Prefer an exact decimal string in the account currency (1.00–10000.00); legacy JSON numbers remain accepted. Exponent strings, signs, spaces and more than two decimal places are refused.' },
         method: { type: 'string', enum: ['btc', 'xmr', 'trx', 'usdt', 'usdt_trc20'], description: 'Optional preferred crypto rail; the payment page still lets the customer switch.' },
       },
       required: ['amount'],
@@ -4333,12 +4333,16 @@ function withStructuredContent<R extends { content?: unknown; isError?: unknown;
 
 /** Reject URL navigation before credentials or policy requests can leave the process.
  * Encoding alone preserves dot segments, which WHATWG URL normalizes away. */
-function deploymentPathSegment(value: unknown): string {
+function identifierPathSegment(value: unknown, field = 'identifier'): string {
   if (typeof value !== 'string' || !value || value !== value.trim() ||
       value === '.' || value === '..' || /[\\/%\x00-\x20\x7f]/.test(value)) {
-    throw new Error('A valid deployment_id is required; use one identifier without path segments or escapes.');
+    throw new Error(`A valid ${field} is required; use one identifier without path segments or escapes.`);
   }
   return encodeURIComponent(value);
+}
+
+function deploymentPathSegment(value: unknown): string {
+  return identifierPathSegment(value, 'deployment_id');
 }
 
 async function callTool(req: CallToolRequest) {
@@ -4349,6 +4353,15 @@ async function callTool(req: CallToolRequest) {
     // An explicit empty filter has always meant all tasks/backups.
     const emptyOptionalFilter = args.deployment_id === '' && ['impreza_list_tasks', 'impreza_list_backups'].includes(name);
     if (args.deployment_id !== undefined && !emptyOptionalFilter) deploymentPathSegment(args.deployment_id);
+    // Inspect raw legacy IDs before trimming/coercion or policy requests.
+    // Empty optional read/run/task filters retain their list semantics.
+    for (const field of ['read_id', 'run_id', 'task_id', 'backup_id', 'vm_id', 'image_id', 'invoice_id', 'command_id'] as const) {
+      if (typeof args[field] === 'string' && args[field] !== '') identifierPathSegment(args[field], field);
+    }
+    // Domains in query/body tools retain their existing semantics.
+    // Only tools placing the domain in a route inspect the raw selector.
+    if (["impreza_domain_details", "impreza_list_dns", "impreza_add_dns_record", "impreza_update_dns_record", "impreza_delete_dns_record", "impreza_set_nameservers", "impreza_domain_lock", "impreza_domain_id_protection", "impreza_domain_registrar_action", "impreza_titan_details", "impreza_titan_dns", "impreza_titan_webmail", "impreza_google_details", "impreza_google_setup_admin"].includes(name) && typeof args.domain === 'string') identifierPathSegment(args.domain, 'domain');
+    if (name === 'impreza_dedicated_set_rdns' && typeof args.ip === 'string') identifierPathSegment(args.ip, 'ip');
     if (basicCloudUnavailable(name)) {
       throw new Error('FEATURE_NOT_AVAILABLE: This VPS supports status, allocated resources, start, shutdown and reboot. Contact Impreza support for other infrastructure operations.');
     }
@@ -4376,7 +4389,7 @@ async function callTool(req: CallToolRequest) {
       }
       case 'impreza_get_host_inventory': {
         const p = z.object({ agent_id: z.string().regex(/^agt_[a-f0-9]{16,24}$/), include_ssh_fingerprints: z.boolean().optional() }).strict().parse(args);
-        const inventory = await impreza.get<unknown>(`/v1/platform/servers/${encodeURIComponent(p.agent_id)}/inventory`);
+        const inventory = await impreza.get<unknown>(`/v1/platform/servers/${identifierPathSegment(p.agent_id)}/inventory`);
         return toStructuredResult(hostInventoryForMcp(inventory, p.include_ssh_fingerprints === true));
       }
 
@@ -4472,7 +4485,7 @@ async function callTool(req: CallToolRequest) {
         const readId = String(args.read_id ?? '');
         const base = `/v1/platform/deployments/${deploymentPathSegment(dep)}/reads`;
         return toResult(
-          await impreza.get<unknown>(readId ? `${base}/${encodeURIComponent(readId)}` : base),
+          await impreza.get<unknown>(readId ? `${base}/${identifierPathSegment(readId)}` : base),
         );
       }
 
@@ -4496,7 +4509,7 @@ async function callTool(req: CallToolRequest) {
         const runId = String(args.run_id ?? '');
         const base = `/v1/platform/deployments/${deploymentPathSegment(dep)}/cli`;
         return toResult(
-          await impreza.get<unknown>(runId ? `${base}/${encodeURIComponent(runId)}` : base),
+          await impreza.get<unknown>(runId ? `${base}/${identifierPathSegment(runId)}` : base),
         );
       }
 
@@ -4509,7 +4522,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_list_tasks': {
         const tid = String(args.task_id ?? '');
         if (tid) {
-          return toResult(await impreza.get(`/v1/tasks/${encodeURIComponent(tid)}/runs`));
+          return toResult(await impreza.get(`/v1/tasks/${identifierPathSegment(tid)}/runs`));
         }
         const dep = String(args.deployment_id ?? '');
         return toResult(
@@ -4530,7 +4543,7 @@ async function callTool(req: CallToolRequest) {
         if (name === 'impreza_update_task') {
           const tid = String(args.task_id ?? '').trim();
           if (!tid) return toError('task_id is required — get it from impreza_list_tasks. To create a new task, use impreza_create_task.');
-          return toResult(await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}`, body));
+          return toResult(await impreza.post(`/v1/tasks/${identifierPathSegment(tid)}`, body));
         }
         if (!String(args.deployment_id ?? '').trim()) {
           return toError('deployment_id is required — a task belongs to an app. Find it with impreza_list_deployments.');
@@ -4541,13 +4554,13 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_run_task': {
         const tid = String(args.task_id ?? '');
         if (!tid) return toError('task_id is required');
-        return toResult(await impreza.post(`/v1/tasks/${encodeURIComponent(tid)}/run`, {}));
+        return toResult(await impreza.post(`/v1/tasks/${identifierPathSegment(tid)}/run`, {}));
       }
 
       case 'impreza_delete_task': {
         const tid = String(args.task_id ?? '');
         if (!tid) return toError('task_id is required');
-        return toResult(await impreza.del(`/v1/tasks/${encodeURIComponent(tid)}`));
+        return toResult(await impreza.del(`/v1/tasks/${identifierPathSegment(tid)}`));
       }
 
       case 'impreza_backup_schedule': {
@@ -4576,7 +4589,7 @@ async function callTool(req: CallToolRequest) {
         // different app and the original is left alone.
         const into = String(args.target_deployment_id ?? '').trim();
         return toResult(await impreza.post(
-          `/v1/backups/${encodeURIComponent(bid)}/restore`,
+          `/v1/backups/${identifierPathSegment(bid)}/restore`,
           into ? { target_deployment_id: into } : {},
         ));
       }
@@ -4585,7 +4598,7 @@ async function callTool(req: CallToolRequest) {
         const bid = String(args.backup_id ?? '');
         if (!bid) return toError('backup_id is required');
         return toResult(
-          await impreza.post(`/v1/backups/${encodeURIComponent(bid)}/discard-previous`, {}),
+          await impreza.post(`/v1/backups/${identifierPathSegment(bid)}/discard-previous`, {}),
         );
       }
 
@@ -4707,7 +4720,7 @@ async function callTool(req: CallToolRequest) {
         if (!/^cmd_[A-Za-z0-9_-]{1,28}$/.test(command)) return toError('command_id is required (the cmd_... id from impreza_export_onion_key)');
         return toResult(
           await impreza.get<{ command_id: string; onion: string; sealed: string; note: string }>(
-            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/export/${encodeURIComponent(command)}`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/export/${identifierPathSegment(command)}`,
           ),
         );
       }
@@ -4786,7 +4799,7 @@ async function callTool(req: CallToolRequest) {
         if (!name) return toError('name is required');
         return toResult(
           await impreza.del<unknown>(
-            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/clients/${encodeURIComponent(name)}`,
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/onion/clients/${identifierPathSegment(name)}`,
           ),
         );
       }
@@ -4897,13 +4910,13 @@ async function callTool(req: CallToolRequest) {
         if (!['boot', 'shutdown', 'reboot'].includes(action)) {
           throw new Error('action must be one of: boot, shutdown, reboot.');
         }
-        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/${action}`, {}));
+        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${identifierPathSegment(vm)}/${action}`, {}));
       }
 
       case 'impreza_cloud_rescue': {
         const vm = String(args.vm_id ?? '').trim();
         if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
-        const path = `/v1/vps/cloud/${encodeURIComponent(vm)}/rescue`;
+        const path = `/v1/vps/cloud/${identifierPathSegment(vm)}/rescue`;
         return toResult(
           args.enable ? await impreza.post<unknown>(path, {}) : await impreza.del<unknown>(path),
         );
@@ -4979,14 +4992,14 @@ async function callTool(req: CallToolRequest) {
           throw new Error('instance_size is required — list the options with impreza_api_call on /vps/cloud/sizes.');
         }
         return toResult(
-          await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/resize`, { instance_size: size }),
+          await impreza.post<unknown>(`/v1/vps/cloud/${identifierPathSegment(vm)}/resize`, { instance_size: size }),
         );
       }
 
       case 'impreza_cloud_create_image': {
         const vm = String(args.vm_id ?? '').trim();
         if (!vm) throw new Error('vm_id is required — the cloud VPS id from impreza_list_services.');
-        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/images`, {}));
+        return toResult(await impreza.post<unknown>(`/v1/vps/cloud/${identifierPathSegment(vm)}/images`, {}));
       }
 
       case 'impreza_cloud_restore_image': {
@@ -4998,7 +5011,7 @@ async function callTool(req: CallToolRequest) {
         }
         return toResult(
           await impreza.post<unknown>(
-            `/v1/vps/cloud/${encodeURIComponent(vm)}/images/${encodeURIComponent(img)}/restore`,
+            `/v1/vps/cloud/${identifierPathSegment(vm)}/images/${identifierPathSegment(img)}/restore`,
             {},
           ),
         );
@@ -5009,7 +5022,7 @@ async function callTool(req: CallToolRequest) {
         if (!img) {
           throw new Error('image_id is required — list them with impreza_api_call on /vps/cloud/{vmId}/images.');
         }
-        return toResult(await impreza.del<unknown>(`/v1/vps/cloud/images/${encodeURIComponent(img)}`));
+        return toResult(await impreza.del<unknown>(`/v1/vps/cloud/images/${identifierPathSegment(img)}`));
       }
 
       case 'impreza_cloud_add_ssh_key': {
@@ -5022,7 +5035,7 @@ async function callTool(req: CallToolRequest) {
           );
         }
         return toResult(
-          await impreza.post<unknown>(`/v1/vps/cloud/${encodeURIComponent(vm)}/ssh-keys`, { ssh_keys: keys }),
+          await impreza.post<unknown>(`/v1/vps/cloud/${identifierPathSegment(vm)}/ssh-keys`, { ssh_keys: keys }),
         );
       }
 
@@ -5078,14 +5091,14 @@ async function callTool(req: CallToolRequest) {
         if (!('lock' in args)) {
           throw new Error('lock is required: true to lock (safe), false to unlock for a deliberate transfer out.');
         }
-        const path = `/v1/domains/${encodeURIComponent(d)}/lock`;
+        const path = `/v1/domains/${identifierPathSegment(d)}/lock`;
         return toResult(args.lock ? await impreza.post<unknown>(path, {}) : await impreza.del<unknown>(path));
       }
 
       case 'impreza_domain_id_protection': {
         const d = String(args.domain ?? '').trim().toLowerCase();
         if (!d) throw new Error('domain is required.');
-        return toResult(await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(d)}/id-protection`, {}));
+        return toResult(await impreza.post<unknown>(`/v1/domains/${identifierPathSegment(d)}/id-protection`, {}));
       }
 
       case 'impreza_domain_registrar_action': {
@@ -5102,7 +5115,7 @@ async function callTool(req: CallToolRequest) {
           throw new Error('action must be one of: raa_verify, gdpr_auth, transfer_approval, activate_dns.');
         }
         return toResult(
-          await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(d)}/${seg[action]}`, {}),
+          await impreza.post<unknown>(`/v1/domains/${identifierPathSegment(d)}/${seg[action]}`, {}),
         );
       }
 
@@ -5196,7 +5209,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_revoke_credential': {
         const id = typeof args.credential_id === 'number' ? args.credential_id : Number(args.credential_id);
         if (!Number.isFinite(id) || id <= 0) return toError('credential_id is required (a number from impreza_list_credentials)');
-        return toResult(await impreza.del<unknown>(`/v1/credentials/${encodeURIComponent(String(id))}`));
+        return toResult(await impreza.del<unknown>(`/v1/credentials/${identifierPathSegment(String(id))}`));
       }
 
       case 'impreza_agent_activity': {
@@ -5269,11 +5282,11 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_list_contexts': {
         const context = args.context_id;
         if (context !== undefined && (typeof context !== 'string' || !/^ctx_[a-f0-9]{1,36}$/.test(context))) return toError('Invalid context_id');
-        return toResult(await impreza.get('/v1/platform/deployments/custom/contexts' + (context ? '/' + encodeURIComponent(context) : '')));
+        return toResult(await impreza.get('/v1/platform/deployments/custom/contexts' + (context ? '/' + identifierPathSegment(context) : '')));
       }
       case 'impreza_delete_context':
         if (args.confirm !== true || typeof args.context_id !== 'string' || !/^ctx_[a-f0-9]{1,36}$/.test(args.context_id)) return toError('Valid context_id and confirm=true are required');
-        return toResult(await impreza.del('/v1/platform/deployments/custom/contexts/' + encodeURIComponent(args.context_id)));
+        return toResult(await impreza.del('/v1/platform/deployments/custom/contexts/' + identifierPathSegment(args.context_id)));
       case 'impreza_prepare_compose': {
         const body: Record<string, unknown> = {};
         for (const field of ['compose_yaml', 'web_service', 'target_port', 'context_id']) if (args[field] !== undefined) body[field] = args[field];
@@ -5284,24 +5297,24 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_list_project_plans': {
         const plan = args.plan_id;
         if (plan !== undefined && (typeof plan !== 'string' || !/^plan_[a-f0-9]{24}$/.test(plan))) return toError('Invalid plan_id');
-        return toResult(await impreza.get('/v1/platform/deployments/custom/plans' + (plan ? '/' + encodeURIComponent(plan) : '')));
+        return toResult(await impreza.get('/v1/platform/deployments/custom/plans' + (plan ? '/' + identifierPathSegment(plan) : '')));
       }
       case 'impreza_deploy_project_plan': {
         if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
         const { plan_id, ...body } = args;
-        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/deploy', body));
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + identifierPathSegment(plan_id) + '/deploy', body));
       }
       case 'impreza_list_projects': {
         const id=args.project_id;
         if (id!==undefined && (typeof id!=='string'||!/^prj_[a-f0-9]{24}$/.test(id))) return toError('Invalid project_id');
-        return toResult(await impreza.get('/v1/platform/projects'+(id?'/'+encodeURIComponent(id):'')));
+        return toResult(await impreza.get('/v1/platform/projects'+(id?'/'+identifierPathSegment(id):'')));
       }
       case 'impreza_create_project':
         return toResult(await impreza.post<unknown>('/v1/platform/projects',args));
       case 'impreza_create_environment': {
         const {project_id,...body}=args;
         if (typeof project_id!=='string'||!/^prj_[a-f0-9]{24}$/.test(project_id)) return toError('Invalid project_id');
-        return toResult(await impreza.post<unknown>('/v1/platform/projects/'+encodeURIComponent(project_id)+'/environments',body));
+        return toResult(await impreza.post<unknown>('/v1/platform/projects/'+identifierPathSegment(project_id)+'/environments',body));
       }
       case 'impreza_attach_environment_service':
       case 'impreza_detach_environment_service': {
@@ -5309,26 +5322,26 @@ async function callTool(req: CallToolRequest) {
         if (typeof environment_id!=='string'||!/^env_[a-f0-9]{24}$/.test(environment_id)) return toError('Invalid environment_id');
         const detach=name==='impreza_detach_environment_service';
         if (detach&&body.confirm!==true) return toError('Explicit confirm=true is required');
-        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+encodeURIComponent(environment_id)+'/services'+(detach?'/detach':''),body));
+        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+identifierPathSegment(environment_id)+'/services'+(detach?'/detach':''),body));
       }
       case 'impreza_compare_environments': {
         const p=z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),other_environment_id:z.string().regex(/^env_[a-f0-9]{24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/environments/'+encodeURIComponent(p.environment_id)+'/compare',{other:p.other_environment_id}));
+        return toResult(await impreza.get('/v1/platform/environments/'+identifierPathSegment(p.environment_id)+'/compare',{other:p.other_environment_id}));
       }
       case 'impreza_list_environment_deploys': {
         const p=z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/environments/'+encodeURIComponent(p.environment_id)+'/deploys'));
+        return toResult(await impreza.get('/v1/platform/environments/'+identifierPathSegment(p.environment_id)+'/deploys'));
       }
       // The same REST mapping the hosted connector uses.
       case 'impreza_get_variable_group': {
         const p=z.object({project_id:z.string().regex(/^prj_[a-f0-9]{24}$/),environment_id:z.string().regex(/^env_[a-f0-9]{24}$/).optional()}).strict().parse(args);
-        const path='/v1/platform/'+(p.environment_id?'environments/'+encodeURIComponent(p.environment_id):'projects/'+encodeURIComponent(p.project_id))+'/vars';
+        const path='/v1/platform/'+(p.environment_id?'environments/'+identifierPathSegment(p.environment_id):'projects/'+identifierPathSegment(p.project_id))+'/vars';
         return toResult(await impreza.get(path));
       }
       case 'impreza_set_variable_group': {
         const p=z.object({project_id:z.string().regex(/^prj_[a-f0-9]{24}$/),environment_id:z.string().regex(/^env_[a-f0-9]{24}$/).optional(),vars:z.record(z.string(),z.string()).optional(),secrets:z.record(z.string(),z.string()).optional(),base_revision:z.number().int().nonnegative().optional()}).strict().parse(args);
         const {project_id,environment_id,...body}=p;
-        const path='/v1/platform/'+(environment_id?'environments/'+encodeURIComponent(environment_id):'projects/'+encodeURIComponent(project_id))+'/vars';
+        const path='/v1/platform/'+(environment_id?'environments/'+identifierPathSegment(environment_id):'projects/'+identifierPathSegment(project_id))+'/vars';
         return toResult(await impreza.put<unknown>(path,body));
       }
       case 'impreza_rename_project':
@@ -5339,7 +5352,7 @@ async function callTool(req: CallToolRequest) {
           : z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),name:z.string().regex(/^[a-z][a-z0-9-]{0,47}$/)}).strict().parse(args);
         const {name:newName,...ids}=p;
         const id=Object.values(ids)[0] as string;
-        return toResult(await impreza.post<unknown>('/v1/platform/'+(isProject?'projects/':'environments/')+encodeURIComponent(id)+'/rename',{name:newName}));
+        return toResult(await impreza.post<unknown>('/v1/platform/'+(isProject?'projects/':'environments/')+identifierPathSegment(id)+'/rename',{name:newName}));
       }
       case 'impreza_delete_project':
       case 'impreza_delete_environment': {
@@ -5349,49 +5362,49 @@ async function callTool(req: CallToolRequest) {
           : z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),confirm:z.string().min(1)}).strict().parse(args);
         const {confirm,...ids}=p;
         const id=Object.values(ids)[0] as string;
-        return toResult(await impreza.post<unknown>('/v1/platform/'+(isProject?'projects/':'environments/')+encodeURIComponent(id)+'/delete',{confirm}));
+        return toResult(await impreza.post<unknown>('/v1/platform/'+(isProject?'projects/':'environments/')+identifierPathSegment(id)+'/delete',{confirm}));
       }
       case 'impreza_deploy_environment': {
         const p=z.object({environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),require_healthy_start:z.boolean().optional()}).strict().parse(args);
         const {environment_id,...body}=p;
-        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+encodeURIComponent(environment_id)+'/deploy',body));
+        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+identifierPathSegment(environment_id)+'/deploy',body));
       }
       case 'impreza_get_environment_deploy': {
         const p=z.object({batch_id:z.string().regex(/^edb_[a-f0-9]{24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/environment-deploys/'+encodeURIComponent(p.batch_id)));
+        return toResult(await impreza.get('/v1/platform/environment-deploys/'+identifierPathSegment(p.batch_id)));
       }
       case 'impreza_prepare_config_promotion': {
         const p=z.object({target_environment_id:z.string().regex(/^env_[a-f0-9]{24}$/),source_environment_id:z.string().regex(/^env_[a-f0-9]{24}$/)}).strict().parse(args);
         if(p.target_environment_id===p.source_environment_id) return toError('Choose a different source environment');
-        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+encodeURIComponent(p.target_environment_id)+'/config-promotions',{source_environment_id:p.source_environment_id}));
+        return toResult(await impreza.post<unknown>('/v1/platform/environments/'+identifierPathSegment(p.target_environment_id)+'/config-promotions',{source_environment_id:p.source_environment_id}));
       }
       case 'impreza_get_config_promotion': {
         const p=z.object({promotion_id:z.string().regex(/^cpro_[a-f0-9]{24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/config-promotions/'+encodeURIComponent(p.promotion_id)));
+        return toResult(await impreza.get('/v1/platform/config-promotions/'+identifierPathSegment(p.promotion_id)));
       }
       case 'impreza_apply_config_promotion': {
         const p=z.object({promotion_id:z.string().regex(/^cpro_[a-f0-9]{24}$/),review_digest:z.string().regex(/^[a-f0-9]{64}$/),confirm:z.literal(true)}).strict().parse(args);
-        return toResult(await impreza.post<unknown>('/v1/platform/config-promotions/'+encodeURIComponent(p.promotion_id)+'/apply',{review_digest:p.review_digest,confirm:p.confirm}));
+        return toResult(await impreza.post<unknown>('/v1/platform/config-promotions/'+identifierPathSegment(p.promotion_id)+'/apply',{review_digest:p.review_digest,confirm:p.confirm}));
       }
       case 'impreza_get_update_policy': {
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/update-policy'));
+        return toResult(await impreza.get('/v1/platform/servers/'+identifierPathSegment(p.agent_id)+'/update-policy'));
       }
       case 'impreza_set_update_policy': {
         const hhmm=z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/);
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/),update_channel:z.enum(['stable','beta','pinned']).optional(),pinned_version:z.string().regex(/^[0-9]+\.[0-9]+\.[0-9]+$/).optional(),maintenance_window_utc:z.object({start:hhmm,end:hhmm}).strict().nullable().optional()}).strict().parse(args);
         if(p.update_channel==='pinned'&&!p.pinned_version) return toError('pinned_version is required with update_channel=pinned');
         const {agent_id,...body}=p;
-        return toResult(await impreza.put<unknown>('/v1/platform/servers/'+encodeURIComponent(agent_id)+'/update-policy',body));
+        return toResult(await impreza.put<unknown>('/v1/platform/servers/'+identifierPathSegment(agent_id)+'/update-policy',body));
       }
       case 'impreza_pause_agent':
       case 'impreza_resume_agent': {
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/).refine(v=>v===v.trim()),confirm:z.literal(true)}).strict().parse(args);
-        return toResult(await impreza.post<unknown>('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/'+(name==='impreza_pause_agent'?'pause':'resume'),{confirm:p.confirm}));
+        return toResult(await impreza.post<unknown>('/v1/platform/servers/'+identifierPathSegment(p.agent_id)+'/'+(name==='impreza_pause_agent'?'pause':'resume'),{confirm:p.confirm}));
       }
       case 'impreza_request_agent_update': {
         const p=z.object({agent_id:z.string().regex(/^agt_[a-f0-9]{16,24}$/),confirm:z.literal(true)}).strict().parse(args);
-        return toResult(await impreza.post<unknown>('/v1/platform/servers/'+encodeURIComponent(p.agent_id)+'/agent-update',{confirm:p.confirm}));
+        return toResult(await impreza.post<unknown>('/v1/platform/servers/'+identifierPathSegment(p.agent_id)+'/agent-update',{confirm:p.confirm}));
       }
       case 'impreza_install_agent': {
         // The same two calls as the hosted connector. The first reads
@@ -5436,7 +5449,7 @@ async function callTool(req: CallToolRequest) {
         let status='pending',final=false,nextOffset=0,chunksRead=0,logs='';
         const deadline=Date.now()+wait*1000;
         while(wait>0&&requestId!==''&&Date.now()<deadline){
-          const page=await impreza.get<{status?:string;final?:boolean;next_offset?:number;chunks?:Array<{id:number;chunk:string;final?:boolean}>}>('/v1/platform/deployments/'+deploymentPathSegment(deployment_id)+'/logs/requests/'+encodeURIComponent(requestId),{after:String(nextOffset)});
+          const page=await impreza.get<{status?:string;final?:boolean;next_offset?:number;chunks?:Array<{id:number;chunk:string;final?:boolean}>}>('/v1/platform/deployments/'+deploymentPathSegment(deployment_id)+'/logs/requests/'+identifierPathSegment(requestId),{after:String(nextOffset)});
           status=page.status??status;
           for(const chunk of page.chunks??[]){nextOffset=chunk.id;chunksRead++;logs+=chunk.chunk;if(chunk.final)final=true;}
           if(page.final)final=true;
@@ -5454,11 +5467,11 @@ async function callTool(req: CallToolRequest) {
       }
       case 'impreza_get_traffic_switch': {
         const p=z.object({switch_id:z.string().regex(/^tsw_[a-f0-9]{24}$/)}).strict().parse(args);
-        return toResult(await impreza.get('/v1/platform/traffic-switches/'+encodeURIComponent(p.switch_id)));
+        return toResult(await impreza.get('/v1/platform/traffic-switches/'+identifierPathSegment(p.switch_id)));
       }
       case 'impreza_apply_traffic_switch': {
         const p=z.object({switch_id:z.string().regex(/^tsw_[a-f0-9]{24}$/),review_digest:z.string().regex(/^[a-f0-9]{64}$/),confirm:z.literal(true)}).strict().parse(args);
-        return toResult(await impreza.post('/v1/platform/traffic-switches/'+encodeURIComponent(p.switch_id)+'/apply',{review_digest:p.review_digest,confirm:true}));
+        return toResult(await impreza.post('/v1/platform/traffic-switches/'+identifierPathSegment(p.switch_id)+'/apply',{review_digest:p.review_digest,confirm:true}));
       }
       case 'impreza_create_preview': {
         const p=z.object({deployment_id:z.string().regex(/^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$/),branch:z.string().min(1).max(100),protect:z.boolean().optional(),private:z.boolean().optional(),onion_clients:z.array(z.object({name:z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/),pubkey:z.string().regex(/^[A-Za-z2-7]{52}$/)}).strict()).min(1).max(16).optional()}).strict().parse(args);
@@ -5485,12 +5498,12 @@ async function callTool(req: CallToolRequest) {
       }
       case 'impreza_get_service_binding_plan': {
         if (typeof args.binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(args.binding_plan_id)) return toError('Invalid binding_plan_id');
-        return toResult(await impreza.get('/v1/platform/binding-plans/'+encodeURIComponent(args.binding_plan_id)));
+        return toResult(await impreza.get('/v1/platform/binding-plans/'+identifierPathSegment(args.binding_plan_id)));
       }
       case 'impreza_apply_service_binding_plan': {
         const {binding_plan_id,...body}=args;
         if (typeof binding_plan_id!=='string'||!/^bplan_[a-f0-9]{24}$/.test(binding_plan_id)||body.confirm!==true||typeof body.review_digest!=='string'||! /^[a-f0-9]{64}$/.test(body.review_digest)) return toError('A binding review, digest and confirm=true are required');
-        return toResult(await impreza.post('/v1/platform/binding-plans/'+encodeURIComponent(binding_plan_id)+'/apply',body));
+        return toResult(await impreza.post('/v1/platform/binding-plans/'+identifierPathSegment(binding_plan_id)+'/apply',body));
       }
       case 'impreza_prepare_image_promotion': {
         if (typeof args.deployment_id !== 'string' || !args.deployment_id || typeof args.source_deployment_id !== 'string' || !args.source_deployment_id) return toError('Target and source deployment IDs are required');
@@ -5499,27 +5512,27 @@ async function callTool(req: CallToolRequest) {
       }
       case 'impreza_get_image_promotion': {
         if (typeof args.promotion_id !== 'string' || !/^prom_[a-f0-9]{24}$/.test(args.promotion_id)) return toError('Invalid promotion_id');
-        return toResult(await impreza.get('/v1/platform/deployments/custom/promotions/' + encodeURIComponent(args.promotion_id)));
+        return toResult(await impreza.get('/v1/platform/deployments/custom/promotions/' + identifierPathSegment(args.promotion_id)));
       }
       case 'impreza_apply_image_promotion': {
         if (typeof args.promotion_id !== 'string' || !/^prom_[a-f0-9]{24}$/.test(args.promotion_id) || args.confirm !== true) return toError('A reviewed promotion_id and confirm=true are required');
         const { promotion_id, ...body } = args;
-        return toResult(await impreza.post('/v1/platform/deployments/custom/promotions/' + encodeURIComponent(promotion_id) + '/apply', body));
+        return toResult(await impreza.post('/v1/platform/deployments/custom/promotions/' + identifierPathSegment(promotion_id) + '/apply', body));
       }
       case 'impreza_prepare_project_deployment': {
         if (typeof args.plan_id !== 'string' || !/^plan_[a-f0-9]{24}$/.test(args.plan_id)) return toError('Invalid plan_id');
         const { plan_id, ...body } = args;
-        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + encodeURIComponent(plan_id) + '/prepare-deployment', body));
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/plans/' + identifierPathSegment(plan_id) + '/prepare-deployment', body));
       }
       case 'impreza_list_prepared_deployments': {
         const execution = args.execution_id;
         if (execution !== undefined && (typeof execution !== 'string' || !/^pdep_[a-f0-9]{24}$/.test(execution))) return toError('Invalid execution_id');
-        return toResult(await impreza.get('/v1/platform/deployments/custom/prepared' + (execution ? '/' + encodeURIComponent(execution) : '')));
+        return toResult(await impreza.get('/v1/platform/deployments/custom/prepared' + (execution ? '/' + identifierPathSegment(execution) : '')));
       }
       case 'impreza_apply_project_deployment': {
         if (typeof args.execution_id !== 'string' || !/^pdep_[a-f0-9]{24}$/.test(args.execution_id)) return toError('Invalid execution_id');
         const { execution_id, ...body } = args;
-        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepared/' + encodeURIComponent(execution_id) + '/apply', body));
+        return toResult(await impreza.post<unknown>('/v1/platform/deployments/custom/prepared/' + identifierPathSegment(execution_id) + '/apply', body));
       }
       case 'impreza_prepare_project': {
         const body: Record<string, unknown> = {};
@@ -5673,11 +5686,7 @@ async function callTool(req: CallToolRequest) {
       }
 
       case 'impreza_topup': {
-        const amount = typeof args.amount === 'number' ? args.amount : Number(args.amount);
-        if (!Number.isFinite(amount) || amount <= 0) {
-          return toError('amount is required (a positive number in the account currency)');
-        }
-        const body: Record<string, unknown> = { amount };
+        const body: Record<string, unknown> = { amount: args.amount };
         if (typeof args.method === 'string' && args.method) body.method = args.method;
         return toResult(await impreza.post<unknown>('/v1/account/topup', body));
       }
@@ -5685,7 +5694,7 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_topup_status': {
         const invoiceId = String(args.invoice_id ?? '');
         if (!invoiceId) return toError('invoice_id is required');
-        return toResult(await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}`));
+        return toResult(await impreza.get<unknown>(`/v1/account/topup/${identifierPathSegment(invoiceId)}`));
       }
 
       case 'impreza_topup_payment': {
@@ -5697,7 +5706,7 @@ async function callTool(req: CallToolRequest) {
         // re-parsing our text block. Only the panelled tools get it: on the
         // rest it would duplicate the payload the model already reads.
         return toStructuredResult(
-          await impreza.get<unknown>(`/v1/account/topup/${encodeURIComponent(invoiceId)}/payment`, query),
+          await impreza.get<unknown>(`/v1/account/topup/${identifierPathSegment(invoiceId)}/payment`, query),
         );
       }
 
@@ -5751,13 +5760,13 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_domain_details': {
         const domain = String(args.domain ?? '');
         if (!domain) return toError('domain is required');
-        return toResult(await impreza.get<unknown>(`/v1/domains/${encodeURIComponent(domain)}`));
+        return toResult(await impreza.get<unknown>(`/v1/domains/${identifierPathSegment(domain)}`));
       }
 
       case 'impreza_list_dns': {
         const domain = String(args.domain ?? '');
         if (!domain) return toError('domain is required');
-        return toResult(await impreza.get<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`));
+        return toResult(await impreza.get<unknown>(`/v1/domains/${identifierPathSegment(domain)}/dns`));
       }
 
       case 'impreza_add_dns_record': {
@@ -5770,7 +5779,7 @@ async function callTool(req: CallToolRequest) {
         };
         if (typeof args.ttl === 'number') body.ttl = args.ttl;
         if (typeof args.priority === 'number') body.priority = args.priority;
-        return toResult(await impreza.post<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+        return toResult(await impreza.post<unknown>(`/v1/domains/${identifierPathSegment(domain)}/dns`, body));
       }
 
       case 'impreza_update_dns_record': {
@@ -5784,7 +5793,7 @@ async function callTool(req: CallToolRequest) {
         };
         if (typeof args.ttl === 'number') body.ttl = args.ttl;
         if (typeof args.priority === 'number') body.priority = args.priority;
-        return toResult(await impreza.put<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+        return toResult(await impreza.put<unknown>(`/v1/domains/${identifierPathSegment(domain)}/dns`, body));
       }
 
       case 'impreza_delete_dns_record': {
@@ -5795,7 +5804,7 @@ async function callTool(req: CallToolRequest) {
           host: String(args.host ?? ''),
           value: String(args.value ?? ''),
         };
-        return toResult(await impreza.del<unknown>(`/v1/domains/${encodeURIComponent(domain)}/dns`, body));
+        return toResult(await impreza.del<unknown>(`/v1/domains/${identifierPathSegment(domain)}/dns`, body));
       }
 
       case 'impreza_set_nameservers': {
@@ -5805,7 +5814,7 @@ async function callTool(req: CallToolRequest) {
           return toError('nameservers is required (a non-empty array of hostnames)');
         }
         return toResult(
-          await impreza.put<unknown>(`/v1/domains/${encodeURIComponent(domain)}/nameservers`, {
+          await impreza.put<unknown>(`/v1/domains/${identifierPathSegment(domain)}/nameservers`, {
             nameservers: args.nameservers,
           }),
         );
@@ -5929,7 +5938,7 @@ async function callTool(req: CallToolRequest) {
         const invoiceId = Number(args.invoice_id ?? 0);
         if (!Number.isInteger(invoiceId) || invoiceId < 1) return toError('invoice_id is required');
         return toResult(
-          await impreza.post<unknown>(`/v1/invoices/${encodeURIComponent(String(invoiceId))}/pay`, {}),
+          await impreza.post<unknown>(`/v1/invoices/${identifierPathSegment(String(invoiceId))}/pay`, {}),
         );
       }
 
@@ -5982,7 +5991,7 @@ async function callTool(req: CallToolRequest) {
         if (!ip) return toError('ip is required (get it from impreza_dedicated_ips)');
         if (!hostname) return toError('hostname is required — the PTR value to publish, e.g. mail.example.com');
         return toResult(
-          await impreza.put<unknown>(`/v1/dedicated/${sid}/ips/${encodeURIComponent(ip)}/rdns`, { hostname }),
+          await impreza.put<unknown>(`/v1/dedicated/${sid}/ips/${identifierPathSegment(ip)}/rdns`, { hostname }),
         );
       }
 
@@ -6043,7 +6052,7 @@ async function callTool(req: CallToolRequest) {
         const suffix =
           name === 'impreza_titan_dns' ? '/dns' : name === 'impreza_titan_webmail' ? '/sso' : '';
         return toResult(
-          await impreza.get<unknown>(`/v1/email/${vendor}/${encodeURIComponent(domain)}${suffix}`),
+          await impreza.get<unknown>(`/v1/email/${vendor}/${identifierPathSegment(domain)}${suffix}`),
         );
       }
 
@@ -6064,7 +6073,7 @@ async function callTool(req: CallToolRequest) {
           if (!body[k]) return toError(`${k} is required to create the Workspace admin`);
         }
         return toResult(
-          await impreza.post<unknown>(`/v1/email/google/${encodeURIComponent(domain)}/admin`, body),
+          await impreza.post<unknown>(`/v1/email/google/${identifierPathSegment(domain)}/admin`, body),
         );
       }
 
@@ -6099,7 +6108,7 @@ async function callTool(req: CallToolRequest) {
         // value cannot walk the route. encodeURIComponent alone is not the
         // same guarantee — mirrors the whitelist on the hosted server.
         if (!SNAPSHOT_NAME.test(snap)) return toError(SNAPSHOT_NAME_ERROR);
-        const path = `/v1/vps/proxmox/${sid}/snapshots/${encodeURIComponent(snap)}`;
+        const path = `/v1/vps/proxmox/${sid}/snapshots/${identifierPathSegment(snap)}`;
         return name === 'impreza_vps_rollback_snapshot'
           ? toResult(await impreza.post<unknown>(`${path}/rollback`, {}))
           : toResult(await impreza.del<unknown>(path));
@@ -6125,7 +6134,7 @@ async function callTool(req: CallToolRequest) {
         const ip = String(args.ip ?? '').trim();
         if (!ip) return toError('ip is required — the cloud VPS IP address');
         if (!isIpAddress(ip)) return toError('ip must be a valid IP address');
-        const path = `/v1/vps/cloud/rdns/${encodeURIComponent(ip)}`;
+        const path = `/v1/vps/cloud/rdns/${identifierPathSegment(ip)}`;
         if (name === 'impreza_cloud_rdns') return toResult(await impreza.get<unknown>(path));
         if (name === 'impreza_cloud_delete_rdns') return toResult(await impreza.del<unknown>(path));
         const ptr = String(args.domain ?? '').trim();

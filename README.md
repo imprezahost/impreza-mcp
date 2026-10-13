@@ -20,6 +20,17 @@ Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is req
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
+## Exact top-up amounts and checked IDs in API paths (0.51.0)
+
+- **Exact top-up amounts.** `impreza_topup` accepts the amount as an exact decimal string (for example `"25.50"`)
+  and sends it to the API unchanged, without converting it to a binary floating-point number. A JSON number is still
+  accepted. Strings with an exponent, a sign, spaces or more than two decimal places are refused.
+- **Every ID placed in an API path is checked.** The 0.50.0 guard for `deployment_id` now covers every identifier the
+  package places in an API URL path: task, backup, VPS, image, invoice, command, read and run IDs, agent IDs, onion
+  client names, the domain in tools that route by domain, and the dedicated IP for reverse DNS. A value that would add
+  or change path segments (`.`, `..`, `/`, `\`, `%`, whitespace or control characters) is refused before any request
+  leaves the process. Valid IDs are sent exactly as before.
+
 ## Protect an app, safer deployment IDs and bare VPS orders (0.50.0)
 
 - **Protect an app, as a guided prompt.** `prompts/list` adds `impreza_protect_app`. Starting from one of your
@@ -315,7 +326,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.50.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.51.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that

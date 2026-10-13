@@ -1,3 +1,13 @@
+# MCP 0.51.0
+
+- `impreza_topup` accepts the amount as an exact decimal string and forwards it unchanged;
+  JSON numbers remain accepted.
+- Every identifier placed in an API URL path (task, backup, VPS, image, invoice, command,
+  read and run IDs, agent IDs, onion client names, routed domains and the dedicated IP for
+  reverse DNS) is refused before any request when it would add path segments, as
+  `deployment_id` already was.
+- 216 tools and 6 prompts in the local package.
+
 # MCP 0.50.0
 
 - New prompt `impreza_protect_app`: guides a cold standby of an app on a server in another

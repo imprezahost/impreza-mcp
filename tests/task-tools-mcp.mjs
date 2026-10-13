@@ -43,9 +43,10 @@ try {
   r = await call('impreza_update_task', { task_id: 'tsk_a1b2c3d4e5f60718a1b2c3d4', enabled: false });
   assert.equal(r.data.path, '/v1/tasks/tsk_a1b2c3d4e5f60718a1b2c3d4');
   assert.deepEqual(r.data.body, { enabled: false }, 'only the fields that change; task_id is the path, not the body');
-  r = await call('impreza_update_task', { task_id: 'tsk_x/../y', name: 'x' });
-  assert.equal(r.data.path, '/v1/tasks/tsk_x%2F..%2Fy', 'the id is one encoded path segment');
   const before = r.data.request_count;
+  r = await call('impreza_update_task', { task_id: 'tsk_x/../y', name: 'x' });
+  assert(r.error, 'a task id containing path segments must be refused');
+  assert.match(r.text, /identifier|task_id/, 'the refusal identifies the invalid ID');
 
   for (const [tool, args, why] of [
     ['impreza_create_task', { name: 'no app' }, /deployment_id is required/],
