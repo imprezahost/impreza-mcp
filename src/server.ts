@@ -684,6 +684,90 @@ const TOOLS = [
   },
   "title": "Get agent install state"
 },
+{
+  "name": "impreza_get_ingress",
+  "description": "Inbound access of an application: which address ranges may reach each non-HTTP port it publishes (databases, game servers, RustDesk...). Every deployment starts open. Returns the revision (pass it to impreza_set_ingress), the status (open, pending, enforced, not_enforced with a reason, or agent_update_required with the minimum agent version) and, per port, open or restricted with its sources. HTTP and HTTPS are not covered: they go through the proxy and the Shield. Requires read scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "description": "The dpl_… deployment id (from impreza_list_deployments)."
+      }
+    },
+    "required": [
+      "deployment_id"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Get inbound access of an app"
+},
+{
+  "name": "impreza_set_ingress",
+  "description": "Replace the inbound allowlist of an application (the complete desired state, never a delta). rules lists only the restricted ports, each with the CIDR sources (IPv4 or IPv6) allowed to reach it; a port absent from rules is open to everyone, and rules=[] opens every port again. Restricting can block your own access, so it requires confirm=true; opening does not. base_revision is the revision you read (impreza_get_ingress); a stale one is refused with REVISION_CONFLICT. The agent applies it within about a minute; read the status to see it enforced. If a restriction cannot be applied, the ports stay open, the status says not_enforced with the reason, and an alert fires on the app. Requires manage scope.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "deployment_id": {
+        "type": "string",
+        "description": "The dpl_… deployment id (from impreza_list_deployments)."
+      },
+      "base_revision": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "The revision you read."
+      },
+      "rules": {
+        "type": "array",
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "protocol": {
+              "type": "string",
+              "enum": [
+                "tcp",
+                "udp"
+              ]
+            },
+            "sources": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "string",
+                "description": "CIDR, for example 203.0.113.0/24 or 2001:db8::/48."
+              }
+            }
+          },
+          "required": [
+            "port",
+            "protocol",
+            "sources"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "confirm": {
+        "type": "boolean",
+        "const": true,
+        "description": "Required when rules is not empty: only the listed sources will reach those ports."
+      }
+    },
+    "required": [
+      "deployment_id",
+      "base_revision",
+      "rules"
+    ],
+    "additionalProperties": false
+  },
+  "title": "Set inbound access of an app"
+},
   {
     "name": "impreza_get_shield",
     "description": "Read the Shield policy revision, CRS exclusions and the last 24 hours of WAF audit findings for one app: requests that would have been blocked, blocked requests and the top five static CRS rules. No visitor identity. Requires read scope.",
@@ -3929,6 +4013,8 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_get_agent_install: A_READ,
   impreza_get_shield: A_READ,
   impreza_set_shield: A_WRITE_EXT_IDEM,
+  impreza_get_ingress: A_READ,
+  impreza_set_ingress: A_DESTRUCTIVE,
   impreza_tail_logs: A_READ,
   impreza_prepare_traffic_switch: A_WRITE,
   impreza_get_traffic_switch: A_READ,
@@ -5428,6 +5514,17 @@ async function callTool(req: CallToolRequest) {
         // The consent token is the install's, never a read's: dropped here, as the hosted read never has it.
         const {confirm_token:_token,...state}=await impreza.get<Record<string,unknown>>('/v1/platform/services/'+p.service_id+'/agent-install');
         return toResult(state);
+      }
+      case 'impreza_get_ingress': {
+        const p=z.object({deployment_id:z.string().min(1)}).strict().parse(args);
+        return toResult(await impreza.get<unknown>('/v1/platform/deployments/'+deploymentPathSegment(p.deployment_id)+'/ingress'));
+      }
+      case 'impreza_set_ingress': {
+        const rule=z.object({port:z.number().int().min(1).max(65535),protocol:z.enum(['tcp','udp']),sources:z.array(z.string()).min(1).max(64)}).strict();
+        const p=z.object({deployment_id:z.string().min(1),base_revision:z.number().int().nonnegative(),rules:z.array(rule).max(32),confirm:z.literal(true).optional()}).strict().parse(args);
+        // Restricting can block the caller's own access: explicit consent.
+        if(p.rules.length>0&&p.confirm!==true) return toError('Restricting inbound access can block your own connections: pass confirm=true after checking the sources.');
+        return toResult(await impreza.put<unknown>('/v1/platform/deployments/'+deploymentPathSegment(p.deployment_id)+'/ingress',{base_revision:p.base_revision,rules:p.rules}));
       }
       case 'impreza_get_shield': {
         const p=z.object({deployment_id:z.string().min(1)}).strict().parse(args);

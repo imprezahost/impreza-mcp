@@ -1,3 +1,10 @@
+# MCP 0.52.0
+
+- `impreza_get_ingress` and `impreza_set_ingress`: read and replace the inbound allowlist
+  of an application's non-HTTP ports. Restricting needs `confirm=true`; a stale
+  `base_revision` is refused. Enforcement needs agent 0.6.26 or later.
+- 218 tools and 6 prompts in the local package.
+
 # MCP 0.51.0
 
 - `impreza_topup` accepts the amount as an exact decimal string and forwards it unchanged;

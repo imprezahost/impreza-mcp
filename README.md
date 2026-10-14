@@ -20,6 +20,19 @@ Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is req
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
+## Inbound access for non-HTTP ports (0.52.0)
+
+- **`impreza_get_ingress`** reads which address ranges may reach each non-HTTP port an application publishes
+  (databases, game servers, RustDesk...). Every deployment starts open. The answer carries the revision, the status
+  (`open`, `pending`, `enforced`, `not_enforced` with a reason, or `agent_update_required` with the minimum agent
+  version) and, per port, open or restricted with its sources. Requires read scope.
+- **`impreza_set_ingress`** replaces the allowlist with the complete desired state: `rules` lists only the restricted
+  ports, each with its IPv4 or IPv6 CIDR sources, and `rules=[]` opens every port again. Restricting can block your own
+  access, so it needs `confirm: true`; opening does not. Pass the `base_revision` you read; a stale one is refused with
+  `REVISION_CONFLICT`. The agent applies it within about a minute. If a restriction cannot be applied, the ports stay
+  open, the status says `not_enforced` with the reason, and an alert fires on the app. Requires manage scope.
+- HTTP and HTTPS are not covered: they go through the proxy and the Shield. Enforcement needs agent 0.6.26 or later.
+
 ## Exact top-up amounts and checked IDs in API paths (0.51.0)
 
 - **Exact top-up amounts.** `impreza_topup` accepts the amount as an exact decimal string (for example `"25.50"`)
@@ -326,7 +339,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.51.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.52.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -338,7 +351,7 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 216 tools in the local package**. Declared, one-direction gaps remain:
+catalog — 218 tools in the local package**. Declared, one-direction gaps remain:
 `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
 requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and
