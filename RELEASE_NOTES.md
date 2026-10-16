@@ -1,3 +1,12 @@
+# MCP 0.53.0
+
+- New `impreza_add_server`: connect a server the customer already has with a one-time install token (10 minutes)
+  and a one-line command; the first external server is free on every account. `label` is limited to 120 Unicode
+  code points, as the API counts them.
+- The `start-from-nothing` skill offers the customer's own server first and describes the hosted lobby's public reads.
+- Tool titles and descriptions aligned with the current API guidance.
+- 219 tools and 6 prompts in the local package.
+
 # MCP 0.52.0
 
 - `impreza_get_ingress` and `impreza_set_ingress`: read and replace the inbound allowlist

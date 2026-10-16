@@ -20,6 +20,22 @@ Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is req
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
+## Add a server you already have (0.53.0)
+
+- **`impreza_add_server`** connects a server the customer already has (any Linux machine with root access and
+  outbound HTTPS, at any provider) and returns a one-line install command with a one-time token valid for 10 minutes.
+  The first external server is free on every account, with no plan and no balance; any active Impreza VPS moves the
+  account to Bundled (5 external servers). The token is shown once and only its hash is kept: if it is lost or
+  expires, call the tool again. An unused token holds the free slot until it expires, and new servers are limited
+  per day. `label` is optional plain text of up to 120 characters, counted as Unicode code points, the same way the
+  API counts them. For a managed Impreza VPS, use `impreza_install_agent`. Requires deploy scope.
+- The `start-from-nothing` skill asks first whether the customer already has a server, and describes the anonymous
+  lobby of the hosted connector: account creation plus reads of public information (docs search, the VPS offer and
+  quote, products, apps, manifest check, domain availability and prices).
+- Tool titles and descriptions follow the current API guidance: secret values are typed by the account owner in the
+  portal, VPS orders stay bare unless the agent is requested, and retained archives and watched Git refs are
+  described as the API applies them.
+
 ## Inbound access for non-HTTP ports (0.52.0)
 
 - **`impreza_get_ingress`** reads which address ranges may reach each non-HTTP port an application publishes
@@ -339,7 +355,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.52.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.53.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -351,7 +367,7 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 218 tools in the local package**. Declared, one-direction gaps remain:
+catalog — 219 tools in the local package**. Declared, one-direction gaps remain:
 `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
 requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and

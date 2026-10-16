@@ -114,7 +114,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_app_metrics",
-    "description": "Recent per-app metrics from its server: container state (running/restarting/exited), restart count, CPU percent, memory bytes against its limit, and volume bytes \u2014 minute-bucketed over the last 24 hours. The state \"unknown\" means the agent has not reported recently; unknown is never \"healthy\". Numbers only \u2014 the report the agent sends cannot carry configuration or secrets. Use it to see whether an app is actually alive and what it costs.",
+    "description": "Per-app metrics from its server: container state (running/restarting/exited), restart count, CPU percent (the bucket's sample-weighted mean), memory bytes against its limit, and volume bytes. Minute points cover the last ~48 hours; longer ranges merge the hourly rollup (kept 90 days) with the live minute tail, each point marked with its resolution. The state \"unknown\" means the agent has not reported recently; unknown is never \"healthy\". Numbers only — the report the agent sends cannot carry configuration or secrets. Use it to see whether an app is actually alive and what it costs. The local stdio package currently accepts minutes from 5 to 1440; use the hosted tool or a catalogued API read for longer history.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -124,7 +124,7 @@ export const CUSTOMER_TOOLS = [
         },
         "minutes": {
           "type": "number",
-          "description": "How far back the series goes (5-1440, default 120)."
+          "description": "How far back to request, default 120 minutes. Hosted: up to 129600, merging hourly aggregates kept for 90 days above 1440. Local stdio: 5-1440 minutes. Use a catalogued API read for longer history on a local connection."
         }
       },
       "required": [
@@ -141,7 +141,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_list_alerts",
-    "description": "Alert rules and fired alerts for an application: each rule's metric (down, restart_loop, memory_pct), threshold and window, and each alert with its status (open/resolved), when it fired and recovered, and the numeric evidence that crossed the threshold. Alerts deliver to the account's webhook as deployment.alert with bounded retry.",
+    "description": "Alert rules and fired alerts for an application: each rule's metric (down, restart_loop, memory_pct, cpu_pct, agent_offline, backup_failed, ingress_not_enforced, uptime, shield_blocked, shield_rate_limited), threshold and window, and each alert with its status (open/resolved), when it fired and recovered, and the numeric evidence that crossed the threshold. Alerts deliver to the account's webhook as deployment.alert with bounded retry.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -164,7 +164,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_set_alert_rule",
-    "description": "Create or update an alert rule on an application. metric \"down\" fires when the app is not running (threshold is 1); \"restart_loop\" fires when restarts grow past threshold within the window; \"memory_pct\" fires when memory stays above threshold percent of its cgroup limit for the window. Shield metrics shield_blocked and shield_rate_limited fire when distinct request counts exceed an integer threshold (1-1000000) across five UTC minute buckets. duration_minutes must be 5 (default 5 for Shield metrics). Evidence contains only counts and window. duration_minutes (1-60) is the consecutive-minutes window for other metrics. An open rule fires once and closes with a note when the condition clears. Pass rule_id to update an existing rule. Requires deploy scope.",
+    "description": "Create or update an alert rule on an application using a metric allowed by this connection's input schema. metric \"down\" fires when the app is not running (threshold is 1); \"restart_loop\" fires when restarts grow past threshold within the window; \"memory_pct\" fires when memory stays above threshold percent of its cgroup limit for the window; \"cpu_pct\" fires when the minute-average CPU stays at or above threshold percent (100 = one full core); \"agent_offline\" fires when the platform has not heard the app's agent for duration_minutes (threshold is 1); \"backup_failed\" fires when the latest backup finished failed at least duration_minutes ago (threshold is 1); \"ingress_not_enforced\" fires when the application's inbound allowlist has not been enforced by the agent for duration_minutes, so the restricted ports are open (threshold is 1; created automatically, enabled, when a port is first restricted); \"uptime\" fires when at least two external probe regions agree the app's public address is unreachable, confirmed for duration_minutes consecutive rounds (threshold is 1; opt-in — without the rule nothing probes the app; at most 25 probed apps per account). The Shield metrics \"shield_blocked\" and \"shield_rate_limited\" fire when distinct request counts exceed an integer threshold (1-1000000) across five UTC minute buckets; duration_minutes must be 5 (default 5 for these metrics). Evidence contains only request counts and the window. duration_minutes (1-60) is the window for other metrics. The environmental and uptime metrics are evaluated by the minute cron, not the agent report. An open rule fires once and closes with a note when the condition clears. Pass rule_id to update an existing rule. Requires deploy scope.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -188,7 +188,7 @@ export const CUSTOMER_TOOLS = [
         },
         "threshold": {
           "type": "number",
-          "description": "1 for down; restart count for restart_loop; percent 1-100 for memory_pct."
+          "description": "For a metric allowed by this connection: 1 for down, agent_offline, backup_failed, ingress_not_enforced or uptime; restart count for restart_loop; 1-100 percent for memory_pct; 1-10000 percent for cpu_pct (100 is one full core). Shield metrics use integer request counts from 1 to 1000000 across five UTC minute buckets."
         },
         "duration_minutes": {
           "type": "number",
@@ -216,7 +216,7 @@ export const CUSTOMER_TOOLS = [
   },
   {
     "name": "impreza_get_account_overview",
-    "description": "One read-only call that situates you on the account: servers (agent, version, state), apps and environments, domains, open alerts, recent deployment failures and the suggested next actions with the exact tool to call. When your credential is confined to specific resources, every section is filtered to them and each affected section carries filtered: showing/of. No metrics, no logs, no write actions.",
+    "description": "One read-only call that situates you on the account: servers (agent, version, state), apps and environments, domains, open alerts, recent deployment failures and the suggested next actions with the exact tool to call. With an unrestricted credential it also lists agentless_servers: the managed VPS without the Impreza agent, each with agent_installable and, when false, the reason (see impreza_install_agent). When your credential is confined to specific resources, every section is filtered to them and each affected section carries filtered: showing/of. No metrics, no logs, no write actions.",
     "inputSchema": {
       "type": "object",
       "properties": {},
