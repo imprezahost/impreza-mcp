@@ -13,8 +13,9 @@ parts the tool list alone does not teach.
 - **Three skills.** `deploy-an-app` covers the catalog and custom-repository
   paths and the fact that every deploy is asynchronous. `diagnose-a-deployment`
   is the procedure for a failing app: logs, then its own files, then its own
-  command line. `start-from-nothing` covers anonymous sign-up, funding in
-  Bitcoin or Monero, and exactly where the line is between what a conversation
+  command line. `start-from-nothing` covers anonymous sign-up, a server the
+  customer already has (the first one is free), funding in Bitcoin or Monero,
+  and exactly where the line is between what a conversation
   can do and what the customer must do on the checkout page.
 
 ## What it does not do
