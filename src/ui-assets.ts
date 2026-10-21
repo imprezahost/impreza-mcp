@@ -257,6 +257,7 @@ input:focus-visible, select:focus-visible {
   #paymentQR { margin:12px 0; max-width:256px; }
   .value { overflow-wrap:anywhere; }
   .actions { flex-wrap:wrap; }
+  .amount-gap { margin-bottom: 10px; }
   .rail:focus-visible { outline: 2px solid var(--color-text-secondary); outline-offset: 1px; }
 </style>
 </head>
@@ -273,7 +274,7 @@ input:focus-visible, select:focus-visible {
   <div class="rails" id="rails" hidden role="tablist" aria-label="Payment currency"></div>
 
   <div id="pay" hidden>
-    <div class="field" style="margin-bottom:10px">
+    <div class="field amount-gap">
       <div class="field-head">
         <span class="label">Send exactly</span>
         <button class="copy" id="copyAmount" type="button">Copy</button>
@@ -466,11 +467,11 @@ var Bridge = (function () {
 
     return request('ui/initialize', {
       protocolVersion: '2026-01-26',
-      clientInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
+      appInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
       appCapabilities: {}
     }).then(function (result) {
       result = result || {};
-      hostCaps = result.capabilities || {};
+      hostCaps = result.hostCapabilities || result.capabilities || {};
       var ctx = result.hostContext || {};
       applyTheme(ctx.theme);
       applyStyles(ctx.styles);
@@ -1033,7 +1034,7 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/topup-card.html, LF-normalised. */
-export const TOPUP_CARD_HTML_MD5 = '04d7a6ddd8d034feec752d5782ae539d';
+export const TOPUP_CARD_HTML_MD5 = 'da28ab3578d56e7b59d771787055d2d4';
 
 export const SERVER_CARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -1362,7 +1363,7 @@ input:focus-visible, select:focus-visible {
   .fresh[data-stale="1"] { color: var(--color-text-warning); }
 
   /* ── deployments ──────────────────────────────────────────────────────── */
-  .apps { display: flex; flex-direction: column; gap: 6px; }
+  .apps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .app {
     display: flex;
     align-items: baseline;
@@ -1443,7 +1444,7 @@ input:focus-visible, select:focus-visible {
 
   <div>
     <button class="btn quiet" id="appsToggle" type="button" aria-expanded="false" aria-controls="apps">Show deployed apps</button>
-    <div class="apps" id="apps" hidden style="margin-top:10px"></div>
+    <div class="apps" id="apps" hidden></div>
   </div>
 </div>
 
@@ -1602,11 +1603,11 @@ var Bridge = (function () {
 
     return request('ui/initialize', {
       protocolVersion: '2026-01-26',
-      clientInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
+      appInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
       appCapabilities: {}
     }).then(function (result) {
       result = result || {};
-      hostCaps = result.capabilities || {};
+      hostCaps = result.hostCapabilities || result.capabilities || {};
       var ctx = result.hostContext || {};
       applyTheme(ctx.theme);
       applyStyles(ctx.styles);
@@ -2179,7 +2180,7 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/server-card.html, LF-normalised. */
-export const SERVER_CARD_HTML_MD5 = '8e785d52e00c6248327a3562e8b79c12';
+export const SERVER_CARD_HTML_MD5 = 'fc96f752c99b6e80324fe8e23b6ad854';
 
 export const DEPLOY_WIZARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -2495,6 +2496,11 @@ input:focus-visible, select:focus-visible {
   .step[data-kind="ok"]   b { color: var(--color-text-success); }
   .step[data-kind="work"] b { color: var(--color-text-warning); }
   .step[data-kind="bad"]  b { color: var(--color-text-danger); }
+  .search-row { margin-bottom: 8px; }
+  .empty-note { margin-top: 8px; }
+  .label .plain { text-transform: none; letter-spacing: 0; }
+  .result-gap { margin-top: 10px; }
+  .actions-gap { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -2509,12 +2515,12 @@ input:focus-visible, select:focus-visible {
 
   <!-- ── pick ────────────────────────────────────────────────────────── -->
   <div id="pick" hidden>
-    <div class="row" style="margin-bottom:8px">
+    <div class="row search-row">
       <label class="label" for="search">Search the catalogue</label>
       <input type="text" id="search" autocomplete="off" spellcheck="false" placeholder="name, category or tag">
     </div>
     <div class="tiles" id="tiles" role="listbox" aria-label="Catalogue apps"></div>
-    <div class="note" id="none" hidden style="margin-top:8px">Nothing in the catalogue matches that.</div>
+    <div class="note empty-note" id="none" hidden>Nothing in the catalogue matches that.</div>
   </div>
 
   <!-- ── configure ───────────────────────────────────────────────────── -->
@@ -2525,7 +2531,7 @@ input:focus-visible, select:focus-visible {
       <select id="agent"></select>
     </div>
     <div class="row" id="domainRow">
-      <label class="label" for="domain">Domain <span style="text-transform:none;letter-spacing:0">— leave blank for a free *.imprezaapps.com hostname</span></label>
+      <label class="label" for="domain">Domain <span class="plain">— leave blank for a free *.imprezaapps.com hostname</span></label>
       <input type="text" id="domain" autocomplete="off" spellcheck="false" placeholder="app.example.com">
     </div>
     <label class="check" id="onionRow">
@@ -2542,14 +2548,14 @@ input:focus-visible, select:focus-visible {
   <!-- ── watch ───────────────────────────────────────────────────────── -->
   <div id="progress" hidden>
     <div class="steps" id="steps"></div>
-    <div class="field" id="result" hidden style="margin-top:10px">
+    <div class="field result-gap" id="result" hidden>
       <div class="field-head">
         <span class="label">Live at</span>
         <button class="copy" id="copyUrl" type="button">Copy</button>
       </div>
       <div class="value" id="url"></div>
     </div>
-    <div class="actions" style="margin-top:10px">
+    <div class="actions actions-gap">
       <button class="btn" id="open" type="button" hidden>Open</button>
       <button class="btn quiet" id="again" type="button" hidden>Deploy another</button>
     </div>
@@ -2711,11 +2717,11 @@ var Bridge = (function () {
 
     return request('ui/initialize', {
       protocolVersion: '2026-01-26',
-      clientInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
+      appInfo: { name: opts.name || 'impreza-panel', version: '1.0.0' },
       appCapabilities: {}
     }).then(function (result) {
       result = result || {};
-      hostCaps = result.capabilities || {};
+      hostCaps = result.hostCapabilities || result.capabilities || {};
       var ctx = result.hostContext || {};
       applyTheme(ctx.theme);
       applyStyles(ctx.styles);
@@ -3090,4 +3096,4 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/deploy-wizard.html, LF-normalised. */
-export const DEPLOY_WIZARD_HTML_MD5 = '5d92d074da67ef7e5b8896d1bd779ef0';
+export const DEPLOY_WIZARD_HTML_MD5 = '6ef2a2ee550065aac5eebce7507b089c';

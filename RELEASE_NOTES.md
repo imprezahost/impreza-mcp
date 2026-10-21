@@ -1,3 +1,11 @@
+# MCP 0.55.1
+
+- The MCP Apps panels use the stable MCP Apps handshake (`2026-01-26`): `ui/initialize` now sends `appInfo`, and the
+  panel reads the host's `hostCapabilities` from the reply, or `capabilities` from a host that still sends that.
+- The panels move their inline style attributes into their own stylesheet, matching the panels the hosted connector
+  serves.
+- 219 tools and 6 prompts in the local package (unchanged).
+
 # MCP 0.55.0
 
 - The MCP Apps panels shipped in the local package now match the ones the hosted connector serves.
