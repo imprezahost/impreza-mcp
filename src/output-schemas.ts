@@ -713,71 +713,192 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "plan_id": {
-            "type": "string",
-            "pattern": "^hpl_[a-f0-9]{32}$"
-          },
-          "operation": {
-            "type": "string",
-            "const": "vps.reinstall"
-          },
-          "service_id": {
-            "type": "integer"
-          },
-          "template_id": {
-            "type": "integer"
-          },
-          "plan_digest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "approval_id": {
-            "type": "string",
-            "pattern": "^apr_[a-f0-9]{32}$"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "prepared",
-              "dispatching",
-              "submitted",
-              "partial",
-              "completed",
-              "failed",
-              "expired",
-              "refused"
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "type": "string",
+                "const": "vps.reinstall"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "template_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "provider_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "template_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "provider_ref",
+              "note"
             ]
           },
-          "created_at": {
-            "type": "string"
-          },
-          "expires_at": {
-            "type": "string"
-          },
-          "provider_ref": {
-            "type": [
-              "string",
-              "null"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "const": "managed_service.reload"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused",
+                  "uncertain"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "preview": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operation",
+                  "unit",
+                  "possible_connection_loss",
+                  "restart_fallback",
+                  "packages",
+                  "reboot",
+                  "health_scope"
+                ],
+                "properties": {
+                  "operation": {
+                    "const": "managed_service.reload"
+                  },
+                  "unit": {
+                    "const": "impreza-agent-ingress.service"
+                  },
+                  "possible_connection_loss": {
+                    "const": true
+                  },
+                  "restart_fallback": {
+                    "const": false
+                  },
+                  "packages": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "reboot": {
+                    "const": false
+                  },
+                  "health_scope": {
+                    "const": "complete_adapter_verification_required"
+                  }
+                }
+              },
+              "affected_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 32
+              },
+              "affected_refs": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "agent_ref": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "note",
+              "preview",
+              "affected_count",
+              "affected_refs",
+              "agent_ref"
             ]
-          },
-          "note": {
-            "type": "string"
           }
-        },
-        "required": [
-          "plan_id",
-          "operation",
-          "service_id",
-          "template_id",
-          "plan_digest",
-          "approval_id",
-          "status",
-          "created_at",
-          "expires_at",
-          "provider_ref",
-          "note"
         ]
       },
       {
@@ -2587,6 +2708,9 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
               "null"
             ]
           },
+          "onion_note": {
+            "type": "string"
+          },
           "onion_profile": {
             "type": "string"
           },
@@ -2792,6 +2916,9 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
               "string",
               "null"
             ]
+          },
+          "onion_note": {
+            "type": "string"
           },
           "onion_profile": {
             "type": "string"
@@ -7423,71 +7550,192 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "plan_id": {
-            "type": "string",
-            "pattern": "^hpl_[a-f0-9]{32}$"
-          },
-          "operation": {
-            "type": "string",
-            "const": "vps.reinstall"
-          },
-          "service_id": {
-            "type": "integer"
-          },
-          "template_id": {
-            "type": "integer"
-          },
-          "plan_digest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "approval_id": {
-            "type": "string",
-            "pattern": "^apr_[a-f0-9]{32}$"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "prepared",
-              "dispatching",
-              "submitted",
-              "partial",
-              "completed",
-              "failed",
-              "expired",
-              "refused"
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "type": "string",
+                "const": "vps.reinstall"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "template_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "provider_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "template_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "provider_ref",
+              "note"
             ]
           },
-          "created_at": {
-            "type": "string"
-          },
-          "expires_at": {
-            "type": "string"
-          },
-          "provider_ref": {
-            "type": [
-              "string",
-              "null"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "const": "managed_service.reload"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused",
+                  "uncertain"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "preview": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operation",
+                  "unit",
+                  "possible_connection_loss",
+                  "restart_fallback",
+                  "packages",
+                  "reboot",
+                  "health_scope"
+                ],
+                "properties": {
+                  "operation": {
+                    "const": "managed_service.reload"
+                  },
+                  "unit": {
+                    "const": "impreza-agent-ingress.service"
+                  },
+                  "possible_connection_loss": {
+                    "const": true
+                  },
+                  "restart_fallback": {
+                    "const": false
+                  },
+                  "packages": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "reboot": {
+                    "const": false
+                  },
+                  "health_scope": {
+                    "const": "complete_adapter_verification_required"
+                  }
+                }
+              },
+              "affected_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 32
+              },
+              "affected_refs": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "agent_ref": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "note",
+              "preview",
+              "affected_count",
+              "affected_refs",
+              "agent_ref"
             ]
-          },
-          "note": {
-            "type": "string"
           }
-        },
-        "required": [
-          "plan_id",
-          "operation",
-          "service_id",
-          "template_id",
-          "plan_digest",
-          "approval_id",
-          "status",
-          "created_at",
-          "expires_at",
-          "provider_ref",
-          "note"
         ]
       },
       {
@@ -9370,7 +9618,10 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
               "properties": {
                 "operation": {
                   "type": "string",
-                  "const": "vps.reinstall"
+                  "enum": [
+                    "vps.reinstall",
+                    "managed_service.reload"
+                  ]
                 },
                 "service_id": {
                   "type": "integer"
@@ -13770,71 +14021,192 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "plan_id": {
-            "type": "string",
-            "pattern": "^hpl_[a-f0-9]{32}$"
-          },
-          "operation": {
-            "type": "string",
-            "const": "vps.reinstall"
-          },
-          "service_id": {
-            "type": "integer"
-          },
-          "template_id": {
-            "type": "integer"
-          },
-          "plan_digest": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{64}$"
-          },
-          "approval_id": {
-            "type": "string",
-            "pattern": "^apr_[a-f0-9]{32}$"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "prepared",
-              "dispatching",
-              "submitted",
-              "partial",
-              "completed",
-              "failed",
-              "expired",
-              "refused"
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "type": "string",
+                "const": "vps.reinstall"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "template_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "provider_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "template_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "provider_ref",
+              "note"
             ]
           },
-          "created_at": {
-            "type": "string"
-          },
-          "expires_at": {
-            "type": "string"
-          },
-          "provider_ref": {
-            "type": [
-              "string",
-              "null"
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "pattern": "^hpl_[a-f0-9]{32}$"
+              },
+              "operation": {
+                "const": "managed_service.reload"
+              },
+              "service_id": {
+                "type": "integer"
+              },
+              "plan_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "approval_id": {
+                "type": "string",
+                "pattern": "^apr_[a-f0-9]{32}$"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "prepared",
+                  "dispatching",
+                  "submitted",
+                  "partial",
+                  "completed",
+                  "failed",
+                  "expired",
+                  "refused",
+                  "uncertain"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "preview": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operation",
+                  "unit",
+                  "possible_connection_loss",
+                  "restart_fallback",
+                  "packages",
+                  "reboot",
+                  "health_scope"
+                ],
+                "properties": {
+                  "operation": {
+                    "const": "managed_service.reload"
+                  },
+                  "unit": {
+                    "const": "impreza-agent-ingress.service"
+                  },
+                  "possible_connection_loss": {
+                    "const": true
+                  },
+                  "restart_fallback": {
+                    "const": false
+                  },
+                  "packages": {
+                    "type": "array",
+                    "maxItems": 0
+                  },
+                  "reboot": {
+                    "const": false
+                  },
+                  "health_scope": {
+                    "const": "complete_adapter_verification_required"
+                  }
+                }
+              },
+              "affected_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 32
+              },
+              "affected_refs": {
+                "type": "array",
+                "maxItems": 32,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "agent_ref": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "plan_id",
+              "operation",
+              "service_id",
+              "plan_digest",
+              "approval_id",
+              "status",
+              "created_at",
+              "expires_at",
+              "note",
+              "preview",
+              "affected_count",
+              "affected_refs",
+              "agent_ref"
             ]
-          },
-          "note": {
-            "type": "string"
           }
-        },
-        "required": [
-          "plan_id",
-          "operation",
-          "service_id",
-          "template_id",
-          "plan_digest",
-          "approval_id",
-          "status",
-          "created_at",
-          "expires_at",
-          "provider_ref",
-          "note"
         ]
       },
       {

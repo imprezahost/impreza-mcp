@@ -1,3 +1,17 @@
+# MCP 0.55.0
+
+- The MCP Apps panels shipped in the local package now match the ones the hosted connector serves.
+- The server card shows what the agent currently reports, keeps runtime health apart from deployment operations and
+  does not fill in missing values.
+- The deploy wizard keeps current runtime health apart from deployment operations.
+- Panels report their size to the host only after the host has initialized them, so they open at the right height.
+- The top-up card is the one the hosted connector serves today: for on-chain Bitcoin and Monero it shows a QR code,
+  a wallet link and a countdown to the payment's own expiry, but only when the payment details match exactly;
+  otherwise it shows a warning and nothing to copy. The QR is drawn inside the card, with no third-party service.
+- The output schemas of `impreza_deploy_catalog_app` and `impreza_deploy_custom` accept an optional `onion_note`:
+  a new .onion address can take several minutes to answer over Tor after it appears.
+- 219 tools and 6 prompts in the local package (unchanged).
+
 # MCP 0.54.0
 
 - A VPS bought with `impreza_order_vps` is now born with the Impreza agent by default (`app: "@agent"`), for the
