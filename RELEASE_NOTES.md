@@ -1,3 +1,15 @@
+# MCP 0.54.0
+
+- A VPS bought with `impreza_order_vps` is now born with the Impreza agent by default (`app: "@agent"`), for the
+  configurable VPS and fixed VPS plans alike, so it can receive deployments. Pass `app: "none"` for a bare OS. The
+  REST API, the cart and the customer portal keep a bare OS as their default.
+- The whole-configuration quote of `impreza_vps_offer` uses the same default app as the order, so the quote and the
+  order match. The order result echoes the app it asked for as `app_requested`.
+- A non-text `app` (number, boolean, object or array) is refused before any request.
+- An accepted order is not a ready agent: poll `impreza_list_services`, and the agent appears in
+  `impreza_list_servers` once it has installed and connected.
+- 219 tools and 6 prompts in the local package (unchanged).
+
 # MCP 0.53.0
 
 - New `impreza_add_server`: connect a server the customer already has with a one-time install token (10 minutes)

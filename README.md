@@ -355,7 +355,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.53.0.** The tool catalog covers app deployment plus account +
+**Package version: 0.54.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -542,7 +542,7 @@ and `impreza_api_search` finds anything not named here.
 | **Catalog & ordering** | |
 | `impreza_list_products` | `GET /v1/products` — products + pricing; the VPS is listed at its smallest size (`configurable: true`) |
 | `impreza_vps_offer` | `GET /v1/products/vps` — VPS locations, operating systems, CPU / memory / disk ranges and prices; with a whole configuration, `GET /v1/products/vps/quote` — its exact price |
-| `impreza_order_vps` | `POST /v1/orders` — a VPS by location, OS and size (or a fixed plan by `product_id`); paid from balance; bare OS by default (`app: "none"`); explicitly request `app: "@agent"` for deployment, or use `impreza_install_agent` later with customer confirmation; 202 + poll `impreza_list_services` |
+| `impreza_order_vps` | `POST /v1/orders` — a VPS by location, OS and size (or a fixed plan by `product_id`); paid from balance; born with the Impreza agent by default (`app: "@agent"`, for the configurable VPS and fixed VPS plans alike, the same app `impreza_vps_offer` quotes, and echoed as `app_requested` in the result); a non-text `app` is refused before any request; pass `app: "none"` for a bare OS (the customer portal keeps a bare OS as its default) and add the agent later with `impreza_install_agent` with customer confirmation; 202 is not a ready agent: poll `impreza_list_services`, and the agent appears in `impreza_list_servers` once it has installed and connected |
 | **Domains & DNS** | |
 | `impreza_domain_check` | `GET /v1/domains/check` |
 | `impreza_domain_details` | `GET /v1/domains/{domain}` |

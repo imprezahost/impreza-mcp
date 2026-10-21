@@ -13,13 +13,15 @@ try{
  for(const name of ['impreza_vps_offer','impreza_order_vps']){
   const t=tools.find(t=>t.name===name);check(name+' listed',!!t);
   const d=t?.inputSchema.properties?.app?.description??'';
-  check(name+' bare default',d.includes("'none' (default")&&!d.includes("'@agent' (default"));
-  check(name+' agent opt-in',d.includes("'@agent' is opt-in"));
-  check(name+' install later with confirmation',d.includes('impreza_install_agent')&&d.includes('confirmation'));
+  // 19/10: a VPS bought through the MCP defaults to the agent; 'none' stays the explicit bare OS.
+  check(name+' agent default when omitted',/Omitted[^.]{0,20}: '@agent'/.test(d)&&!d.includes("'none' (default"));
+  check(name+' bare OS stays explicit',d.includes("'none' for a bare OS"));
   check(name+' app remains optional',!t?.inputSchema.required?.includes('app'));
  }
  const d=tools.find(t=>t.name==='impreza_order_vps')?.description??'';
- check('order whole-tool description bare default',d.includes('app=none')&&!d.includes('auto-installed'));
+ check('order whole-tool description agent default',d.includes('defaults to app=@agent')&&d.includes('Pass app=none for a bare OS')&&!d.includes('auto-installed'));
+ check('order whole-tool portal keeps bare default',d.includes('customer portal and cart keep a bare OS'));
+ check('order whole-tool accepted is not ready',d.includes('not a ready agent')&&d.includes('impreza_list_servers'));
  check('order whole-tool install later',d.includes('impreza_install_agent')&&d.includes('confirmation'));
  check('bare service polling',d.includes('impreza_list_services'));
  const report={entry:'real SDK initialize -> stdio tools/list; network disabled',total:checks.length,passed:checks.filter(x=>x.pass).length,failed:checks.filter(x=>!x.pass).length,checks};

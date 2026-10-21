@@ -42,17 +42,18 @@ try {
   assert.deepEqual(r.structured, sample('impreza_vps_offer:quote'));
   assert.equal(mcp.last().method, 'GET');
   assert.equal(mcp.last().path, '/v1/products/vps/quote', 'a whole configuration is priced');
-  assert.deepEqual(mcp.last().query, { billing_cycle: 'monthly', location: 'romania', os: 'ubuntu-24.04', cpu_cores: '2', memory_gb: '4', disk_gb: '40' });
+  assert.deepEqual(mcp.last().query, { billing_cycle: 'monthly', location: 'romania', os: 'ubuntu-24.04', cpu_cores: '2', memory_gb: '4', disk_gb: '40', app: '@agent' },
+    'a quote with app omitted prices the agent, like the order');
 
   r = await call('impreza_order_vps', { ...vps, hostname: 'web-1' });
   assert(!r.error, r.text);
   assert.equal(mcp.last().method, 'POST');
   assert.equal(mcp.last().path, '/v1/orders');
-  assert.deepEqual(mcp.last().body, { ...vps, hostname: 'web-1' }, 'the VPS order carries its configuration and no product_id');
+  assert.deepEqual(mcp.last().body, { ...vps, hostname: 'web-1', app: '@agent' }, 'the VPS order carries its configuration, the agent by default and no product_id');
 
   r = await call('impreza_order_vps', { product_id: 682, billing_cycle: 'monthly' });
   assert(!r.error, r.text);
-  assert.deepEqual(mcp.last().body, { billing_cycle: 'monthly', product_id: 682 }, 'a fixed plan orders by product_id');
+  assert.deepEqual(mcp.last().body, { billing_cycle: 'monthly', product_id: 682, app: '@agent' }, 'a fixed plan orders by product_id (the API ignores app for plans that are not a VPS)');
   const before = mcp.count();
 
   const bad = await call('impreza_order_vps', { product_id: 'abc', billing_cycle: 'monthly' });

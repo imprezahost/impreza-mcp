@@ -3342,7 +3342,7 @@ const TOOLS = [
         cpu_cores: { type: 'number', description: 'Optional: vCPU count, inside the range this tool lists.' },
         memory_gb: { type: 'number', description: 'Optional: memory in GB, inside the range this tool lists.' },
         disk_gb: { type: 'number', description: 'Optional: SSD disk in GB, inside the range this tool lists.' },
-        app: { type: 'string', description: "Optional: what it is born with — 'none' (default, bare OS); '@agent' is opt-in, '@agent-mcp', 'none', a '@panel-*' choice or a catalog app name. The customer can request the agent later via impreza_install_agent with confirmation." },
+        app: { type: 'string', description: "Optional: what it is born with. Omitted: '@agent' (the Impreza agent), the same default impreza_order_vps uses, so the quote and the order match. 'none' for a bare OS, '@agent-mcp', a '@panel-*' choice or a catalog app name." },
       },
       additionalProperties: false,
     },
@@ -3351,7 +3351,7 @@ const TOOLS = [
   {
     name: 'impreza_order_vps',
     description:
-      "Order a VPS and pay from the account credit balance — the balance must already cover the price (top up first with impreza_topup). For the VPS, choose location, os, cpu_cores, memory_gb and disk_gb from impreza_vps_offer and leave product_id out; the price is exactly what impreza_vps_offer quotes for that configuration. For a fixed plan such as Tor Hosting, pass its product_id from impreza_list_products instead (and config_options only if that plan has some). The VPS defaults to app=none (bare OS, no agent), matching the cart. Choose app=@agent explicitly, or request the agent later via impreza_install_agent with customer confirmation. Bare VPS services appear under impreza_list_services; impreza_list_servers only lists installed agents. Requires the \"manage\" scope. Returns order_id, invoice_id, amount, the configuration and status. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. COSTS MONEY — takes two calls: the first is a QUOTE that charges nothing and returns the price plus a confirm_token, the second repeats the same arguments plus confirm_token and buys. Purchases also count against a daily spend ceiling on the credential.",
+      "Order a VPS and pay from the account credit balance — the balance must already cover the price (top up first with impreza_topup). For the VPS, choose location, os, cpu_cores, memory_gb and disk_gb from impreza_vps_offer and leave product_id out; the price is exactly what impreza_vps_offer quotes for that configuration. For a fixed plan such as Tor Hosting, pass its product_id from impreza_list_products instead (and config_options only if that plan has some). Ordered here, a VPS (the configurable VPS or a fixed VPS plan) defaults to app=@agent: it is born with the Impreza agent so it can receive app deployments, and the result shows it as app_requested. Pass app=none for a bare OS (the customer portal and cart keep a bare OS as their default); a bare VPS can get the agent later through impreza_install_agent with customer confirmation. Installing the agent does not connect an MCP client or create a credential. An accepted order is not a ready agent: the service appears under impreza_list_services first, and the agent appears in impreza_list_servers only once it has installed and connected. Requires the \"manage\" scope. Returns order_id, invoice_id, amount, the configuration and status. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. COSTS MONEY — takes two calls: the first is a QUOTE that charges nothing and returns the price plus a confirm_token, the second repeats the same arguments plus confirm_token and buys. Purchases also count against a daily spend ceiling on the credential.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -3361,7 +3361,7 @@ const TOOLS = [
         cpu_cores: { type: 'number', description: 'VPS vCPU count, inside the range impreza_vps_offer lists.' },
         memory_gb: { type: 'number', description: 'VPS memory in GB, inside the range impreza_vps_offer lists.' },
         disk_gb: { type: 'number', description: 'VPS SSD disk in GB, inside the range impreza_vps_offer lists.' },
-        app: { type: 'string', description: "Optional initial software: 'none' (default, bare OS), opt-in @agent, @agent-mcp (agent plus MCP), a @panel-* control panel, or a catalog app name from impreza_list_apps. The customer may later request the agent through impreza_install_agent with confirmation." },
+        app: { type: 'string', description: "Optional initial software, as text. Omitted, null or blank: '@agent' (the Impreza agent), for the configurable VPS and for fixed VPS plans alike. 'none' for a bare OS, '@agent-mcp' (agent plus MCP), a @panel-* control panel, or a catalog app name from impreza_list_apps. Plans that are not a VPS ignore it." },
         hostname: { type: 'string', description: 'Optional server hostname (a DNS name such as "web-1"). Two identical VPS orders within a day are refused as a repeat unless their hostnames differ.' },
         product_id: { type: 'number', description: 'Only for a fixed plan (e.g. Tor Hosting) from impreza_list_products. Leave it out for the VPS.' },
         config_options: { type: 'object', description: "Fixed plans only: optionId-to-value map from that plan's product details. Every option must belong to the selected plan." },
@@ -5795,12 +5795,17 @@ async function callTool(req: CallToolRequest) {
         // The server checks every value against the product; this only picks
         // which of the two reads the arguments ask for.
         const pick: Record<string, string> = {};
-        for (const k of ['billing_cycle', 'location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb', 'app']) {
+        for (const k of ['billing_cycle', 'location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb']) {
           const v = args[k];
           if ((typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v))) pick[k] = String(v);
         }
         const whole = ['billing_cycle', 'location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb'].every((k) => k in pick);
-        if (whole) return toResult(await impreza.get<unknown>('/v1/products/vps/quote', pick));
+        if (whole) {
+          // Priced with the same app the order will carry (orderApp: omitted → @agent).
+          const app = orderApp(args.app);
+          if (app === undefined) return toError(ORDER_APP_TYPE);
+          return toResult(await impreza.get<unknown>('/v1/products/vps/quote', { ...pick, app }));
+        }
         return toResult(await impreza.get<unknown>('/v1/products/vps'));
       }
 
@@ -5815,12 +5820,17 @@ async function callTool(req: CallToolRequest) {
           }
           body.product_id = productId;
         }
-        for (const k of ['location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb', 'app', 'hostname', 'domain']) {
+        for (const k of ['location', 'os', 'cpu_cores', 'memory_gb', 'disk_gb', 'hostname', 'domain']) {
           const v = args[k];
           if ((typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v))) body[k] = v;
         }
+        const app = orderApp(args.app);
+        if (app === undefined) return toError(ORDER_APP_TYPE);
+        body.app = app;
         if (args.config_options && typeof args.config_options === 'object') body.config_options = args.config_options;
-        return toResult(await impreza.post<unknown>('/v1/orders', body));
+        // The app this call asked for, shown with the result: the default is never applied silently.
+        const placed = await impreza.post<unknown>('/v1/orders', body);
+        return toResult(placed && typeof placed === 'object' && !Array.isArray(placed) ? { ...(placed as Record<string, unknown>), app_requested: app } : placed);
       }
 
       // ── Domains + DNS ────────────────────────────────────────────────
@@ -6526,6 +6536,22 @@ async function apiCatalog(impreza: ImprezaClient): Promise<CatalogOp[]> {
   }
   catalogCache = ops;
   return ops;
+}
+
+/**
+ * The initial app of a VPS bought through this MCP. Omitted (or blank) means the Impreza agent: a VPS ordered from
+ * an AI assistant should be able to receive deployments. Applied before the quote and the order, so both carry the
+ * same choice. An explicit 'none' (bare OS) or any other value passes through unchanged and the API validates it;
+ * the API applies it to the configurable VPS and to fixed VPS plans and ignores it for plans that are not a VPS. The
+ * REST API, the cart and the customer portal keep their own default (a bare OS). Anything that is not text (a number,
+ * a boolean, an object, an array) is refused before any request (undefined).
+ */
+const ORDER_APP_DEFAULT = '@agent';
+const ORDER_APP_TYPE = "app must be text: '@agent', 'none', '@agent-mcp', a @panel-* choice or a catalog app name.";
+function orderApp(value: unknown): string | undefined {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return ORDER_APP_DEFAULT;
+  if (typeof value === 'string') return value;
+  return undefined; // a number, boolean, object or array is not an app name: refused before any request
 }
 
 function svcId(args: Record<string, unknown>): string {
