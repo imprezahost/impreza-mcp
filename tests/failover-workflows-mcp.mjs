@@ -25,6 +25,11 @@ const cases=[
 let requests=0;
 try{
  await client.connect(transport);const tools=(await client.listTools()).tools;
+ const pairDescription=tools.find(t=>t.name==='impreza_pair_failover_standby').description;
+ assert(pairDescription.includes('Standby pairing requires a hostname in the managed zone. A primary with only a .onion address cannot be paired yet.'));
+ assert(!pairDescription.includes('or a public .onion'), 'tool must not promise onion-only pairing');
+ const retryTool=tools.find(t=>t.name==='impreza_retry_failover_activation');
+ assert(retryTool.description.includes('failed provider fence'));assert(retryTool.description.includes('original digest and confirm=true'));assert(retryTool.description.includes('pending work is not duplicated'));
  for(const [name,args,method,path,body,readOnly,destructive,idempotent] of cases){
   const tool=tools.find(t=>t.name===name);assert(tool);assert.equal(tool.inputSchema.additionalProperties,false);
   assert.equal(tool.annotations.readOnlyHint,readOnly);assert.equal(tool.annotations.destructiveHint,destructive);assert.equal(tool.annotations.idempotentHint,readOnly?undefined:idempotent);
@@ -47,6 +52,11 @@ try{
   assert((await client.callTool({name:'impreza_pair_failover_standby',arguments:{deployment_id,target_deployment_id,mode:'cold',...extra}})).isError);
  for(const interval_minutes of [59,10081,'60',60.5,true,[]])
   assert((await client.callTool({name:'impreza_set_failover_drill_policy',arguments:{deployment_id,interval_minutes}})).isError,'drill interval '+JSON.stringify(interval_minutes));
+ const database={source_provider_deployment_id:'dpl_'+'1'.repeat(16),target_provider_deployment_id:'dpl_'+'2'.repeat(16),rpo_seconds:900};
+ const dbPair=await client.callTool({name:'impreza_pair_failover_standby',arguments:{deployment_id,target_deployment_id,mode:'cold',database}});
+ assert(!dbPair.isError,JSON.stringify(dbPair));assert.deepEqual(JSON.parse(dbPair.content[0].text).body,{target_deployment_id,mode:'cold',database});
+ for(const bad of [{...database,rpo_seconds:299},{...database,rpo_seconds:3601},{...database,rpo_seconds:'900'},{...database,rpo_seconds:900.5},{...database,secret:'never-send'},{...database,target_provider_deployment_id:database.source_provider_deployment_id},{...database,target_provider_deployment_id:target_deployment_id},{...database,source_provider_deployment_id:deployment_id},{...database,target_provider_deployment_id:'../foreign'},null])
+  assert((await client.callTool({name:'impreza_pair_failover_standby',arguments:{deployment_id,target_deployment_id,mode:'cold',database:bad}})).isError,'invalid provider topology must send no HTTP');
  const off=await client.callTool({name:'impreza_set_failover_drill_policy',arguments:{deployment_id,interval_minutes:null}});
  assert(!off.isError);assert.deepEqual(JSON.parse(off.content[0].text).body,{interval_minutes:null});requests=JSON.parse(off.content[0].text).request_count;
  const probe=await client.callTool({name:'impreza_get_failover',arguments:{cutover_id}});

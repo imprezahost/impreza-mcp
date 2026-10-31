@@ -230,6 +230,65 @@ export const CUSTOMER_TOOLS = [
     "title": "Get account overview"
   },
   {
+    "name": "impreza_get_status_page",
+    "description": "The opt-in PUBLIC status page of an application: whether it is on, the public name its owner gave it, and the address (an opaque token — no account or deployment identity in it). Derived from the external uptime vantages, served as a ready aggregate, never per-visit. Read-only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deployment_id": {
+          "type": "string",
+          "description": "The application (dpl_...)."
+        }
+      },
+      "required": [
+        "deployment_id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "title": "Get status page"
+  },
+  {
+    "name": "impreza_set_status_page",
+    "description": "Turn an application's public status page on or off, set the public name visitors see, or rotate the address. The page shows only the chosen name, the current state, 24h/7d/90d availability and the incident list — monitored from multiple regions, nothing that identifies the account, the deployment or a vantage. enabled=false withdraws the page at once (the address 404s); rotate_token mints a fresh address and kills the old one. Off by default. Requires manage scope.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deployment_id": {
+          "type": "string",
+          "description": "The application (dpl_...)."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "true to publish (default when public_name is given), false to withdraw the page now."
+        },
+        "public_name": {
+          "type": "string",
+          "description": "The name visitors see (1-80 characters). Not the internal deployment name."
+        },
+        "rotate_token": {
+          "type": "boolean",
+          "description": "Mint a new address for an already-published page; the old address 404s immediately."
+        }
+      },
+      "required": [
+        "deployment_id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "title": "Set status page"
+  },
+  {
     "name": "impreza_prepare_database_restore",
     "description": "Prepare a 15-minute reviewed restore of a completed backup's managed PostgreSQL or MariaDB dump into a NEW database on the original or an eligible target binding's provider of the same engine \u2014 the current database is never overwritten and nothing is cut over. Returns the review with source, target database and digest; preparing queues nothing. The binding must be healthy: a pending credential rotation or cleanup refuses the review. Requires deploy scope.",
     "inputSchema": {
@@ -349,11 +408,13 @@ const validators: Record<string,z.ZodTypeAny> = {"impreza_export_app_config":z.o
 "impreza_list_alerts":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])"))}).strict(),
 "impreza_set_alert_rule":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])")),"rule_id":z.string().regex(new RegExp("^arl_[a-f0-9]{24}$(?![\\s\\S])")).optional(),"metric":z.enum(["down", "restart_loop", "memory_pct", "shield_blocked", "shield_rate_limited"]),"threshold":z.number().finite().int().min(1).max(1000000),"duration_minutes":z.number().finite().int().min(1).max(60).optional(),"enabled":z.boolean().optional()}).strict(),
 "impreza_get_account_overview":z.object({}).strict(),
+"impreza_get_status_page":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])"))}).strict(),
+"impreza_set_status_page":z.object({"deployment_id":z.string().regex(new RegExp("^dpl_(?:[a-f0-9]{16}|[a-f0-9]{24})$(?![\\s\\S])")),"enabled":z.boolean().optional(),"public_name":z.string().min(1).max(80).optional(),"rotate_token":z.boolean().optional()}).strict(),
 "impreza_prepare_database_restore":z.object({"backup_id":z.string().regex(new RegExp("^bkp_[a-f0-9]{16}$(?![\\s\\S])")),"target_binding_id":z.string().regex(new RegExp("^bnd_[a-f0-9]{24}$(?![\\s\\S])")).optional()}).strict(),
 "impreza_get_database_restore":z.object({"restore_plan_id":z.string().regex(new RegExp("^rspl_[a-f0-9]{24}$(?![\\s\\S])"))}).strict(),
 "impreza_apply_database_restore":z.object({"restore_plan_id":z.string().regex(new RegExp("^rspl_[a-f0-9]{24}$(?![\\s\\S])")),"review_digest":z.string().regex(new RegExp("^[a-f0-9]{64}$(?![\\s\\S])")),"confirm":z.literal(true)}).strict(),
 "impreza_download_backup":z.object({"backup_id":z.string().regex(new RegExp("^bkp_[a-f0-9]{16}$(?![\\s\\S])"))}).strict()};
-const routes: Record<string,[string,string]> = {"impreza_export_app_config": ["GET", "/v1/platform/deployments/custom/{deployment_id}/config"], "impreza_prepare_config_apply": ["POST", "/v1/platform/deployments/custom/{deployment_id}/prepare-config-apply"], "impreza_get_config_plan": ["GET", "/v1/platform/config-plans/{config_plan_id}"], "impreza_apply_config_plan": ["POST", "/v1/platform/config-plans/{config_plan_id}/apply"], "impreza_app_metrics": ["GET", "/v1/platform/deployments/custom/{deployment_id}/metrics"], "impreza_list_alerts": ["GET", "/v1/platform/deployments/custom/{deployment_id}/alerts"], "impreza_set_alert_rule": ["POST", "/v1/platform/deployments/custom/{deployment_id}/alert-rules"], "impreza_get_account_overview": ["GET", "/v1/platform/overview"], "impreza_prepare_database_restore": ["POST", "/v1/backups/{backup_id}/prepare-database-restore"], "impreza_get_database_restore": ["GET", "/v1/database-restores/{restore_plan_id}"], "impreza_apply_database_restore": ["POST", "/v1/database-restores/{restore_plan_id}/apply"], "impreza_download_backup": ["POST", "/v1/backups/{backup_id}/download-link"]};
+const routes: Record<string,[string,string]> = {"impreza_export_app_config": ["GET", "/v1/platform/deployments/custom/{deployment_id}/config"], "impreza_prepare_config_apply": ["POST", "/v1/platform/deployments/custom/{deployment_id}/prepare-config-apply"], "impreza_get_config_plan": ["GET", "/v1/platform/config-plans/{config_plan_id}"], "impreza_apply_config_plan": ["POST", "/v1/platform/config-plans/{config_plan_id}/apply"], "impreza_app_metrics": ["GET", "/v1/platform/deployments/custom/{deployment_id}/metrics"], "impreza_list_alerts": ["GET", "/v1/platform/deployments/custom/{deployment_id}/alerts"], "impreza_set_alert_rule": ["POST", "/v1/platform/deployments/custom/{deployment_id}/alert-rules"], "impreza_get_account_overview": ["GET", "/v1/platform/overview"], "impreza_get_status_page": ["GET", "/v1/platform/deployments/custom/{deployment_id}/status-page"], "impreza_set_status_page": ["PUT", "/v1/platform/deployments/custom/{deployment_id}/status-page"], "impreza_prepare_database_restore": ["POST", "/v1/backups/{backup_id}/prepare-database-restore"], "impreza_get_database_restore": ["GET", "/v1/database-restores/{restore_plan_id}"], "impreza_apply_database_restore": ["POST", "/v1/database-restores/{restore_plan_id}/apply"], "impreza_download_backup": ["POST", "/v1/backups/{backup_id}/download-link"]};
 export function isCustomerTool(name:string):boolean { return Object.hasOwn(routes,name); }
 export async function callCustomerTool(client:ImprezaClient,name:string,args:Record<string,unknown>):Promise<unknown> {
  const validator=validators[name], route=routes[name];

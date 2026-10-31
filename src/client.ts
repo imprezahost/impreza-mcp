@@ -34,6 +34,11 @@ export interface ImprezaConfig {
    * unreachable, requests fail — there is no silent fallback to clearnet.
    */
   proxy?: string;
+  /**
+   * Optional request allowlist (the DEV profile): every request is checked BEFORE credentials are attached
+   * or anything is sent; a refused request never reaches fetch or the proxy. Absent = no restriction, as before.
+   */
+  requestGuard?: (method: string, url: URL) => boolean;
 }
 
 /**
@@ -59,8 +64,10 @@ export class ImprezaClient {
   private readonly apiSecret: string;
   private readonly timeoutMs: number;
   private readonly proxy: SocksProxy | undefined;
+  private readonly requestGuard: ((method: string, url: URL) => boolean) | undefined;
 
   constructor(cfg: ImprezaConfig) {
+    this.requestGuard = cfg.requestGuard;
     this.baseURL = cfg.baseURL.replace(/\/+$/, '');
     this.apiKey = cfg.apiKey;
     this.apiSecret = cfg.apiSecret;
@@ -184,6 +191,9 @@ export class ImprezaClient {
   }
 
   private async fetch(url: URL, init: RequestInit): Promise<Response> {
+    if (this.requestGuard && !this.requestGuard(String(init.method ?? 'GET').toUpperCase(), url)) {
+      throw new Error('DEV_PROFILE_DENIED: request');
+    }
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     const headers: Record<string, string> = {

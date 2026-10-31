@@ -1,9 +1,9 @@
 // GENERATED — do not edit.
 //
-// Source of truth: whmcs/modules/addons/imprezaapi/lib/ui/*.html in the
-// imprezaAPI repo. Regenerate with:
+// Source of truth: the panel HTML (lib/ui/*.html) in the imprezaAPI
+// module. Regenerate with that module's tools/gen_ui_assets.php:
 //
-//   php whmcs/modules/addons/imprezaapi/tools/gen_ui_assets.php --local-mcp=<path>
+//   php tools/gen_ui_assets.php --local-mcp=<path>
 //
 // The panel is embedded rather than shipped as a file because the npm package
 // publishes only dist/ and tsc does not copy assets. verify_surface.php checks
@@ -1070,9 +1070,9 @@ export const SERVER_CARD_HTML = `<!DOCTYPE html>
   F58.10 — observation, not new control:
 
   · A number the server did not send is shown as "not reported", never as 0.
-    \`cpu_usage\` is the hypervisor's 0–1 fraction of all vCPUs
-    (ProxmoxVPSController::status); anything outside 0–1 is shown as reported
-    with "unit unclear", without a bar, rather than guessed into a percentage.
+    \`cpu_usage\` is the hypervisor's 0–100 percent of all vCPUs — the provider
+    module scales it before this API ever sees it; anything outside 0–100 is
+    shown as reported with "unit unclear", without a bar, rather than guessed.
     Disk and network are cumulative counters since the VM started, labelled as
     such: the status call carries no disk usage, only the size from identity.
 
@@ -1364,6 +1364,8 @@ input:focus-visible, select:focus-visible {
 
   /* ── deployments ──────────────────────────────────────────────────────── */
   .apps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .events { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+  .events li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 10px; border: 1px solid var(--line, #d8dce0); border-radius: 6px; font-size: 11.5px; }
   .app {
     display: flex;
     align-items: baseline;
@@ -1440,6 +1442,7 @@ input:focus-visible, select:focus-visible {
   <div>
     <div class="label section-head">Activity</div>
     <div class="note" id="activity">Logs and progress for this server are not available in this card yet. Power actions report only that they were accepted; refresh to see the new state.</div>
+    <ul class="events" id="events" hidden></ul>
   </div>
 
   <div>
@@ -1771,11 +1774,15 @@ function el(id) { return document.getElementById(id); }
   function cpuReading(raw) {
     var n = num(raw);
     if (n === null) { return { pct: null, text: 'not reported' }; }
-    if (n < 0 || n > 1) {
-      return { pct: null, text: clip(n, 24) + ' as reported (unit unclear, expected 0–1)', bad: true };
+    // F58.10: cpu_usage is the documented 0–100 percent of all vCPUs (the
+    // provider module scales it before this API ever sees it). The old
+    // "anything <= 1 is a 0–1 fraction, multiply by a hundred" guess read
+    // an idle 0.5% server as a 50% bar; the number is shown as it arrives,
+    // and only a value outside the contract range loses the bar.
+    if (n < 0 || n > 100) {
+      return { pct: null, text: clip(n, 24) + ' as reported (unit unclear, expected 0–100)', bad: true };
     }
-    var pct = n * 100;
-    return { pct: pct, text: pct.toFixed(1) + '% of all vCPUs' };
+    return { pct: n, text: n.toFixed(1) + '% of all vCPUs' };
   }
 
   function memReading(d) {
@@ -2018,6 +2025,9 @@ function el(id) { return document.getElementById(id); }
     apps.textContent = '';
     apps.hidden = true;
     appsLoaded = false;
+    var events = el('events');
+    events.textContent = '';
+    events.hidden = true;
     var toggle = el('appsToggle');
     toggle.textContent = 'Show deployed apps';
     toggle.setAttribute('aria-expanded', 'false');
@@ -2106,6 +2116,51 @@ function el(id) { return document.getElementById(id); }
       .catch(function () { /* the card is still useful without the hardware strip */ });
   }
 
+  // ── activity (F58.10): the operations ledger behind this server ─────────
+  var EVENT_LABELS = {
+    'power.start': 'Start requested', 'power.shutdown': 'Shut down requested',
+    'power.reboot': 'Reboot requested', 'power.stop': 'Stop requested',
+    'reinstall': 'Reinstall requested', 'password.change': 'Password change requested',
+    'hostname.change': 'Hostname change requested', 'autostart.set': 'Auto-start policy changed',
+    'backup.create': 'Backup requested', 'backup.restore': 'Backup restore requested',
+    'backup.delete': 'Backup deletion requested',
+    'backup.schedule.create': 'Backup schedule created', 'backup.schedule.delete': 'Backup schedule deleted',
+    'snapshot.create': 'Snapshot requested', 'snapshot.delete': 'Snapshot deletion requested',
+    'snapshot.rollback': 'Snapshot rollback requested'
+  };
+
+  function renderEvents(list) {
+    var box = el('events');
+    box.textContent = '';
+    var rows = Array.isArray(list) ? list.filter(function (d) { return d && typeof d === 'object'; }) : [];
+    if (rows.length === 0) { box.hidden = true; return; }
+    // The ledger's kinds are a fixed enum; an unknown one still renders —
+    // as its raw kind text, which can only be a short enum-shaped string,
+    // never provider or customer text.
+    rows.slice(0, 8).forEach(function (d) {
+      var li = document.createElement('li');
+      var label = document.createElement('span');
+      label.textContent = EVENT_LABELS[d.kind] || ('Operation ' + clip(String(d.kind), 32));
+      var when = document.createElement('span');
+      when.className = 'imps3-muted';
+      when.textContent = typeof d.accepted_at === 'string' ? d.accepted_at.replace('T', ' ').replace('Z', ' UTC') : '';
+      li.appendChild(label); li.appendChild(when);
+      box.appendChild(li);
+    });
+    box.hidden = false;
+    Bridge.reportSize();
+  }
+
+  function loadEvents() {
+    if (serviceId === null) { return; }
+    var g = generation;
+    // The ledger records ACCEPTED requests only; outcomes stay on the live
+    // status. Any failure keeps the card's honest "not available" note.
+    Bridge.callTool('impreza_api_call', { path: '/vps/proxmox/' + serviceId + '/events' })
+      .then(function (d) { if (g === generation) { renderEvents((d && d.events) || []); } })
+      .catch(function () { /* the honest fallback note stays */ });
+  }
+
   function loadApps() {
     // Two calls, and only on demand: list_servers maps this service to its
     // agent, and only then can deployments be filtered to THIS machine.
@@ -2169,6 +2224,7 @@ function el(id) { return document.getElementById(id); }
       serviceId = sid;
       el('sub').textContent = 'Service #' + serviceId;
       loadIdentity();
+      loadEvents();
     },
     onResult: renderStatus,
     onFail: fail
@@ -2180,7 +2236,7 @@ function el(id) { return document.getElementById(id); }
 `;
 
 /** md5 of the canonical lib/ui/server-card.html, LF-normalised. */
-export const SERVER_CARD_HTML_MD5 = 'fc96f752c99b6e80324fe8e23b6ad854';
+export const SERVER_CARD_HTML_MD5 = '57b201cc139a75ffb5d541c80f57a456';
 
 export const DEPLOY_WIZARD_HTML = `<!DOCTYPE html>
 <html lang="en">

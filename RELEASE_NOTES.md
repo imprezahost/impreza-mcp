@@ -1,3 +1,38 @@
+# MCP 0.56.0
+
+New tools:
+
+- `impreza_explain_incident`: groups an application's incident (crash loop, out of memory, full disk) from the
+  platform's per-minute metrics and an optional log tail you supply, and returns the evidence and a remediation plan.
+  It never runs the plan.
+- `impreza_vps_events`: the last 20 operations your account requested on a VPS (power, reinstall, password, backups,
+  snapshots), each with the time the provider accepted it. It does not claim an outcome.
+- `impreza_vps_set_auto_start`: whether a VPS starts by itself when its host boots or on scheduled automation,
+  separate from the power actions. `impreza_vps_status` now reports this `auto_start` policy (`null` when it is
+  unknown).
+- `impreza_set_domain_alias`: also answer on the www (or apex) name of a custom app with a 301 to its main domain.
+  Available only when the server's agent supports it; otherwise the answer is that it is not available for this server
+  yet, and nothing changes.
+- `impreza_get_status_page` and `impreza_set_status_page`: a public status page for an application. They work where
+  the service offers public status pages; elsewhere they answer "not found".
+- `impreza_i2p_destination`, `impreza_i2p_export` and `impreza_i2p_remove`: I2P for an application. They are listed
+  only when the service reports that I2P is available for your account.
+
+Changed:
+
+- `impreza_prepare_host_plan` accepts the managed ingress reload (`managed_service.reload`) and, where the service
+  enables them, the fixed Redis/cache unit operations and the operational-profile operations. Each needs its own
+  per-server permission and a person's approval in the portal; `vps.reinstall` still requires `template_id`.
+- The server card shows the VPS's recent operations and reads CPU usage as the 0–100 percent the API reports.
+- Snapshot and restore tools say that a server with a customer-encrypted root refuses snapshots, and that MCP cannot
+  confirm destroying it.
+- Standby pairing says that a hostname in the managed zone is required and that a primary with only an .onion address
+  cannot be paired yet. Retrying a failed failover activation also covers a failed provider fence.
+- Output schemas now match the hosted connector for `impreza_list_servers` (`os`), the deploy tools
+  (`credentials_keys`; credentials stay in the text content only), host plans and permissions (the `released` status)
+  and `impreza_privacy_report`.
+- 225 tools (228 where I2P is available) and 6 prompts in the local package.
+
 # MCP 0.55.1
 
 - The MCP Apps panels use the stable MCP Apps handshake (`2026-01-26`): `ui/initialize` now sends `appInfo`, and the

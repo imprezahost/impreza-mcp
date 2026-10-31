@@ -49,10 +49,32 @@ import { DEPLOY_WIZARD_HTML, SERVER_CARD_HTML, TOPUP_CARD_HTML } from './ui-asse
 import { envSchema } from './env.js';
 import { VERSION } from './version.js';
 import { secretInputRefusal } from './secret-entry.js';
-import { OUTPUT_SCHEMAS, STRUCTURED_OMIT } from './output-schemas.js';
+import { I2P_TOOLS, I2P_ANNOTATIONS, filterI2pTools, handleI2p, isI2pTool } from './i2p-tools.js';
+import { OUTPUT_SCHEMAS as BASE_OUTPUT_SCHEMAS, STRUCTURED_OMIT } from './output-schemas.js';
+import {withUnitSchemas,unitOperations} from './managed-unit-schema.js';
+import {withIdentitySchemas,identityInputAllowed,identityOperations} from './managed-identity-plan.js';
+const OUTPUT_SCHEMAS=withIdentitySchemas(withUnitSchemas(BASE_OUTPUT_SCHEMAS));
 import {CUSTOMER_TOOLS,isCustomerTool,callCustomerTool} from './customer-workflows.js';
 import {PITR_TOOLS,isPitrTool,callPitrTool} from './pitr-workflows.js';
 import {FAILOVER_TOOLS,isFailoverTool,callFailoverTool} from './failover-workflows.js';
+import {INCIDENT_TOOLS,isIncidentTool,callIncidentTool} from './incident-workflows.js';
+import {
+  type DevProfile, DevProfileRefusal, DEV_RESOURCE, DEV_TOOLS,
+  devProfileDeploymentsResult, devProfileFromEnv, devProfileGate, devProfileRequest, devProfileResult, devProfileServers,
+} from './dev-profile.js';
+
+// ─────────────────────────────────────────────────────────────────────
+// DEV profile — operator opt-in only (IMPREZA_DEV_PROFILE). Checked first: before any subcommand, saved
+// credential or HTTP client. Unset, nothing below changes. See dev-profile.ts.
+// ─────────────────────────────────────────────────────────────────────
+
+let devProfile: DevProfile | null;
+try {
+  devProfile = devProfileFromEnv(process.env, process.argv);
+} catch (error) {
+  console.error(error instanceof DevProfileRefusal ? error.message : 'DEV_PROFILE_DENIED: startup');
+  process.exit(78);
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Subcommand dispatch — `setup` short-circuits before env validation.
@@ -94,7 +116,8 @@ if (sub === '--version' || sub === '-V' || sub === 'version') {
 
 let cfg: z.infer<typeof envSchema>;
 try {
-  cfg = envSchema.parse(credentialEnvironment(process.env));
+  // The DEV profile takes both values from the operator's environment only: no saved/paired fallback.
+  cfg = envSchema.parse(devProfile ? process.env : credentialEnvironment(process.env));
 } catch (err) {
   // Log to stderr (stdout is the MCP transport stream — must stay clean).
   if (err instanceof z.ZodError) {
@@ -116,6 +139,7 @@ const impreza = new ImprezaClient({
   apiKey: cfg.IMPREZA_API_KEY,
   apiSecret: cfg.IMPREZA_API_SECRET,
   ...(cfg.IMPREZA_PROXY ? { proxy: cfg.IMPREZA_PROXY } : {}),
+  ...(devProfile ? { requestGuard: (method: string, url: URL) => devProfileRequest(devProfile as DevProfile, method, url) } : {}),
 });
 
 if (cfg.IMPREZA_PROXY) {
@@ -162,6 +186,7 @@ const TOOLS = [
 ...CUSTOMER_TOOLS,
 ...PITR_TOOLS,
 ...FAILOVER_TOOLS,
+...INCIDENT_TOOLS,
 {
   "name": "impreza_create_preview",
   "description": "Create (or refresh) the preview of one branch now, without waiting for a push. With protect=true the preview gets an HTTPS address on the shared preview domain — a random label, so the branch name still reaches no DNS record or CT log — gated by a generated password returned ONLY in this response: it is never stored in plaintext and cannot be retrieved later; the username is \"preview\". With private=true (or onion_clients) the preview's .onion requires Tor client authorization: pass reviewer public keys, or none and one reviewer keypair is minted (private key shown ONCE, same one-time channel as the password). Calling again for the same branch refreshes the existing preview and never mints a new password; changing protection or client list of a live preview means retiring it first. Requires deploy scope; the agent must support preview-basic-auth-v1 for protected previews and onion-private-preview-v1 for private ones.",
@@ -1415,6 +1440,22 @@ const TOOLS = [
     "title": "Change app domain",
   },
   {
+    // The sibling (www <-> apex) 301 redirect of a custom app.
+    name: 'impreza_set_domain_alias',
+    description:
+      "Make a RUNNING custom app also answer on its sibling name — www.example.com when its domain is example.com, or example.com when it is www.example.com — with a fixed 301 redirect to the main domain that keeps the path and query. The sibling is derived from the app's domain and cannot be chosen; other shapes (app.example.com), platform subdomains and IPs are refused. FIRST the customer creates an A record for the sibling pointing to the server's IP, with no AAAA record: without it nothing is changed and no certificate is requested. Available only when the server's agent supports it; otherwise the answer is 422 (not available for this server yet) and nothing changes. The .onion address is not affected. After a domain change the redirect pauses (status needs_check) until it is turned on again. Read the app (impreza_api_call on /platform/deployments/{id}) for domain_alias.status: pending, active, failed, needs_check or unsupported.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        deployment_id: { type: 'string', description: "The dpl_… deployment id (from impreza_list_deployments)." },
+        enabled: { type: 'boolean', description: 'true to serve the sibling and redirect it, false to stop.' },
+      },
+      required: ['deployment_id', 'enabled'],
+      additionalProperties: false,
+    },
+    "title": "Serve www and redirect",
+  },
+  {
     name: 'impreza_add_onion',
     description:
       "Add a Tor v3 hidden service (.onion mirror) to a deployment currently running clearnet-only. The agent publishes it alongside the existing clearnet route and persists its address. Catalog apps must declare supports.onion; custom deployments always support it. Use onion_profile for standard intro-point rate limiting, hardened limits and max streams, or max with experimental proof-of-work. Default standard. This is no DDoS guarantee; max is refused if the host lacks the PoW module. Change the profile later with impreza_set_onion_profile.",
@@ -1507,6 +1548,7 @@ const TOOLS = [
     },
     "title": "Purge onion identity",
   },
+  ...I2P_TOOLS,
   {
     name: 'impreza_onion_auth_list',
     description:
@@ -1641,7 +1683,7 @@ const TOOLS = [
   "title": "Host permissions"},
   {"name": "impreza_get_host_plan", "description": "Read and reconcile this credential's originating host plan against current permissions and the provider queue. Returns no command output, passwords or raw provider errors. Acceptance is not completion; a partial effect never authorizes a retry.", "inputSchema": {"type": "object", "properties": {"plan_id": {"type": "string", "pattern": "^hpl_[a-f0-9]{32}$"}}, "required": ["plan_id"], "additionalProperties": false},
   "title": "Host plan state"},
-  {"name": "impreza_prepare_host_plan", "description": "Prepare a VPS reinstall plan for human approval in the customer portal, binding the exact server, template, observed-state digest and deadline. Requires explicit operation/server permission and manage scope. Preparation dispatches nothing to the provider.", "inputSchema": {"type": "object", "properties": {"service_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "operation": {"type": "string", "enum": ["vps.reinstall"]}, "template_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "ttl_minutes": {"type": "integer", "minimum": 15, "maximum": 60}}, "required": ["service_id", "operation", "template_id"], "additionalProperties": false},
+  {"name": "impreza_prepare_host_plan", "description": "Prepare a typed host plan for human approval: existing vps.reinstall requires template_id; opt-in managed_service.reload and unit.redis.status/start/stop/restart/reload require verified locally pinned capabilities and separate per-server/per-operation grants; unit actions have an independent default-OFF gate and accept only service_id/operation/ttl_seconds (30-300); the gated operational impreza-ops identity operations need exact server+operation grants and local recovery policy, take a public ed25519 key or its fingerprint only, never a password, private key, free sudo, user or path. Bind server, generation, preview, observed-state digest and deadline. Requires explicit operation/server permission and manage scope. Preparation dispatches nothing to the provider.", "inputSchema": {"type": "object", "properties": {"service_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "operation": {"type": "string", "enum": ["vps.reinstall", "managed_service.reload", ...unitOperations, ...identityOperations]}, "template_id": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "ttl_minutes": {"type": "integer", "minimum": 15, "maximum": 60}, "ttl_seconds": {"type": "integer", "minimum": 30, "maximum": 300}, "public_key": {"type": "string", "maxLength": 128}, "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}, "required": ["service_id", "operation"], "additionalProperties": false},
   "title": "Prepare host plan"},
   {"name": "impreza_apply_host_plan", "description": "Apply exactly one stored host plan after human approval in the customer portal. Revalidates permission, credential revocation, server state, digest and expiry before the existing VPS reinstall operation. The AI cannot approve its own plan. Replay is refused; reconcile a partial effect instead of retrying blindly.", "inputSchema": {"type": "object", "properties": {"plan_id": {"type": "string", "pattern": "^hpl_[a-f0-9]{32}$"}, "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "approval_id": {"type": "string", "pattern": "^apr_[a-f0-9]{32}$"}}, "required": ["plan_id", "plan_digest", "approval_id"], "additionalProperties": false},
   "title": "Apply approved host plan"},
@@ -3214,7 +3256,7 @@ const TOOLS = [
   {
     name: 'impreza_vps_status',
     description:
-      "Get a Proxmox VPS's live power state + resource usage (CPU, memory, disk, network, uptime). Find the service_id via impreza_list_services. Read-only.",
+      "Get a Proxmox VPS's live power state, auto_start policy (null means unknown) + resource usage (CPU, memory, disk, network, uptime). Find the service_id via impreza_list_services. Read-only.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -3226,10 +3268,23 @@ const TOOLS = [
     "title": "VPS status and usage",
   },
   {
+    name: 'impreza_vps_events',
+    description:
+      "List the operations THIS client requested through this API for a Proxmox VPS (power, reinstall, password, backups, snapshots), newest first, up to 20. Each entry is a fixed operation kind plus the UTC instant the provider ACCEPTED it; the list never claims an outcome — read impreza_vps_status for the current state. Read-only.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+      },
+      required: ['service_id'],
+      additionalProperties: false,
+    },
+    "title": "VPS recent operations",
+  },
+  {
     name: 'impreza_vps_power',
     description:
-      'Change a Proxmox VPS power state: start, shutdown (graceful ACPI), reboot, or stop (hard power-off). ' +
-      'shutdown/stop take the server offline — confirm with the customer first.',
+      'Start, shut down, reboot or stop a VPS. Shutdown and stop take the server offline. Confirm with the customer first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3240,6 +3295,21 @@ const TOOLS = [
       additionalProperties: false,
     },
     "title": "Power VPS",
+  },
+  {
+    name: 'impreza_vps_set_auto_start',
+    description: 'Set the VPS auto-start policy. Requires manage scope and explicit customer consent. Controls unrequested host-boot and scheduled automation starts; does not start or stop the VPS. Maintenance restores previous power state; reinstall with auto_start=false stays stopped. Explicit manual power remains available.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        service_id: { type: 'string', description: 'VPS service id (numeric; from impreza_list_services).' },
+        auto_start: { type: 'boolean' },
+        confirm: { type: 'boolean', const: true },
+      },
+      required: ['service_id', 'auto_start', 'confirm'],
+      additionalProperties: false,
+    },
+    title: 'Set VPS auto-start',
   },
   {
     name: 'impreza_vps_list_backups',
@@ -3663,7 +3733,7 @@ const TOOLS = [
   {
     name: 'impreza_vps_create_snapshot',
     description:
-      "Take a VPS snapshot before a customer-approved risky change, such as an upgrade, migration or configuration change, so a later rollback has a restore point. A snapshot does not replace an independent backup. Requires manage scope.",
+      "Take a VPS snapshot before a customer-approved risky change, such as an upgrade, migration or configuration change, so a later rollback has a restore point. A snapshot does not replace an independent backup. Refused for a server with a customer-encrypted root, because a snapshot could carry the disk key. Requires manage scope.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -3679,7 +3749,7 @@ const TOOLS = [
   {
     name: 'impreza_vps_rollback_snapshot',
     description:
-      "DESTRUCTIVE: revert a VPS to a snapshot. Everything written after that snapshot — files, databases, mail, new users — is LOST, and the VPS restarts. Never call it on your own initiative: name the snapshot and its date to the customer, confirm they accept losing everything since then, and prefer taking a fresh snapshot first so the current state is still recoverable. Requires the \"manage\" scope. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. IRREVERSIBLE — takes two calls: the first returns a confirm_token and changes nothing, the second repeats the same arguments plus confirm_token and executes.",
+      "DESTRUCTIVE: revert a VPS to a snapshot. Everything written after that snapshot — files, databases, mail, new users — is LOST, and the VPS restarts. Never call it on your own initiative: name the snapshot and its date to the customer, confirm they accept losing everything since then, and prefer taking a fresh snapshot first so the current state is still recoverable. On a server with a customer-encrypted root no snapshot can be taken, and this rollback destroys the encrypted disk: MCP cannot confirm it; it needs an account API key. Requires the \"manage\" scope. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. IRREVERSIBLE — takes two calls: the first returns a confirm_token and changes nothing, the second repeats the same arguments plus confirm_token and executes.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -3709,7 +3779,7 @@ const TOOLS = [
   {
     name: 'impreza_vps_restore_backup',
     description:
-      "DESTRUCTIVE: restore a VPS from a backup, overwriting the current disk. Everything newer than the backup is LOST. Same rule as a rollback: state which backup and its date, get explicit confirmation, and consider a snapshot of the current state first. List candidates with impreza_vps_list_backups. Requires the \"manage\" scope. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. IRREVERSIBLE — takes two calls: the first returns a confirm_token and changes nothing, the second repeats the same arguments plus confirm_token and executes.",
+      "DESTRUCTIVE: restore a VPS from a backup, overwriting the current disk. Everything newer than the backup is LOST. Same rule as a rollback: state which backup and its date, get explicit confirmation, and consider a snapshot of the current state first (refused on a server with a customer-encrypted root, where the restore also destroys the encrypted disk: MCP cannot confirm it; it needs the client area or an account API key). List candidates with impreza_vps_list_backups. Requires the \"manage\" scope. If confirm_token is absent from this connection's input schema, use a connection that exposes it or a supported customer-portal flow. A quote or confirmation request is not completion. IRREVERSIBLE — takes two calls: the first returns a confirm_token and changes nothing, the second repeats the same arguments plus confirm_token and executes.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -3839,6 +3909,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   ...Object.fromEntries(CUSTOMER_TOOLS.map(t=>[t.name,t.annotations])),
   ...Object.fromEntries(PITR_TOOLS.map(t=>[t.name,t.annotations])),
   ...Object.fromEntries(FAILOVER_TOOLS.map(t=>[t.name,t.annotations])),
+  ...Object.fromEntries(INCIDENT_TOOLS.map(t=>[t.name,t.annotations])),
   // ── platform: apps / deployments ──────────────────────────────────────────
   impreza_get_host_inventory: A_READ,
   impreza_list_servers: A_READ,
@@ -3880,6 +3951,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   impreza_run_task: A_WRITE_EXT,
   impreza_delete_task: A_DESTRUCTIVE,
   impreza_change_domain: A_WRITE_EXT_IDEM,
+  impreza_set_domain_alias: A_WRITE_EXT_IDEM,
   impreza_add_onion: A_WRITE_EXT_IDEM,
   // Setting the same tier twice converges to the same torrc — idempotent.
   impreza_set_onion_profile: A_WRITE_EXT_IDEM,
@@ -3895,6 +3967,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // Purge destroys retained recovery material forever: same ceiling as
   // rotate, minus the recovery window.
   impreza_purge_onion_key: A_DESTRUCTIVE,
+  ...I2P_ANNOTATIONS,
   // Onion client authorization (Tor v3 restricted discovery). Add is NOT
   // idempotent: a duplicate name is refused with 409. Revoke kills an
   // authorization — destructive, like the hosted marks it (a second revoke of
@@ -4071,6 +4144,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
   // ── VPS lifecycle (Proxmox) ───────────────────────────────────────────────
   impreza_vps_status: A_READ,
+  impreza_vps_events: A_READ,
   impreza_vps_resize_recommendation: A_READ,
   impreza_vps_list_backups: A_READ,
   impreza_vps_list_templates: A_READ,
@@ -4081,6 +4155,7 @@ const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   // 'stop' is a hard power-off and 'reboot' is not repeat-safe, so the tool as
   // a whole is destructive and non-idempotent.
   impreza_vps_power: A_DESTRUCTIVE,
+  impreza_vps_set_auto_start: A_WRITE_IDEM,
   impreza_vps_reinstall: A_DESTRUCTIVE, // erases the disk
   // Spends account credit and changes what the VPS is billed at; sizes only go up.
   impreza_vps_resize: A_DESTRUCTIVE,
@@ -4229,11 +4304,17 @@ function panelFor(tool: string): string | undefined {
   return UI_PANELS.find((p) => p.tool === tool)?.uri;
 }
 
-server.setRequestHandler(ListPromptsRequestSchema, async (req) => listPrompts(req.params));
-server.setRequestHandler(GetPromptRequestSchema, async (req) => getPrompt(req.params));
+// Under the DEV profile: no playbooks (they steer to tools this profile refuses) and only the server card.
+server.setRequestHandler(ListPromptsRequestSchema, async (req) => (devProfile ? { prompts: [] } : listPrompts(req.params)));
+server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+  if (devProfile) throw new Error('DEV_PROFILE_DENIED: prompt');
+  return getPrompt(req.params);
+});
+
+const panelsOffered = () => (devProfile ? UI_PANELS.filter((p) => p.uri === DEV_RESOURCE) : UI_PANELS);
 
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-  resources: UI_PANELS.map((p) => ({
+  resources: panelsOffered().map((p) => ({
     uri: p.uri,
     name: p.name,
     description: p.description,
@@ -4245,7 +4326,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
 server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
   // Refusing anything outside the table is the point: the uri is
   // caller-controlled and must never reach a file path.
-  const panel = UI_PANELS.find((p) => p.uri === req.params.uri);
+  const panel = panelsOffered().find((p) => p.uri === req.params.uri);
   if (!panel) throw new Error(`No such resource: ${req.params.uri}. List them with resources/list.`);
   return {
     contents: [{ uri: panel.uri, mimeType: UI_MIME, text: panel.html, _meta: { ui: UI_RENDER_META } }],
@@ -4277,20 +4358,22 @@ const ANNOTATED_TOOLS = TOOLS.filter(tool => !basicCloudUnavailable(tool.name)).
  * rules. A copy of the prefix-to-family map here would drift the first time a
  * family is added server-side, and would need an npm release to catch up.
  *
- * Fails open in every direction — a request that errors, times out, or comes
- * back malformed hides nothing. Too many tools is the behaviour we shipped
- * yesterday; too few silently removes capability the customer pays for, and
- * they would have no way to tell why.
+ * Other families fail open: a request that errors, times out, or comes back
+ * malformed hides nothing. Too many of those tools is the behaviour we shipped
+ * yesterday; too few silently removes capability the customer pays for.
+ * I2P does not follow that rule. It stays out of the list unless data.i2p is
+ * exactly true, including when this read fails.
  */
-async function hiddenTools(): Promise<Set<string>> {
+async function hiddenTools(): Promise<{ hidden: Set<string>; entitlements: unknown }> {
   try {
-    const res = await impreza.get<{ hidden?: unknown; known?: unknown }>('/v1/entitlements');
-    if (res?.known !== true || !Array.isArray(res.hidden)) {
-      return new Set();
-    }
-    return new Set(res.hidden.filter((n): n is string => typeof n === 'string'));
+    const res = await impreza.get<{ hidden?: unknown; known?: unknown; i2p?: unknown }>('/v1/entitlements');
+    const hidden = res?.known === true && Array.isArray(res.hidden)
+      ? new Set(res.hidden.filter((n): n is string => typeof n === 'string'))
+      : new Set<string>();
+    // Other families fail open. I2P fails closed: only data.i2p === true lists it.
+    return { hidden, entitlements: res };
   } catch {
-    return new Set();
+    return { hidden: new Set(), entitlements: null };
   }
 }
 
@@ -4300,9 +4383,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   // outlives a purchase, and a customer who buys a VPS mid-session should see
   // its tools on the next listing rather than after a restart. tools/list is
   // called rarely enough that the extra round trip does not matter.
-  const hidden = await hiddenTools();
-  const tools = ANNOTATED_TOOLS
-    .filter((tool) => !hidden.has(tool.name))
+  // The DEV profile lists its four reads and asks the API nothing (no entitlements request).
+  const catalogue = devProfile ? { hidden: new Set<string>(), entitlements: null } : await hiddenTools();
+  const tools = filterI2pTools(ANNOTATED_TOOLS
+    .filter((tool) => !catalogue.hidden.has(tool.name))
+    .filter((tool) => !devProfile || (DEV_TOOLS as readonly string[]).includes(tool.name)), catalogue.entitlements)
     .map((tool) => {
       const uri = offer ? panelFor(tool.name) : undefined;
       // The nested `ui.resourceUri`, not the flat `_meta["ui/resourceUri"]`:
@@ -4312,7 +4397,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: tools as unknown as typeof TOOLS[number][] };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (req) => withStructuredContent(req.params.name, await callTool(req)));
+server.setRequestHandler(CallToolRequestSchema, async (req) =>
+  withStructuredContent(req.params.name, devProfile ? await callDevProfileTool(devProfile, req) : await callTool(req)));
+
+/**
+ * The DEV profile's dispatcher: the gate runs first (so before secret-entry policy lookups or any other request).
+ * Status/refresh keep the ordinary handler; the strict client serves identity with one direct GET
+ * (no catalogue), the server list from the operator binding (no request) and deployments with one GET (no query).
+ */
+async function callDevProfileTool(profile: DevProfile, req: CallToolRequest) {
+  const name = req.params.name;
+  const refusal = devProfileGate(profile, name, req.params.arguments ?? {});
+  if (refusal) return toError(`DEV_PROFILE_DENIED: ${refusal}`);
+  try {
+    switch (name) {
+      case 'impreza_list_servers':
+        return devProfileServers(profile);
+      case 'impreza_list_deployments':
+        return devProfileDeploymentsResult(profile, await impreza.get<unknown>('/v1/platform/deployments'));
+      case 'impreza_api_call': {
+        // The gate already confined the path to the card's two reads
+        // (identity and the events ledger); serve exactly that path
+        // instead of always the identity, so the Activity section reads the
+        // real ledger through the same strict client.
+        const devPath = String((req.params.arguments as { path?: unknown } | undefined)?.path ?? '');
+        return devProfileResult(profile, name, toResult(await impreza.get<unknown>(`/v1${devPath}`)));
+      }
+      default:
+        return devProfileResult(profile, name, await callTool(req));
+    }
+  } catch (error) {
+    if (error instanceof DevProfileRefusal) return toError(error.message);
+    return toError(error instanceof Error ? error.message : 'DEV_PROFILE_DENIED: result');
+  }
+}
 
 /**
  * A tool that declares an outputSchema answers with structuredContent on
@@ -4346,7 +4464,11 @@ function projectOntoSchema(value: unknown, schema: unknown): unknown {
     // constraints live one level down — the projector wraps every schema, so the
     // success branch of an anyOf-shaped tool has no required of its own).
     const has = (b: unknown) => {
-      const req = (b as { required?: unknown }).required;
+      const branchShape=b as {required?:unknown;properties?:Record<string,{const?:unknown;enum?:unknown}>};
+      const operation=branchShape.properties?.operation;
+      if(operation && 'const' in operation && operation.const!==v.operation)return false;
+      if(operation && Array.isArray(operation.enum) && !operation.enum.includes(v.operation))return false;
+      const req = branchShape.required;
       return Array.isArray(req) && req.length > 0 && req.every((k) => typeof k === 'string' && k in v);
     };
     const open = (b: unknown) => !Array.isArray((b as { required?: unknown }).required);
@@ -4404,6 +4526,10 @@ async function callTool(req: CallToolRequest) {
   const args = (rawArgs ?? {}) as Record<string, unknown>;
 
   try {
+    if (isI2pTool(name)) {
+      const outcome = await handleI2p(name, args, impreza);
+      return outcome.ok ? toResult(outcome.body) : toError(outcome.error);
+    }
     // An explicit empty filter has always meant all tasks/backups.
     const emptyOptionalFilter = args.deployment_id === '' && ['impreza_list_tasks', 'impreza_list_backups'].includes(name);
     if (args.deployment_id !== undefined && !emptyOptionalFilter) deploymentPathSegment(args.deployment_id);
@@ -4431,6 +4557,7 @@ async function callTool(req: CallToolRequest) {
 
     if(isPitrTool(name)) return toResult(await callPitrTool(impreza,name,args));
     if(isFailoverTool(name)) return toResult(await callFailoverTool(impreza,name,args));
+    if(isIncidentTool(name)) return toResult(await callIncidentTool(impreza,name,args));
     if(isCustomerTool(name)) return toResult(await callCustomerTool(impreza,name,args));
     switch (name) {
       case 'impreza_prepare_secret_entry': {
@@ -4720,6 +4847,18 @@ async function callTool(req: CallToolRequest) {
           await impreza.post<{ command_id: string; deployment: Deployment }>(
             `/v1/platform/deployments/${deploymentPathSegment(dep)}/domain`,
             { domain: newDomain },
+          ),
+        );
+      }
+
+      case 'impreza_set_domain_alias': {
+        const dep = String(args.deployment_id ?? '');
+        if (!dep) return toError('deployment_id is required');
+        if (typeof args.enabled !== 'boolean') return toError('enabled must be true or false.');
+        return toResult(
+          await impreza.post(
+            `/v1/platform/deployments/${deploymentPathSegment(dep)}/domain-alias`,
+            { enabled: args.enabled },
           ),
         );
       }
@@ -5189,13 +5328,19 @@ async function callTool(req: CallToolRequest) {
       case 'impreza_get_host_plan':
       case 'impreza_prepare_host_plan':
       case 'impreza_apply_host_plan': {
-        const allowed = name === 'impreza_host_permissions' ? [] : name === 'impreza_get_host_plan' ? ['plan_id'] : name === 'impreza_prepare_host_plan' ? ['service_id','operation','template_id','ttl_minutes'] : ['plan_id','plan_digest','approval_id'];
+        const allowed = name === 'impreza_host_permissions' ? [] : name === 'impreza_get_host_plan' ? ['plan_id'] : name === 'impreza_prepare_host_plan' ? ['service_id','operation','template_id','ttl_minutes','ttl_seconds','public_key','fingerprint'] : ['plan_id','plan_digest','approval_id'];
         if (Object.keys(args).some(k => !allowed.includes(k))) return toError('INVALID_HOST_INPUT: Unexpected parameter.');
         if (name === 'impreza_host_permissions') return toResult(await impreza.get<unknown>('/v1/host/permissions'));
         if (name !== 'impreza_prepare_host_plan' && (typeof args.plan_id !== 'string' || !/^hpl_[a-f0-9]{32}$/.test(args.plan_id))) return toError('INVALID_HOST_PLAN: Use a returned plan ID.');
         if (name === 'impreza_get_host_plan') return toResult(await impreza.get<unknown>('/v1/host/plans/' + args.plan_id));
         if (name === 'impreza_prepare_host_plan') {
-          if (!Number.isInteger(args.service_id) || Number(args.service_id)<1 || Number(args.service_id)>2147483647 || !Number.isInteger(args.template_id) || Number(args.template_id)<1 || Number(args.template_id)>2147483647 || args.operation !== 'vps.reinstall' || (args.ttl_minutes !== undefined && (!Number.isInteger(args.ttl_minutes) || Number(args.ttl_minutes)<15 || Number(args.ttl_minutes)>60))) return toError('INVALID_HOST_INPUT: Use positive server/template IDs, vps.reinstall and TTL 15-60.');
+          const sid = args.service_id;
+          if (!Number.isInteger(sid) || Number(sid)<1 || Number(sid)>2147483647) return toError('INVALID_HOST_INPUT: Use a positive server ID.');
+          const identity = identityOperations.includes(args.operation as typeof identityOperations[number]);
+          if (identity || args.operation === 'managed_service.reload' || unitOperations.includes(args.operation as typeof unitOperations[number])) {
+            if (args.template_id !== undefined || args.ttl_minutes !== undefined || (args.ttl_seconds !== undefined && (!Number.isInteger(args.ttl_seconds) || Number(args.ttl_seconds)<30 || Number(args.ttl_seconds)>300))) return toError('INVALID_HOST_INPUT: Typed host action accepts only service, operation and technical TTL 30-300 seconds.');
+            if (identity ? !identityInputAllowed(args) : (args.public_key !== undefined || args.fingerprint !== undefined)) return toError('INVALID_HOST_INPUT: Public ed25519 key/fingerprint only for the matching identity operation.');
+          } else if (args.operation !== 'vps.reinstall' || args.ttl_seconds !== undefined || args.public_key !== undefined || args.fingerprint !== undefined || !Number.isInteger(args.template_id) || Number(args.template_id)<1 || Number(args.template_id)>2147483647 || (args.ttl_minutes !== undefined && (!Number.isInteger(args.ttl_minutes) || Number(args.ttl_minutes)<15 || Number(args.ttl_minutes)>60))) return toError('INVALID_HOST_INPUT: Reinstall requires template and TTL 15-60 minutes.');
           return toResult(await impreza.post<unknown>('/v1/host/plans', args));
         }
         if (typeof args.plan_digest !== 'string' || !/^[a-f0-9]{64}$/.test(args.plan_digest) || typeof args.approval_id !== 'string' || !/^apr_[a-f0-9]{32}$/.test(args.approval_id)) return toError('INVALID_HOST_INPUT: Use the returned digest and approval ID.');
@@ -5917,6 +6062,21 @@ async function callTool(req: CallToolRequest) {
         // structuredContent, so the server card renders from data rather than
         // re-parsing our text block. Panelled tools only.
         return toStructuredResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/status`));
+      }
+
+      case 'impreza_vps_events': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        // The operations ledger. structuredContent like the status
+        // call: fixed enum kinds + UTC instants, nothing to re-parse.
+        return toStructuredResult(await impreza.get<unknown>(`/v1/vps/proxmox/${sid}/events`));
+      }
+
+      case 'impreza_vps_set_auto_start': {
+        const sid = svcId(args);
+        if (!sid) return toError('service_id is required (numeric)');
+        if (typeof args.auto_start !== 'boolean' || args.confirm !== true) return toError('Auto-start requires boolean auto_start and confirm=true');
+        return toResult(await impreza.put<unknown>(`/v1/vps/proxmox/${sid}/auto-start`, { auto_start: args.auto_start, confirm: true }));
       }
 
       case 'impreza_vps_power': {

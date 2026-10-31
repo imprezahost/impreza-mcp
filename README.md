@@ -355,7 +355,7 @@ Static npm sites: choose build_strategy=node_npm_static with a Git/context sourc
 
 ## Status
 
-**Package version: 0.55.1.** The tool catalog covers app deployment plus account +
+**Package version: 0.56.0.** The tool catalog covers app deployment plus account +
 crypto balance, catalog + ordering, domains/DNS + registration, invoices, VPS
 lifecycle with snapshots and backups, dedicated / bare-metal servers, plan
 upgrades, and Titan / Google Workspace mailboxes — with a setup wizard that
@@ -367,8 +367,10 @@ output kept, outbound webhooks so you stop polling, reading the app's own
 files, and running the app's own command line.
 
 The local (`npx`) server and the hosted OAuth connector expose the **same tool
-catalog — 219 tools in the local package**. Declared, one-direction gaps remain:
-`impreza_get_log_request` stays hosted-only (only the control plane resolves a
+catalog — 225 tools in the local package**, 228 where I2P is available. Declared,
+one-direction gaps remain:
+`impreza_export_project_topology` and `impreza_probe_accessibility` are
+hosted-only for now; `impreza_get_log_request` stays hosted-only (only the control plane resolves a
 bare `request_id`; locally, call `impreza_tail_logs` again on the application —
 requests dedupe); `impreza_list_approvals`, `impreza_get_approval` and
 `impreza_get_credential_policy` are hosted-first (locally, the same reads are
@@ -992,3 +994,16 @@ The package manifest pins each direct runtime dependency to an exact version: `@
 `tar` 7.5.22 and `zod` 3.25.76. Source builds use `package-lock.json` for the tested dependency tree. Transitive
 dependencies may still change during a fresh consumer installation; dependency updates require a rebuilt package, a
 clean installation test and a review of the installed tree before release.
+
+
+## Automatic VPS starts
+
+Not yet released. `auto_start` reports the Proxmox `onboot` policy; `power_state`/`status` reports whether the VPS is actually running. `null` means the policy could not be confirmed. Turning auto-start off does not stop a running VPS; turning it on does not start a stopped VPS. Explicit manual Start/Reboot and operator actions remain possible. This is not HA or protection against an operator.
+
+Read `GET /v1/vps/proxmox/{serviceId}/status` with read scope. Change it with manage scope and `PUT /v1/vps/proxmox/{serviceId}/auto-start`, body `{"auto_start":false,"confirm":true}`. Booleans must be JSON booleans. A missing confirmation or another account's service is refused before the provider. If an update is not confirmed, read status before retrying; a timeout is not proof of success.
+
+Hosted and local MCP expose this through `impreza_vps_status` and `impreza_vps_set_auto_start` (manage scope), with boolean `auto_start` and `confirm=true`, after the customer agrees. The VPS client area offers a visible confirmation dialog. A pending lifecycle operation prevents changing the policy.
+
+Auto-start controls unrequested host-boot and scheduled automation starts. With it off, a stopped VPS remains off after host reboot until explicitly started. Suspension/reactivation, migration and rollback restore the previously observed power state independently of this policy; unknown previous state never triggers an implicit start. Reinstall captures the live policy in the sealed CommandQueue job before destruction, preserves it on retry and reads it back on the clone. Missing job policy blocks destructive retry. With auto-start off, reinstall leaves the VPS stopped and defers required agent/app setup until explicit customer Start; a refused setup queue remains visibly pending and retryable. Resize retains the live policy. Explicit admin recovery starts override auto-start, as disclosed beside their checkboxes; cross-node destination policy is preserved while the parked source stays onboot=0.
+
+Backup restore requests no start and reapplies the current policy after task completion.

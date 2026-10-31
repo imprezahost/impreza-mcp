@@ -1,0 +1,4 @@
+// Test only: no external HTTP; validates the API's code-point boundary.
+import {appendFileSync} from 'node:fs';
+const LOG=process.env.LABEL_CODEPOINTS_LOG;if(!LOG)throw Error('private fixture log required');
+globalThis.fetch=async(url,o={})=>{const u=new URL(String(url));if(u.origin!=='https://label-codepoints.invalid'||u.pathname!=='/v1/platform/servers/external/bootstrap'||o.method!=='POST')throw Error('unexpected fixture destination');const body=JSON.parse(o.body||'{}');appendFileSync(LOG,JSON.stringify(body)+'\n');const label=body.label;const valid=label===undefined||label===''||(typeof label==='string'&&/^[^\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]{1,120}$/u.test(label)&&!/^ +$/.test(label));return new Response(JSON.stringify(valid?{success:true,data:{fixture:true}}:{success:false,error:{code:'INVALID_REQUEST',message:'label must be up to 120 characters of plain text.'}}),{status:valid?201:400,headers:{'Content-Type':'application/json'}});};

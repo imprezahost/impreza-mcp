@@ -713,74 +713,345 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "oneOf": [
+        "anyOf": [
           {
             "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "plan_id": {
-                "type": "string",
-                "pattern": "^hpl_[a-f0-9]{32}$"
-              },
-              "operation": {
-                "type": "string",
-                "const": "vps.reinstall"
-              },
-              "service_id": {
-                "type": "integer"
-              },
-              "template_id": {
-                "type": "integer"
-              },
-              "plan_digest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "approval_id": {
-                "type": "string",
-                "pattern": "^apr_[a-f0-9]{32}$"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "prepared",
-                  "dispatching",
-                  "submitted",
-                  "partial",
-                  "completed",
-                  "failed",
-                  "expired",
-                  "refused"
+            "anyOf": [
+              {
+                "type": "object",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "type": "string",
+                        "const": "vps.reinstall"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "template_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "provider_ref": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "template_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "provider_ref",
+                      "note"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "const": "managed_service.reload"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused",
+                          "uncertain"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "type": "string"
+                      },
+                      "preview": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operation",
+                          "unit",
+                          "possible_connection_loss",
+                          "restart_fallback",
+                          "packages",
+                          "reboot",
+                          "health_scope"
+                        ],
+                        "properties": {
+                          "operation": {
+                            "const": "managed_service.reload"
+                          },
+                          "unit": {
+                            "const": "impreza-agent-ingress.service"
+                          },
+                          "possible_connection_loss": {
+                            "const": true
+                          },
+                          "restart_fallback": {
+                            "const": false
+                          },
+                          "packages": {
+                            "type": "array",
+                            "maxItems": 0
+                          },
+                          "reboot": {
+                            "const": false
+                          },
+                          "health_scope": {
+                            "const": "complete_adapter_verification_required"
+                          }
+                        }
+                      },
+                      "affected_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32
+                      },
+                      "affected_refs": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "agent_ref": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "note",
+                      "preview",
+                      "affected_count",
+                      "affected_refs",
+                      "agent_ref"
+                    ]
+                  }
                 ]
               },
-              "created_at": {
-                "type": "string"
-              },
-              "expires_at": {
-                "type": "string"
-              },
-              "provider_ref": {
-                "type": [
-                  "string",
-                  "null"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "plan_id": {
+                    "type": "string",
+                    "pattern": "^hpl_[a-f0-9]{32}$"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "unit.redis.status",
+                      "unit.redis.start",
+                      "unit.redis.stop",
+                      "unit.redis.restart",
+                      "unit.redis.reload"
+                    ]
+                  },
+                  "service_id": {
+                    "type": "integer"
+                  },
+                  "plan_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "pattern": "^apr_[a-f0-9]{32}$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "prepared",
+                      "dispatching",
+                      "submitted",
+                      "partial",
+                      "completed",
+                      "failed",
+                      "expired",
+                      "refused",
+                      "uncertain"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "expires_at": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "preview": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operation",
+                      "unit",
+                      "possible_connection_loss",
+                      "restart_fallback",
+                      "packages",
+                      "reboot",
+                      "health_scope",
+                      "profile",
+                      "prior_state",
+                      "compensation"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "unit.redis.status",
+                          "unit.redis.start",
+                          "unit.redis.stop",
+                          "unit.redis.restart",
+                          "unit.redis.reload"
+                        ]
+                      },
+                      "unit": {
+                        "const": "redis-server.service"
+                      },
+                      "possible_connection_loss": {
+                        "const": true
+                      },
+                      "restart_fallback": {
+                        "const": false
+                      },
+                      "packages": {
+                        "type": "array",
+                        "maxItems": 0
+                      },
+                      "reboot": {
+                        "const": false
+                      },
+                      "health_scope": {
+                        "const": "unit_state_and_local_coverage_not_client_reachability"
+                      },
+                      "profile": {
+                        "const": "cache-redis-ubuntu2404-v1"
+                      },
+                      "prior_state": {
+                        "enum": [
+                          "active",
+                          "inactive"
+                        ]
+                      },
+                      "compensation": {
+                        "const": "new_independently_approved_plan_after_reconciliation"
+                      }
+                    }
+                  },
+                  "affected_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  "affected_refs": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "agent_ref": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "plan_id",
+                  "operation",
+                  "service_id",
+                  "plan_digest",
+                  "approval_id",
+                  "status",
+                  "created_at",
+                  "expires_at",
+                  "note",
+                  "preview",
+                  "affected_count",
+                  "affected_refs",
+                  "agent_ref"
                 ]
-              },
-              "note": {
-                "type": "string"
               }
-            },
-            "required": [
-              "plan_id",
-              "operation",
-              "service_id",
-              "template_id",
-              "plan_digest",
-              "approval_id",
-              "status",
-              "created_at",
-              "expires_at",
-              "provider_ref",
-              "note"
             ]
           },
           {
@@ -792,7 +1063,15 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 "pattern": "^hpl_[a-f0-9]{32}$"
               },
               "operation": {
-                "const": "managed_service.reload"
+                "type": "string",
+                "enum": [
+                  "identity.ops.create",
+                  "identity.ops.remove",
+                  "identity.ops.add-key",
+                  "identity.ops.revoke-key",
+                  "identity.ops.sudo-read",
+                  "identity.ops.sudo-none"
+                ]
               },
               "service_id": {
                 "type": "integer"
@@ -838,14 +1117,29 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                   "restart_fallback",
                   "packages",
                   "reboot",
-                  "health_scope"
+                  "health_scope",
+                  "profile",
+                  "compensation",
+                  "before",
+                  "after",
+                  "uid",
+                  "gid",
+                  "fingerprint"
                 ],
                 "properties": {
                   "operation": {
-                    "const": "managed_service.reload"
+                    "type": "string",
+                    "enum": [
+                      "identity.ops.create",
+                      "identity.ops.remove",
+                      "identity.ops.add-key",
+                      "identity.ops.revoke-key",
+                      "identity.ops.sudo-read",
+                      "identity.ops.sudo-none"
+                    ]
                   },
                   "unit": {
-                    "const": "impreza-agent-ingress.service"
+                    "const": "impreza-ops"
                   },
                   "possible_connection_loss": {
                     "const": true
@@ -861,7 +1155,100 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                     "const": false
                   },
                   "health_scope": {
-                    "const": "complete_adapter_verification_required"
+                    "const": "account_files_not_live_login"
+                  },
+                  "profile": {
+                    "const": "ops-ubuntu2404-v1"
+                  },
+                  "compensation": {
+                    "const": "reconcile_then_new_independent_plan_no_data_deletion"
+                  },
+                  "before": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "after": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "uid": {
+                    "const": 65001
+                  },
+                  "gid": {
+                    "const": 65001
+                  },
+                  "fingerprint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-f0-9]{64}$"
                   }
                 }
               },
@@ -2758,6 +3145,13 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
           },
           "credentials_note": {
             "type": "string"
+          },
+          "credentials_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the one-time credential keys delivered in this response's credentials object. The values exist in the text content only and never in structuredContent; vars does not carry a masked placeholder for them."
           }
         }
       },
@@ -7550,74 +7944,345 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "oneOf": [
+        "anyOf": [
           {
             "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "plan_id": {
-                "type": "string",
-                "pattern": "^hpl_[a-f0-9]{32}$"
-              },
-              "operation": {
-                "type": "string",
-                "const": "vps.reinstall"
-              },
-              "service_id": {
-                "type": "integer"
-              },
-              "template_id": {
-                "type": "integer"
-              },
-              "plan_digest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "approval_id": {
-                "type": "string",
-                "pattern": "^apr_[a-f0-9]{32}$"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "prepared",
-                  "dispatching",
-                  "submitted",
-                  "partial",
-                  "completed",
-                  "failed",
-                  "expired",
-                  "refused"
+            "anyOf": [
+              {
+                "type": "object",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "type": "string",
+                        "const": "vps.reinstall"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "template_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "provider_ref": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "template_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "provider_ref",
+                      "note"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "const": "managed_service.reload"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused",
+                          "uncertain"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "type": "string"
+                      },
+                      "preview": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operation",
+                          "unit",
+                          "possible_connection_loss",
+                          "restart_fallback",
+                          "packages",
+                          "reboot",
+                          "health_scope"
+                        ],
+                        "properties": {
+                          "operation": {
+                            "const": "managed_service.reload"
+                          },
+                          "unit": {
+                            "const": "impreza-agent-ingress.service"
+                          },
+                          "possible_connection_loss": {
+                            "const": true
+                          },
+                          "restart_fallback": {
+                            "const": false
+                          },
+                          "packages": {
+                            "type": "array",
+                            "maxItems": 0
+                          },
+                          "reboot": {
+                            "const": false
+                          },
+                          "health_scope": {
+                            "const": "complete_adapter_verification_required"
+                          }
+                        }
+                      },
+                      "affected_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32
+                      },
+                      "affected_refs": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "agent_ref": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "note",
+                      "preview",
+                      "affected_count",
+                      "affected_refs",
+                      "agent_ref"
+                    ]
+                  }
                 ]
               },
-              "created_at": {
-                "type": "string"
-              },
-              "expires_at": {
-                "type": "string"
-              },
-              "provider_ref": {
-                "type": [
-                  "string",
-                  "null"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "plan_id": {
+                    "type": "string",
+                    "pattern": "^hpl_[a-f0-9]{32}$"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "unit.redis.status",
+                      "unit.redis.start",
+                      "unit.redis.stop",
+                      "unit.redis.restart",
+                      "unit.redis.reload"
+                    ]
+                  },
+                  "service_id": {
+                    "type": "integer"
+                  },
+                  "plan_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "pattern": "^apr_[a-f0-9]{32}$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "prepared",
+                      "dispatching",
+                      "submitted",
+                      "partial",
+                      "completed",
+                      "failed",
+                      "expired",
+                      "refused",
+                      "uncertain"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "expires_at": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "preview": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operation",
+                      "unit",
+                      "possible_connection_loss",
+                      "restart_fallback",
+                      "packages",
+                      "reboot",
+                      "health_scope",
+                      "profile",
+                      "prior_state",
+                      "compensation"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "unit.redis.status",
+                          "unit.redis.start",
+                          "unit.redis.stop",
+                          "unit.redis.restart",
+                          "unit.redis.reload"
+                        ]
+                      },
+                      "unit": {
+                        "const": "redis-server.service"
+                      },
+                      "possible_connection_loss": {
+                        "const": true
+                      },
+                      "restart_fallback": {
+                        "const": false
+                      },
+                      "packages": {
+                        "type": "array",
+                        "maxItems": 0
+                      },
+                      "reboot": {
+                        "const": false
+                      },
+                      "health_scope": {
+                        "const": "unit_state_and_local_coverage_not_client_reachability"
+                      },
+                      "profile": {
+                        "const": "cache-redis-ubuntu2404-v1"
+                      },
+                      "prior_state": {
+                        "enum": [
+                          "active",
+                          "inactive"
+                        ]
+                      },
+                      "compensation": {
+                        "const": "new_independently_approved_plan_after_reconciliation"
+                      }
+                    }
+                  },
+                  "affected_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  "affected_refs": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "agent_ref": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "plan_id",
+                  "operation",
+                  "service_id",
+                  "plan_digest",
+                  "approval_id",
+                  "status",
+                  "created_at",
+                  "expires_at",
+                  "note",
+                  "preview",
+                  "affected_count",
+                  "affected_refs",
+                  "agent_ref"
                 ]
-              },
-              "note": {
-                "type": "string"
               }
-            },
-            "required": [
-              "plan_id",
-              "operation",
-              "service_id",
-              "template_id",
-              "plan_digest",
-              "approval_id",
-              "status",
-              "created_at",
-              "expires_at",
-              "provider_ref",
-              "note"
             ]
           },
           {
@@ -7629,7 +8294,15 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 "pattern": "^hpl_[a-f0-9]{32}$"
               },
               "operation": {
-                "const": "managed_service.reload"
+                "type": "string",
+                "enum": [
+                  "identity.ops.create",
+                  "identity.ops.remove",
+                  "identity.ops.add-key",
+                  "identity.ops.revoke-key",
+                  "identity.ops.sudo-read",
+                  "identity.ops.sudo-none"
+                ]
               },
               "service_id": {
                 "type": "integer"
@@ -7675,14 +8348,29 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                   "restart_fallback",
                   "packages",
                   "reboot",
-                  "health_scope"
+                  "health_scope",
+                  "profile",
+                  "compensation",
+                  "before",
+                  "after",
+                  "uid",
+                  "gid",
+                  "fingerprint"
                 ],
                 "properties": {
                   "operation": {
-                    "const": "managed_service.reload"
+                    "type": "string",
+                    "enum": [
+                      "identity.ops.create",
+                      "identity.ops.remove",
+                      "identity.ops.add-key",
+                      "identity.ops.revoke-key",
+                      "identity.ops.sudo-read",
+                      "identity.ops.sudo-none"
+                    ]
                   },
                   "unit": {
-                    "const": "impreza-agent-ingress.service"
+                    "const": "impreza-ops"
                   },
                   "possible_connection_loss": {
                     "const": true
@@ -7698,7 +8386,100 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                     "const": false
                   },
                   "health_scope": {
-                    "const": "complete_adapter_verification_required"
+                    "const": "account_files_not_live_login"
+                  },
+                  "profile": {
+                    "const": "ops-ubuntu2404-v1"
+                  },
+                  "compensation": {
+                    "const": "reconcile_then_new_independent_plan_no_data_deletion"
+                  },
+                  "before": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "after": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "uid": {
+                    "const": 65001
+                  },
+                  "gid": {
+                    "const": 65001
+                  },
+                  "fingerprint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-f0-9]{64}$"
                   }
                 }
               },
@@ -9620,7 +10401,12 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                   "type": "string",
                   "enum": [
                     "vps.reinstall",
-                    "managed_service.reload"
+                    "managed_service.reload",
+                    "unit.redis.status",
+                    "unit.redis.start",
+                    "unit.redis.stop",
+                    "unit.redis.restart",
+                    "unit.redis.reload"
                   ]
                 },
                 "service_id": {
@@ -12130,6 +12916,12 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 "status": {
                   "type": "string"
                 },
+                "os": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "version": {
                   "type": [
                     "string",
@@ -14021,74 +14813,345 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
     "anyOf": [
       {
         "type": "object",
-        "oneOf": [
+        "anyOf": [
           {
             "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "plan_id": {
-                "type": "string",
-                "pattern": "^hpl_[a-f0-9]{32}$"
-              },
-              "operation": {
-                "type": "string",
-                "const": "vps.reinstall"
-              },
-              "service_id": {
-                "type": "integer"
-              },
-              "template_id": {
-                "type": "integer"
-              },
-              "plan_digest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "approval_id": {
-                "type": "string",
-                "pattern": "^apr_[a-f0-9]{32}$"
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "prepared",
-                  "dispatching",
-                  "submitted",
-                  "partial",
-                  "completed",
-                  "failed",
-                  "expired",
-                  "refused"
+            "anyOf": [
+              {
+                "type": "object",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "type": "string",
+                        "const": "vps.reinstall"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "template_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "provider_ref": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "template_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "provider_ref",
+                      "note"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "plan_id": {
+                        "type": "string",
+                        "pattern": "^hpl_[a-f0-9]{32}$"
+                      },
+                      "operation": {
+                        "const": "managed_service.reload"
+                      },
+                      "service_id": {
+                        "type": "integer"
+                      },
+                      "plan_digest": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "approval_id": {
+                        "type": "string",
+                        "pattern": "^apr_[a-f0-9]{32}$"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "prepared",
+                          "dispatching",
+                          "submitted",
+                          "partial",
+                          "completed",
+                          "failed",
+                          "expired",
+                          "refused",
+                          "uncertain"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "expires_at": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "type": "string"
+                      },
+                      "preview": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operation",
+                          "unit",
+                          "possible_connection_loss",
+                          "restart_fallback",
+                          "packages",
+                          "reboot",
+                          "health_scope"
+                        ],
+                        "properties": {
+                          "operation": {
+                            "const": "managed_service.reload"
+                          },
+                          "unit": {
+                            "const": "impreza-agent-ingress.service"
+                          },
+                          "possible_connection_loss": {
+                            "const": true
+                          },
+                          "restart_fallback": {
+                            "const": false
+                          },
+                          "packages": {
+                            "type": "array",
+                            "maxItems": 0
+                          },
+                          "reboot": {
+                            "const": false
+                          },
+                          "health_scope": {
+                            "const": "complete_adapter_verification_required"
+                          }
+                        }
+                      },
+                      "affected_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32
+                      },
+                      "affected_refs": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "agent_ref": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "plan_id",
+                      "operation",
+                      "service_id",
+                      "plan_digest",
+                      "approval_id",
+                      "status",
+                      "created_at",
+                      "expires_at",
+                      "note",
+                      "preview",
+                      "affected_count",
+                      "affected_refs",
+                      "agent_ref"
+                    ]
+                  }
                 ]
               },
-              "created_at": {
-                "type": "string"
-              },
-              "expires_at": {
-                "type": "string"
-              },
-              "provider_ref": {
-                "type": [
-                  "string",
-                  "null"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "plan_id": {
+                    "type": "string",
+                    "pattern": "^hpl_[a-f0-9]{32}$"
+                  },
+                  "operation": {
+                    "type": "string",
+                    "enum": [
+                      "unit.redis.status",
+                      "unit.redis.start",
+                      "unit.redis.stop",
+                      "unit.redis.restart",
+                      "unit.redis.reload"
+                    ]
+                  },
+                  "service_id": {
+                    "type": "integer"
+                  },
+                  "plan_digest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "approval_id": {
+                    "type": "string",
+                    "pattern": "^apr_[a-f0-9]{32}$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "prepared",
+                      "dispatching",
+                      "submitted",
+                      "partial",
+                      "completed",
+                      "failed",
+                      "expired",
+                      "refused",
+                      "uncertain"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "expires_at": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "preview": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operation",
+                      "unit",
+                      "possible_connection_loss",
+                      "restart_fallback",
+                      "packages",
+                      "reboot",
+                      "health_scope",
+                      "profile",
+                      "prior_state",
+                      "compensation"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "unit.redis.status",
+                          "unit.redis.start",
+                          "unit.redis.stop",
+                          "unit.redis.restart",
+                          "unit.redis.reload"
+                        ]
+                      },
+                      "unit": {
+                        "const": "redis-server.service"
+                      },
+                      "possible_connection_loss": {
+                        "const": true
+                      },
+                      "restart_fallback": {
+                        "const": false
+                      },
+                      "packages": {
+                        "type": "array",
+                        "maxItems": 0
+                      },
+                      "reboot": {
+                        "const": false
+                      },
+                      "health_scope": {
+                        "const": "unit_state_and_local_coverage_not_client_reachability"
+                      },
+                      "profile": {
+                        "const": "cache-redis-ubuntu2404-v1"
+                      },
+                      "prior_state": {
+                        "enum": [
+                          "active",
+                          "inactive"
+                        ]
+                      },
+                      "compensation": {
+                        "const": "new_independently_approved_plan_after_reconciliation"
+                      }
+                    }
+                  },
+                  "affected_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32
+                  },
+                  "affected_refs": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "agent_ref": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "plan_id",
+                  "operation",
+                  "service_id",
+                  "plan_digest",
+                  "approval_id",
+                  "status",
+                  "created_at",
+                  "expires_at",
+                  "note",
+                  "preview",
+                  "affected_count",
+                  "affected_refs",
+                  "agent_ref"
                 ]
-              },
-              "note": {
-                "type": "string"
               }
-            },
-            "required": [
-              "plan_id",
-              "operation",
-              "service_id",
-              "template_id",
-              "plan_digest",
-              "approval_id",
-              "status",
-              "created_at",
-              "expires_at",
-              "provider_ref",
-              "note"
             ]
           },
           {
@@ -14100,7 +15163,15 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 "pattern": "^hpl_[a-f0-9]{32}$"
               },
               "operation": {
-                "const": "managed_service.reload"
+                "type": "string",
+                "enum": [
+                  "identity.ops.create",
+                  "identity.ops.remove",
+                  "identity.ops.add-key",
+                  "identity.ops.revoke-key",
+                  "identity.ops.sudo-read",
+                  "identity.ops.sudo-none"
+                ]
               },
               "service_id": {
                 "type": "integer"
@@ -14146,14 +15217,29 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                   "restart_fallback",
                   "packages",
                   "reboot",
-                  "health_scope"
+                  "health_scope",
+                  "profile",
+                  "compensation",
+                  "before",
+                  "after",
+                  "uid",
+                  "gid",
+                  "fingerprint"
                 ],
                 "properties": {
                   "operation": {
-                    "const": "managed_service.reload"
+                    "type": "string",
+                    "enum": [
+                      "identity.ops.create",
+                      "identity.ops.remove",
+                      "identity.ops.add-key",
+                      "identity.ops.revoke-key",
+                      "identity.ops.sudo-read",
+                      "identity.ops.sudo-none"
+                    ]
                   },
                   "unit": {
-                    "const": "impreza-agent-ingress.service"
+                    "const": "impreza-ops"
                   },
                   "possible_connection_loss": {
                     "const": true
@@ -14169,7 +15255,100 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                     "const": false
                   },
                   "health_scope": {
-                    "const": "complete_adapter_verification_required"
+                    "const": "account_files_not_live_login"
+                  },
+                  "profile": {
+                    "const": "ops-ubuntu2404-v1"
+                  },
+                  "compensation": {
+                    "const": "reconcile_then_new_independent_plan_no_data_deletion"
+                  },
+                  "before": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "after": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "present",
+                      "home",
+                      "group",
+                      "keys",
+                      "sudo"
+                    ],
+                    "properties": {
+                      "present": {
+                        "type": "boolean"
+                      },
+                      "home": {
+                        "type": "boolean"
+                      },
+                      "group": {
+                        "type": "boolean"
+                      },
+                      "keys": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      },
+                      "sudo": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "redis-status"
+                        ]
+                      }
+                    }
+                  },
+                  "uid": {
+                    "const": 65001
+                  },
+                  "gid": {
+                    "const": 65001
+                  },
+                  "fingerprint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[a-f0-9]{64}$"
                   }
                 }
               },
@@ -15700,7 +16879,7 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "table",
+                "store",
                 "holds",
                 "scope",
                 "rows",
@@ -15713,8 +16892,9 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 "sensitive"
               ],
               "properties": {
-                "table": {
-                  "type": "string"
+                "store": {
+                  "type": "string",
+                  "description": "Stable descriptive name of the data store; never an internal table name."
                 },
                 "holds": {
                   "type": "string"
@@ -15757,7 +16937,7 @@ export const OUTPUT_SCHEMAS: Readonly<Record<string, Record<string, unknown>>> =
                 },
                 "note": {
                   "type": "string",
-                  "description": "Why a table is listed without counts: operator audit is our staff's data, never measured against your account."
+                  "description": "Why a store is listed without counts: operator audit is our staff's data, never measured against your account."
                 }
               }
             }
