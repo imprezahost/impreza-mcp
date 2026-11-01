@@ -1,3 +1,19 @@
+# MCP 0.56.1
+
+Changed:
+
+- A credential or a one-time pairing code is sent only to an API origin authorized for it: the official API, a local
+  address, or the exact origin in `IMPREZA_ORIGIN_AUTHORIZED`. Any other `IMPREZA_BASE_URL`, the API's `.onion` mirror
+  included, now needs that variable. Without it the server refuses to start with a key and secret from the
+  environment, and `impreza-mcp login --code` refuses before the code leaves the machine.
+- A credential saved by `impreza-mcp login` keeps the origin it was paired with, so it keeps working without the
+  variable.
+
+Added:
+
+- `grok-plugin/`: a read-only plugin package for Grok Build (the hosted MCP server and a short list of read tools).
+  It is not part of the npm package.
+
 # MCP 0.56.0
 
 New tools:

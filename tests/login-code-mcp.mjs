@@ -17,7 +17,7 @@ function testHome(name,mode='ok') {
  const home=path.join(root,name);mkdirSync(home);
  const config=path.join(home,'fixture.json'),requests=path.join(home,'requests.jsonl');
  writeFileSync(config,JSON.stringify({...fixture,mode}));
- const env={...process.env,HOME:home,USERPROFILE:home,PAIRING_FIXTURE:config,PAIRING_REQUESTS:requests,IMPREZA_BASE_URL:'https://pairing-fixture.invalid'};
+ const env={...process.env,HOME:home,USERPROFILE:home,PAIRING_FIXTURE:config,PAIRING_REQUESTS:requests,IMPREZA_BASE_URL:'https://pairing-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://pairing-fixture.invalid'};
  for(const key of ['IMPREZA_API_KEY','IMPREZA_API_SECRET','IMPREZA_PROXY']) delete env[key];
  return {home,env,file:path.join(home,'.impreza','credentials.json'),requests};
 }
@@ -54,7 +54,7 @@ try {
   const normalized={...h,env:{...h.env,IMPREZA_BASE_URL:'https://pairing-fixture.invalid'+suffix}};
   assert.equal(run(normalized,[]).status,0,'paired API /v1 alias must boot the real server');
  }
- const changedPath={...h,env:{...h.env,IMPREZA_BASE_URL:'https://pairing-fixture.invalid/unexpected'}};
+ const changedPath={...h,env:{...h.env,IMPREZA_BASE_URL:'https://pairing-fixture.invalid/unexpected',IMPREZA_ORIGIN_AUTHORIZED:'https://pairing-fixture.invalid'}};
  assert.notEqual(run(changedPath,[]).status,0,'unrecognized API path must not reuse a saved credential');
  const help=run(h,['--help']);assert.equal(help.status,0);assert(help.stdout.includes('Uses paired credentials or'));
  for(const args of [[],['--code'],['--code',fixture.code,'--unknown'],['--code',fixture.code+'\n'],['--unknown',fixture.code]]){
@@ -68,7 +68,7 @@ try {
  const symlink=testHome('symlink');const target=path.join(root,'target');mkdirSync(target);symlinkSync(target,path.join(symlink.home,'.impreza'),process.platform==='win32'?'junction':'dir');assert.notEqual(run(symlink).status,0);assert.equal(requests(symlink).length,0);assert(!existsSync(path.join(target,'credentials.json')));
  const partial=testHome('partial');partial.env.IMPREZA_API_KEY=fixture.api_key;assert.notEqual(run(partial,[]).status,0);assert.equal(requests(partial).length,0);
  const savedPartial={...h,env:{...h.env,IMPREZA_API_KEY:fixture.api_key}};const previous=requests(h).length;assert.notEqual(run(savedPartial,[]).status,0);assert.equal(requests(h).length,previous,'partial env must not use saved secret');
- const changed={...h,env:{...h.env,IMPREZA_BASE_URL:'https://other.invalid'}};assert.notEqual(run(changed,[]).status,0);assert.equal(requests(h).filter(x=>x.path==='/v1/mcp/pair').length,1);
+ const changed={...h,env:{...h.env,IMPREZA_BASE_URL:'https://other.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://other.invalid'}};assert.notEqual(run(changed,[]).status,0);assert.equal(requests(h).filter(x=>x.path==='/v1/mcp/pair').length,1);
  const corrupt=testHome('corrupt');assert.equal(run(corrupt).status,0);writeFileSync(corrupt.file,'{"api_secret":"'+fixture.api_secret+'"}');assert.notEqual(run(corrupt,[]).status,0);
  const overridden={...corrupt,env:{...corrupt.env,IMPREZA_API_KEY:fixture.api_key,IMPREZA_API_SECRET:fixture.api_secret}};assert.equal(run(overridden,[]).status,0,'complete env credentials take precedence over corrupt saved storage');
  const hardlink=testHome('hardlink');assert.equal(run(hardlink).status,0);linkSync(hardlink.file,path.join(hardlink.home,'another-file'));assert.notEqual(run(hardlink,[]).status,0);

@@ -1,6 +1,6 @@
 import { constants, openSync, fstatSync, writeFileSync, fsyncSync, closeSync, lstatSync, unlinkSync } from 'node:fs';
 import { ImprezaClient } from './client.js';
-import { envSchema } from './env.js';
+import { credentialOriginAllowed, envSchema } from './env.js';
 import { credentialSchema, credentialPath, prepareCredentialDirectory, protectNewCredential } from './credentials.js';
 
 export class LoginError extends Error {}
@@ -14,13 +14,26 @@ export async function runLogin(argv: readonly string[]): Promise<void> {
   if (argv.length !== 2 || argv[0] !== '--code' || !/^pair_[a-f0-9]{32}$(?![\s\S])/.test(argv[1] || '')) {
     throw new LoginError('Usage: impreza-mcp login --code <one-time-code>. Generate a new code in clientarea.');
   }
+  // The schema checks the origin binding, so it needs the binding and the DEV profile too;
+  // without them every non-official origin, authorized or not, would fail here.
   const cfg = envSchema.safeParse({ IMPREZA_API_KEY: 'pairing-anonymous', IMPREZA_API_SECRET: 'pairing-anonymous-no-secret',
     ...(process.env.IMPREZA_BASE_URL ? { IMPREZA_BASE_URL: process.env.IMPREZA_BASE_URL } : {}),
-    ...(process.env.IMPREZA_PROXY ? { IMPREZA_PROXY: process.env.IMPREZA_PROXY } : {}) });
-  if (!cfg.success) throw new LoginError('Invalid API URL or proxy configuration. HTTPS is required; onion APIs require an explicit SOCKS5 proxy.');
+    ...(process.env.IMPREZA_PROXY ? { IMPREZA_PROXY: process.env.IMPREZA_PROXY } : {}),
+    ...(process.env.IMPREZA_ORIGIN_AUTHORIZED ? { IMPREZA_ORIGIN_AUTHORIZED: process.env.IMPREZA_ORIGIN_AUTHORIZED } : {}),
+    ...(process.env.IMPREZA_DEV_PROFILE ? { IMPREZA_DEV_PROFILE: process.env.IMPREZA_DEV_PROFILE } : {}),
+    ...(process.env.IMPREZA_DEV_ORIGIN ? { IMPREZA_DEV_ORIGIN: process.env.IMPREZA_DEV_ORIGIN } : {}) });
+  if (!cfg.success) {
+    if (cfg.error.issues.some((issue) => issue.message.startsWith('IMPREZA_BASE_URL is not an authorized origin'))) {
+      throw new LoginError('This API origin is not authorized to receive the pairing code. Set IMPREZA_ORIGIN_AUTHORIZED to that exact origin.');
+    }
+    throw new LoginError('Invalid API URL or proxy configuration. HTTPS is required; onion APIs require an explicit SOCKS5 proxy.');
+  }
   const endpoint = new URL(cfg.data.IMPREZA_BASE_URL);
   if (!['/', '/v1', '/v1/'].includes(endpoint.pathname)) throw new LoginError('Pairing requires an API origin or its /v1 URL.');
   const baseURL = endpoint.origin;
+  if (!credentialOriginAllowed(baseURL, process.env.IMPREZA_ORIGIN_AUTHORIZED, process.env.IMPREZA_DEV_PROFILE, process.env.IMPREZA_DEV_ORIGIN)) {
+    throw new LoginError('This API origin is not authorized to receive the pairing code. Set IMPREZA_ORIGIN_AUTHORIZED to that exact origin.');
+  }
   try { prepareCredentialDirectory(); }
   catch { throw new LoginError('The credential directory is unavailable or not private. No code was exchanged.'); }
   const file = credentialPath();

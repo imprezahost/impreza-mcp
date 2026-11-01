@@ -4,7 +4,7 @@ import {randomBytes} from 'node:crypto';
 const root=process.env.SEGMENTS_MCP_ROOT||fileURLToPath(new URL('../',import.meta.url)), deps=process.env.SEGMENTS_DEP_ROOT||root;
 const {Client}=await import(pathToFileURL(deps+'/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js'));
 const {StdioClientTransport}=await import(pathToFileURL(deps+'/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js'));
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',pathToFileURL(root+'/tests/fixtures/vps-offer-fetch.mjs').href,root+'/dist/server.js'],env:{...process.env,IMPREZA_BASE_URL:'https://vps-offer.invalid',IMPREZA_API_KEY:randomBytes(24).toString('hex'),IMPREZA_API_SECRET:randomBytes(32).toString('hex')}});
+const transport=new StdioClientTransport({command:process.execPath,args:['--import',pathToFileURL(root+'/tests/fixtures/vps-offer-fetch.mjs').href,root+'/dist/server.js'],env:{...process.env,IMPREZA_BASE_URL:'https://vps-offer.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://vps-offer.invalid',IMPREZA_API_KEY:randomBytes(24).toString('hex'),IMPREZA_API_SECRET:randomBytes(32).toString('hex')}});
 const c=new Client({name:'segments-legacy-compatibility',version:'1'}),rows=[];
 try{await c.connect(transport);
 for(const [name,args,path] of [['impreza_list_tasks',{deployment_id:''},'/v1/tasks'],['impreza_list_backups',{deployment_id:''},'/v1/backups']]){

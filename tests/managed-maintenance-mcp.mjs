@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
-const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-maintenance-fetch.mjs',import.meta.url).href,process.env.MAINTENANCE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
+const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-maintenance-fetch.mjs',import.meta.url).href,process.env.MAINTENANCE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
 const c=new Client({name:'maintenance-test',version:'1'});const plan='hpl_'+'a'.repeat(32),digest='a'.repeat(64),approval='apr_'+'a'.repeat(32);let checks=0;
 try{await c.connect(t);const tool=(await c.listTools()).tools.find(t=>t.name==='impreza_prepare_host_plan');assert.ok(tool.inputSchema.properties.operation.enum.includes('managed_service.reload'));checks++;
  const call=(name,args)=>c.callTool({name:'impreza_'+name,arguments:args});

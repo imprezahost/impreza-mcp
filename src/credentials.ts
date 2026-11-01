@@ -107,5 +107,6 @@ export function credentialEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
     }
   }
   return { ...env, IMPREZA_API_KEY: saved.api_key, IMPREZA_API_SECRET: saved.api_secret, IMPREZA_BASE_URL: saved.base_url,
+    IMPREZA_ORIGIN_AUTHORIZED: new URL(saved.base_url).origin,
     ...(env.IMPREZA_PROXY || saved.proxy ? { IMPREZA_PROXY: env.IMPREZA_PROXY || saved.proxy } : {}) };
 }

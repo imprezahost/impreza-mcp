@@ -29,7 +29,7 @@ export function loggedClient(name, { host = 'rollback.invalid', env = {} } = {})
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ['--import', new URL('./logged-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../../dist/server.js', import.meta.url))],
-    env: { ...process.env, IMPREZA_BASE_URL: 'https://' + host, IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential', ...env, IMPREZA_TEST_REQUEST_LOG: log },
+    env: { ...process.env, IMPREZA_BASE_URL: 'https://' + host, IMPREZA_ORIGIN_AUTHORIZED: 'https://' + host, IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential', ...env, IMPREZA_TEST_REQUEST_LOG: log },
   });
   const client = new Client({ name, version: '1.0.0' });
   const requests = () => existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];

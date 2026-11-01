@@ -24,8 +24,11 @@ assert.equal(parse({ IMPREZA_BASE_URL: 'https://api.imprezahost.com/' }).success
 // 3. .onion accepts BOTH http and https (v3 address: 56 base32 chars).
 const onion = 'http://' + 'a'.repeat(56) + '.onion';
 const proxy = { IMPREZA_PROXY: 'socks5://127.0.0.1:9050' };
-assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: onion }).success, true, 'http .onion refused');
-assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: onion.replace('http://', 'https://') }).success, true, 'https .onion refused');
+assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: onion, IMPREZA_ORIGIN_AUTHORIZED: new URL(onion).origin }).success, true, 'http .onion refused');
+assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: onion.replace('http://', 'https://'), IMPREZA_ORIGIN_AUTHORIZED: new URL(onion.replace('http://', 'https://')).origin }).success, true, 'https .onion refused');
+assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: onion }).success, false, 'unbound onion accepted');
+assert.equal(parse({ IMPREZA_BASE_URL: 'https://unbound-origin.invalid' }).success, false, 'unbound https accepted');
+assert.equal(parse({ IMPREZA_BASE_URL: 'https://unbound-origin.invalid', IMPREZA_ORIGIN_AUTHORIZED: 'https://unbound-origin.invalid' }).success, true, 'bound https refused');
 assert.equal(parse({ IMPREZA_BASE_URL: onion }).success, false, 'onion without proxy accepted');
 assert.equal(parse({ ...proxy, IMPREZA_BASE_URL: 'http://example.onion' }).success, false);
 assert.equal(parse({ IMPREZA_BASE_URL: 'not a URL' }).success, false);

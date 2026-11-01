@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "impreza": {
+      "type": "http",
+      "url": "https://mcp.imprezahost.com/mcp",
+      "allowed_tools": [
+        "impreza_list_servers",
+        "impreza_list_apps",
+        "impreza_list_deployments",
+        "impreza_privacy_report",
+        "impreza_list_invoices",
+        "impreza_topup_status"
+      ]
+    }
+  }
+}

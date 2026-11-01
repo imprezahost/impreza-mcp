@@ -4,7 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { fileURLToPath } from 'node:url';
 // Inbound access (per-deployment ingress allowlists): read, and the complete
 // desired state as a write that needs confirm=true when it restricts.
-const transport = new StdioClientTransport({command: process.execPath, args: ['--import', new URL('./fixtures/ingress-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))], env: { ...process.env, IMPREZA_BASE_URL: 'https://ingress.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential' }});
+const transport = new StdioClientTransport({command: process.execPath, args: ['--import', new URL('./fixtures/ingress-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))], env: { ...process.env, IMPREZA_BASE_URL: 'https://ingress.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://ingress.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential' }});
 const client = new Client({name: 'ingress-test', version: '1.0.0'});
 const parse = (result) => JSON.parse(result.content[0].text);
 const restrict = {deployment_id: 'dpl_test', base_revision: 3, rules: [{port: 5432, protocol: 'tcp', sources: ['203.0.113.0/24', '2001:db8::/48']}]};

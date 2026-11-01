@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 const raw=Buffer.concat([Buffer.from([0,0,0,11]),Buffer.from('ssh-ed25519'),Buffer.from([0,0,0,32]),Buffer.alloc(32,7)]);
 const key='ssh-ed25519 '+raw.toString('base64'),fp=createHash('sha256').update(raw).digest('hex');let schema;
 for(const gate of ['on','off']){
- const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-identities-fetch.mjs',import.meta.url).href,process.env.IDENTITIES_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IDENTITIES_GATE:gate,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
+ const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-identities-fetch.mjs',import.meta.url).href,process.env.IDENTITIES_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IDENTITIES_GATE:gate,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
  const c=new Client({name:'identity-fixture',version:'1'});
  try{await c.connect(t);const tool=(await c.listTools()).tools.find(t=>t.name==='impreza_prepare_host_plan');assert.ok(tool);const current=JSON.stringify({input:tool.inputSchema,output:tool.outputSchema});if(schema)assert.equal(current,schema);schema=current;
   const call=args=>c.callTool({name:'impreza_prepare_host_plan',arguments:args});let n=0;

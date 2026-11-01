@@ -16,7 +16,7 @@ writeFileSync(log, '');
 const requests = () => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const t = new StdioClientTransport({ command: process.execPath, args: ['--import', new URL('./fixtures/add-server-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))],
   stderr: 'pipe',
-  env: { ...process.env, ADD_SERVER_LOG: log, IMPREZA_BASE_URL: 'https://add-server-fixture.invalid', IMPREZA_API_KEY: 'fixture-only', IMPREZA_API_SECRET: 'fixture-only-not-a-real-credential' } });
+  env: { ...process.env, ADD_SERVER_LOG: log, IMPREZA_BASE_URL: 'https://add-server-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://add-server-fixture.invalid', IMPREZA_API_KEY: 'fixture-only', IMPREZA_API_SECRET: 'fixture-only-not-a-real-credential' } });
 let stderr = '';
 t.stderr?.on('data', (chunk) => { stderr += String(chunk); });
 const c = new Client({ name: 'add-server-proof', version: '1.0.0' });

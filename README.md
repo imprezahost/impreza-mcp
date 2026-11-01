@@ -16,7 +16,7 @@ Generate a one-time code in clientarea under **Impreza API → Connect an AI ass
 
 The CLI exchanges the code at `POST /v1/mcp/pair` without sending any existing API credentials. It saves the returned key, secret, scopes and expiry in `~/.impreza/credentials.json`; the code and secret are never printed. The directory uses mode `0700` and the file `0600` on POSIX. Windows uses a protected ACL granting access only to your account. The server reads this file automatically when neither credential environment variable is set. Explicit `IMPREZA_API_KEY` and `IMPREZA_API_SECRET` take precedence together; partial environment credentials never use a saved counterpart.
 
-Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is required; a v3 onion endpoint requires `IMPREZA_PROXY` with an explicit SOCKS5 proxy and never falls back to a direct connection. The endpoint and proxy are saved with the credential. A different API URL refuses the saved credential. Pairing never follows redirects or retries a code automatically.
+Set `IMPREZA_BASE_URL` before pairing for a different API endpoint. HTTPS is required; a v3 onion endpoint requires `IMPREZA_PROXY` with an explicit SOCKS5 proxy and never falls back to a direct connection. An endpoint other than the official API or a local address also needs `IMPREZA_ORIGIN_AUTHORIZED` set to that exact origin (for example the API's `.onion` origin); without it the pairing code is never sent there. The endpoint and proxy are saved with the credential. A different API URL refuses the saved credential. Pairing never follows redirects or retries a code automatically.
 
 An existing credential file is never overwritten. Revoke an old paired key in clientarea before removing its file and pairing again. If an exchange or disk write fails, the code may already have been consumed: check and revoke the new key in clientarea before generating another code. Restart the AI client after pairing.
 
@@ -716,6 +716,10 @@ encrypts onion connections. Clearnet hosts require `https://`. An onion URL
 also requires an explicit `IMPREZA_PROXY`; the client refuses direct DNS and
 connections even when the onion URL uses HTTPS. Proxy requests refuse redirects,
 use a bounded request deadline and accept response bodies up to 16 MiB.
+
+With the key and secret in the environment, also set `IMPREZA_ORIGIN_AUTHORIZED` to that same origin: a
+credential is only sent to the official API, a local address, or the origin named there, and the server refuses to
+start otherwise. A credential saved by `impreza-mcp login` already carries the origin it was paired with.
 
 One account-side adjustment: Tor exit IPs rotate constantly, so a
 fixed-IP whitelist on the API key cannot work. Set the key's IP factor

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
-const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/agent-pause-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://pause-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-a-real-credential'}});
+const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/agent-pause-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://pause-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://pause-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-a-real-credential'}});
 const c=new Client({name:'agent-pause-proof',version:'1.0.0'});let cases=0,count=0;
 const agent='agt_'+'a'.repeat(16);
 try {

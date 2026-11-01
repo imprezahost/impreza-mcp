@@ -14,7 +14,7 @@ const log = join(dir, 'requests.jsonl');
 const server = process.env.AGENT_DEFAULT_SERVER || fileURLToPath(new URL('../dist/server.js', import.meta.url));
 const transport = new StdioClientTransport({ command: process.execPath,
   args: ['--import', new URL('./fixtures/agent-default-fetch.mjs', import.meta.url).href, server],
-  env: { PATH: process.env.PATH, HOME: dir, IMPREZA_BASE_URL: 'https://agent-default.invalid', IMPREZA_API_KEY: 'test-key',
+  env: { PATH: process.env.PATH, HOME: dir, IMPREZA_BASE_URL: 'https://agent-default.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://agent-default.invalid', IMPREZA_API_KEY: 'test-key',
     IMPREZA_API_SECRET: 'test-secret-not-a-real-credential', AGENT_DEFAULT_LOG: log } });
 const client = new Client({ name: 'agent-default', version: '1.0.0' });
 const requests = () => existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];

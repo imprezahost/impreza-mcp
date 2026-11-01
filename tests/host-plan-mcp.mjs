@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
-const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/host-plan-fetch.mjs',import.meta.url).href,process.env.F46_BASE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
+const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/host-plan-fetch.mjs',import.meta.url).href,process.env.F46_BASE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
 const c=new Client({name:'host-plan-test',version:'1.0.0'});let checks=0;
 const plan='hpl_'+'a'.repeat(32),digest='a'.repeat(64),approval='apr_'+'a'.repeat(32);
 try{

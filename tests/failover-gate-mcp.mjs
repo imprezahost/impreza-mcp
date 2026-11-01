@@ -34,7 +34,7 @@ async function server(mode) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ['--import', new URL('./fixtures/failover-gate-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))],
-    env: {...process.env, FIXTURE_FAILOVER: mode, IMPREZA_BASE_URL: 'https://rollback.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential'},
+    env: {...process.env, FIXTURE_FAILOVER: mode, IMPREZA_BASE_URL: 'https://rollback.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://rollback.invalid', IMPREZA_API_KEY: 'test-key', IMPREZA_API_SECRET: 'test-secret-not-a-real-credential'},
     stderr: 'pipe',
   });
   const client = new Client({name: 'failover-gate-fixture', version: '1'});

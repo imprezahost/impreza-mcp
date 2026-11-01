@@ -12,7 +12,7 @@ const fixture=path.join(root,'engineering/fixtures/privileged-audit/boundary-htt
 const server=spawn(php,['-n','-d','extension_dir='+path.join(path.dirname(php),'ext'),'-d','extension=pdo_sqlite','-d','extension=openssl','-S','127.0.0.1:'+port,fixture],{env:{...process.env,F41_NATIVE:'0'},windowsHide:true,stdio:['ignore','pipe','pipe']});
 let stderr='';server.stderr.on('data',d=>stderr+=d);server.stdout.on('data',()=>{});
 const url='http://127.0.0.1:'+port;
-const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./privileged-audit-boundary-fetch.mjs',import.meta.url).href,process.env.F41_BASE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://audit-boundary.invalid',F41_BOUNDARY_HTTP_URL:url,IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real',IMPREZA_SOCKS_PROXY:''}});
+const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./privileged-audit-boundary-fetch.mjs',import.meta.url).href,process.env.F41_BASE_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://audit-boundary.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://audit-boundary.invalid',F41_BOUNDARY_HTTP_URL:url,IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real',IMPREZA_SOCKS_PROXY:''}});
 const c=new Client({name:'audit-resource-boundary',version:'1.0.0'});
 try{
 let ready=false;for(let i=0;i<50;i++){try{ready=(await fetch(url+'/__health')).ok;if(ready)break;}catch{}await new Promise(r=>setTimeout(r,100));}assert.ok(ready,'isolated API fixture must start');

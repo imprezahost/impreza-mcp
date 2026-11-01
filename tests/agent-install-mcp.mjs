@@ -15,7 +15,7 @@ const log = join(dir, 'requests.jsonl');
 writeFileSync(log, '');
 const requests = () => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const t = new StdioClientTransport({ command: process.execPath, args: ['--import', new URL('./fixtures/agent-install-fetch.mjs', import.meta.url).href, fileURLToPath(new URL('../dist/server.js', import.meta.url))],
-  env: { ...process.env, AGENT_INSTALL_LOG: log, IMPREZA_BASE_URL: 'https://agent-install-fixture.invalid', IMPREZA_API_KEY: 'fixture-only', IMPREZA_API_SECRET: 'fixture-only-not-a-real-credential' } });
+  env: { ...process.env, AGENT_INSTALL_LOG: log, IMPREZA_BASE_URL: 'https://agent-install-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://agent-install-fixture.invalid', IMPREZA_API_KEY: 'fixture-only', IMPREZA_API_SECRET: 'fixture-only-not-a-real-credential' } });
 const c = new Client({ name: 'agent-install-proof', version: '1.0.0' });
 const token = (text) => (text.match(/confirm_token="([^"]+)"/) || [])[1] || '';
 let cases = 0;

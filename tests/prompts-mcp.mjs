@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
-const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/prompts-no-fetch.mjs',import.meta.url).href,process.env.X412_SERVER_ROOT ? fileURLToPath(new URL('file:///'+process.env.X412_SERVER_ROOT.replaceAll('\\','/')+'/dist/server.js')) : fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://prompt-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-a-real-credential'}});
+const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/prompts-no-fetch.mjs',import.meta.url).href,process.env.X412_SERVER_ROOT ? fileURLToPath(new URL('file:///'+process.env.X412_SERVER_ROOT.replaceAll('\\','/')+'/dist/server.js')) : fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://prompt-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://prompt-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-a-real-credential'}});
 const c=new Client({name:'prompts-negative',version:'1.0.0'});
 try {
  await c.connect(t);assert.ok(c.getServerCapabilities().prompts);

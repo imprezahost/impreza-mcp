@@ -5,7 +5,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
 const preload = new URL('./fixtures/no-network.mjs', import.meta.url);
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',preload.href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://order-default.invalid',IMPREZA_API_KEY:randomBytes(24).toString('hex'),IMPREZA_API_SECRET:randomBytes(32).toString('hex')},stderr:'pipe'});
+const transport=new StdioClientTransport({command:process.execPath,args:['--import',preload.href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_BASE_URL:'https://order-default.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://order-default.invalid',IMPREZA_API_KEY:randomBytes(24).toString('hex'),IMPREZA_API_SECRET:randomBytes(32).toString('hex')},stderr:'pipe'});
 let childError='' ; transport.stderr?.on('data', c=>{childError+=c.toString()}); const client=new Client({name:'order-default-metadata',version:'1.0.0'});const checks=[];
 function check(name,pass){checks.push({name,pass:!!pass});}
 try{

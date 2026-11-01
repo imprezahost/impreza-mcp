@@ -1,0 +1,13 @@
+{
+  "name": "impreza-host",
+  "version": "0.1.0",
+  "description": "Read an Impreza Host account from Grok Build. Lists servers, apps, deployments and invoices. Does not order, pay, register or transfer.",
+  "author": {
+    "name": "ImpCom International Ltd",
+    "url": "https://impreza.host/"
+  },
+  "homepage": "https://docs.imprezahost.com/use-with-grok.html",
+  "repository": "https://github.com/imprezahost/impreza-mcp",
+  "license": "MIT",
+  "keywords": ["impreza", "hosting", "vps", "dns"]
+}

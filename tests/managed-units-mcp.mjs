@@ -5,7 +5,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
 let schema;
 for(const gate of ['on','off']){
- const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-units-fetch.mjs',import.meta.url).href,process.env.UNITS_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,UNITS_GATE:gate,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
+ const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/managed-units-fetch.mjs',import.meta.url).href,process.env.UNITS_SERVER||fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,UNITS_GATE:gate,IMPREZA_BASE_URL:'https://host-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://host-fixture.invalid',IMPREZA_API_KEY:'fixture-only',IMPREZA_API_SECRET:'fixture-only-not-real'}});
  const c=new Client({name:'unit-test',version:'1'});
  try{
   await c.connect(t);const tool=(await c.listTools()).tools.find(t=>t.name==='impreza_prepare_host_plan');assert.ok(tool);

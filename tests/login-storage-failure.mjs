@@ -14,7 +14,7 @@ writeFileSync(config,JSON.stringify(data));
 writeFileSync(preload,`import ${JSON.stringify(pathToFileURL(path.join(sdk,'tests/fixtures/pairing-fetch.mjs')).href)};
 import {unlinkSync,existsSync,appendFileSync} from 'node:fs';import path from 'node:path';
 const initial=globalThis.fetch;globalThis.fetch=async(...args)=>{const response=await initial(...args);if(new URL(args[0]).pathname==='/v1/mcp/pair'){const f=path.join(process.env.USERPROFILE,'.impreza/credentials.json');unlinkSync(f);appendFileSync(process.env.R2_STORAGE_EVENTS,JSON.stringify({removed:!existsSync(f)})+'\\n');}return response;};`);
-const env={...process.env,HOME:home,USERPROFILE:home,PAIRING_FIXTURE:config,PAIRING_REQUESTS:requests,R2_STORAGE_EVENTS:events,IMPREZA_BASE_URL:'https://pairing-fixture.invalid'};
+const env={...process.env,HOME:home,USERPROFILE:home,PAIRING_FIXTURE:config,PAIRING_REQUESTS:requests,R2_STORAGE_EVENTS:events,IMPREZA_BASE_URL:'https://pairing-fixture.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://pairing-fixture.invalid'};
 for(const k of ['IMPREZA_API_KEY','IMPREZA_API_SECRET','IMPREZA_PROXY'])delete env[k];
 const child=spawnSync(process.execPath,['--import',pathToFileURL(preload).href,path.join(sdk,'dist/server.js'),'login','--code',data.code],{env,encoding:'utf8',timeout:30000,windowsHide:true});
 assert(!child.error,'CLI child must finish');const text=(child.stdout||'')+(child.stderr||'');

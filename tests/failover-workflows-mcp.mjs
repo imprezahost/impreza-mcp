@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {fileURLToPath} from 'node:url';
-const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-failover',IMPREZA_BASE_URL:'https://rollback.invalid'}});
+const transport=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-failover',IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://rollback.invalid'}});
 const client=new Client({name:'failover-surface-fixture',version:'1'});
 const deployment_id='dpl_'+'a'.repeat(16),target_deployment_id='dpl_'+'b'.repeat(24),cutover_id='fov_'+'b'.repeat(24),review_digest='c'.repeat(64),backup_id='bkp_'+'d'.repeat(16),restore_id='bkp_'+'e'.repeat(16),deploy_command_id='cmd_'+'f'.repeat(16),failback_id='fbk_'+'a'.repeat(24),drill_id='fdr_'+'c'.repeat(24);
 const base=`/v1/platform/deployments/custom/${deployment_id}`;

@@ -201,7 +201,7 @@ try {
   // ── 6. profile unset: existing clients unchanged (full catalogue, no DEV refusal) ─────────────────────
   const plain = await (async () => {
     const transport = new StdioClientTransport({ command: process.execPath, args: ['--import', FIXTURE, SERVER],
-      env: environment({ IMPREZA_BASE_URL: 'https://dev.example.test', IMPREZA_API_KEY: BASE.IMPREZA_API_KEY, IMPREZA_API_SECRET: BASE.IMPREZA_API_SECRET }) });
+      env: environment({ IMPREZA_BASE_URL: 'https://dev.example.test', IMPREZA_ORIGIN_AUTHORIZED: 'https://dev.example.test', IMPREZA_API_KEY: BASE.IMPREZA_API_KEY, IMPREZA_API_SECRET: BASE.IMPREZA_API_SECRET }) });
     const c = new Client({ name: 'dev-profile-default-test', version: '1.0.0' });
     await c.connect(transport);
     try {

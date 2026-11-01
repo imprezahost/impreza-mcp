@@ -6,7 +6,7 @@ const deployment_id='dpl_'+'a'.repeat(16),challenge_id='fdc_'+'b'.repeat(24),bas
 const cases=[['impreza_challenge_failover_domain',{deployment_id},'POST',base+'/challenge',{},false],['impreza_verify_failover_domain',{deployment_id,challenge_id},'POST',base+'/verify',{challenge_id},false],['impreza_get_failover_domain',{deployment_id},'GET',base,null,true]];
 let checks=0;
 for(const gate of ['0','1']){
- const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-customer-domain',IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_CUSTOMER_DOMAIN_FAILOVER:gate}});
+ const t=new StdioClientTransport({command:process.execPath,args:['--import',new URL('./fixtures/cycle-workflows-fetch.mjs',import.meta.url).href,fileURLToPath(new URL('../dist/server.js',import.meta.url))],env:{...process.env,IMPREZA_API_KEY:'fixture-key',IMPREZA_API_SECRET:'fixture-secret-for-customer-domain',IMPREZA_BASE_URL:'https://rollback.invalid',IMPREZA_ORIGIN_AUTHORIZED:'https://rollback.invalid',IMPREZA_CUSTOMER_DOMAIN_FAILOVER:gate}});
  const c=new Client({name:'customer-domain-fixture',version:'1'});
  try{await c.connect(t);const tools=(await c.listTools()).tools;
  for(const[name,args,method,path,body,readOnly]of cases){
