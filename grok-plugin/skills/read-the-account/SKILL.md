@@ -1,5 +1,5 @@
 ---
-name: ler-a-conta
+name: read-the-account
 description: Read what an Impreza Host account already has. Use when someone asks which servers, apps or deployments exist. Do not order, pay, register or transfer.
 ---
 
